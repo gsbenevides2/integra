@@ -83,7 +83,7 @@ export function transformHeadersToObjc(headers: Response["headers"]) {
     );
 }
 
-export async function instumentableFetch(
+export async function instrumentableFetch(
     traceId: string,
     input: string | URL | Request,
     init?: BunFetchRequestInit,
@@ -143,5 +143,5 @@ export async function instumentableFetch(
 
 export function getInstrumentableFetchLink(traceId: string): FetchLike {
     return (input: string | URL | Request, init?: BunFetchRequestInit) =>
-        instumentableFetch(traceId, input, init);
+        instrumentableFetch(traceId, input, init);
 }

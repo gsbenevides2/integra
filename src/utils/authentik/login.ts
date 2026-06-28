@@ -1,6 +1,6 @@
 import * as jose from "jose";
 import safeEnvGet from "utils/safeEnvGet";
-import { addTracerEvent, instumentableFetch } from "instrumentation";
+import { addTracerEvent, instrumentableFetch } from "instrumentation";
 
 interface ServiceAccount {
     client_id: string;
@@ -66,7 +66,7 @@ export async function loginInAuthentik(serviceAccount: ServiceAccount, traceId: 
     const base64 = btoa(`${username}:${password}`);
     urlencoded.append("client_secret", base64);
 
-    const response = await instumentableFetch(
+    const response = await instrumentableFetch(
         traceId,
         "https://authentikserver.selfhost.gui.dev.br/application/o/token/",
         {
