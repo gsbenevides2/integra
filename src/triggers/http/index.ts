@@ -12,6 +12,7 @@ global.elysiaClient = TypedElysia()
     .use(openapi())
     .onBeforeHandle(
         async ({ triggerId, traceId, body, cookie, headers, params, path, query, route }) => {
+            if (!traceId) return;
             await startTracer({
                 inputData: { body, cookie, headers, params, path, query, route },
                 traceId,
@@ -34,6 +35,7 @@ global.elysiaClient = TypedElysia()
             query,
             route,
         }) => {
+            if (!traceId) return;
             const status = set.status;
             let statusNumber = 0;
 
