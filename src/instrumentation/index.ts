@@ -69,7 +69,7 @@ export async function createTracerIfNotExtistsAndAppendEvent(
     });
 }
 
-function transformHeadersToObjc(headers: Response["headers"]) {
+export function transformHeadersToObjc(headers: Response["headers"]) {
     return Array.from(headers.keys()).reduce(
         (obj, key) => ({
             ...obj,

@@ -1,13 +1,14 @@
-import onHttp from "triggers/http";
+import onHttp, { getTraceId } from "triggers/http";
 import { loginFailedBody } from "./types";
 import { generateMessage } from "./utils";
 import sendDiscordMessage from "utils/discord/sendMessage";
-import { TypedElysia } from "triggers/http/types";
 import { addTracerEvent } from "instrumentation";
+import Elysia from "elysia";
 
-const elysiaClient = TypedElysia().post(
+const elysiaClient = new Elysia().post(
     "/authentik-login-failed",
-    async ({ body, traceId }) => {
+    async ({ body, set }) => {
+        const traceId = getTraceId(set.headers);
         const message = generateMessage(body.body, body.event_user_email, body.event_user_username);
         await addTracerEvent({
             eventData: { message },
