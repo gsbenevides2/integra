@@ -1,3 +1,4 @@
+import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport";
 import { runModel } from "./mongo";
 import type { CreateEventData, EndTracerParams, StartTracerParams } from "./types";
 
@@ -88,6 +89,11 @@ export async function instumentableFetch(
     init?: BunFetchRequestInit,
 ): Promise<Response> {
     const start = new Date();
+    const body = typeof input === "object" && "body" in input ? input.body : init?.body;
+    let processedBody = body;
+    if (body && typeof body === "object" && "toString" in body) {
+        processedBody = body.toString();
+    }
     const response = await fetch(input, init);
     const end = new Date();
     const copyResponse = response.clone();
@@ -116,6 +122,9 @@ export async function instumentableFetch(
             end,
             input: finalInput,
             init: finalInit,
+            request: {
+                processedBody,
+            },
             response: {
                 status: copyResponse.status,
                 headers: transformHeadersToObjc(
@@ -130,4 +139,9 @@ export async function instumentableFetch(
     });
 
     return response;
+}
+
+export function getInstrumentableFetchLink(traceId: string): FetchLike {
+    return (input: string | URL | Request, init?: BunFetchRequestInit) =>
+        instumentableFetch(traceId, input, init);
 }

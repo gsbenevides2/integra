@@ -25,7 +25,7 @@ export default function onCron(settings: CronSettings, func: CronCall): CronTrig
                     workflowType: "cron",
                 });
                 try {
-                    func(this, traceId);
+                    await func(this, traceId);
                 } catch (error: unknown) {
                     await addTracerEvent({
                         traceId,
@@ -42,6 +42,50 @@ export default function onCron(settings: CronSettings, func: CronCall): CronTrig
                     });
                 }
             });
+        },
+        test: async () => {
+            const cronJob: Bun.CronJob = {
+                cron: settings.cron,
+                ref: function () {
+                    return this;
+                },
+                stop: function () {
+                    return this;
+                },
+                unref: function () {
+                    return this;
+                },
+                [Symbol.dispose]() {
+                    //this.disposed = true;
+                },
+            };
+            let status: TracerStatus = "SUCCESS";
+            const traceId = crypto.randomUUID();
+            await startTracer({
+                inputData: {
+                    cron: settings.cron,
+                },
+                traceId,
+                triggerId: settings.id,
+                workflowType: "cron",
+            });
+            try {
+                await func(cronJob, traceId);
+            } catch (error: unknown) {
+                await addTracerEvent({
+                    traceId,
+                    eventData: error as object,
+                    eventName: "Cron on Error",
+                    eventType: "ERROR",
+                });
+                status = "ERROR";
+            } finally {
+                await endTracer({
+                    outputData: {},
+                    status,
+                    traceId,
+                });
+            }
         },
     };
 }

@@ -12,6 +12,7 @@ export interface TriggerSettings {
 export interface Trigger {
     id: string;
     register: () => Promise<void>;
+    test?: () => Promise<void>;
 }
 
 export interface RegisterConfig {
@@ -21,6 +22,8 @@ export interface RegisterConfig {
 export interface CliSettings {
     onlyRun: string[];
     debug: boolean;
+    test: string;
+    stopBeforeTest: boolean;
 }
 
 function argv0Reader(): CliSettings {
@@ -28,6 +31,8 @@ function argv0Reader(): CliSettings {
     const defaultSettings: CliSettings = {
         onlyRun: [],
         debug: false,
+        test: "",
+        stopBeforeTest: false,
     };
 
     for (const parameter of paramters) {
@@ -37,6 +42,12 @@ function argv0Reader(): CliSettings {
         }
         if (key === "debug") {
             defaultSettings.debug = true;
+        }
+        if (key === "test") {
+            defaultSettings.test = val ?? "";
+        }
+        if (key === "stopBeforeTest") {
+            defaultSettings.stopBeforeTest = true;
         }
     }
 
@@ -48,6 +59,7 @@ export default async function registerTriggers(config: RegisterConfig) {
     if (settings.debug === false) {
         console.debug = () => {};
     }
+
     console.log("Registrando Triggers");
 
     for (const trigger of config.triggers) {
@@ -62,6 +74,20 @@ export default async function registerTriggers(config: RegisterConfig) {
     startRedisClients();
     startEmailClients();
     startPostgresClients();
+
+    if (settings.test) {
+        const findedTrigger = config.triggers.find((trigger) => trigger.id === settings.test);
+        if (!findedTrigger) {
+            throw new Error("Trigger not found to test");
+        } else if ("test" in findedTrigger && findedTrigger.test) {
+            await findedTrigger.test();
+            if (settings.stopBeforeTest) {
+                process.exit(0);
+            }
+        } else {
+            throw new Error("Trigger not has method test");
+        }
+    }
 
     console.log("Triggers registrados. Integra em Operação");
 }

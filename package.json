@@ -37,9 +37,11 @@
     },
     "dependencies": {
         "@elysia/openapi": "^1.4.15",
+        "@modelcontextprotocol/sdk": "^1.29.0",
         "bson": "7.2.0",
         "elysia": "^1.4.29",
         "imap": "^0.8.19",
+        "jose": "^6.2.3",
         "mailparser": "^3.9.12",
         "mongoose": "^9.7.3",
         "mqtt": "^5.15.1",
