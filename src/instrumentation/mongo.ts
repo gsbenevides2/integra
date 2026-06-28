@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import safeEnvGet from "utils/safeEnvGet";
 
 export const client = await mongoose.connect(safeEnvGet("MONGO_LOGS"), {
-    dbName: "integra",
+    dbName: safeEnvGet("MONGO_DB_NAME"),
 });
 
 export const eventSchema = new client.Schema({
