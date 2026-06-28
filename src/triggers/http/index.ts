@@ -33,8 +33,19 @@ function createGlobalElysia() {
                 const traceId = getTraceId(set.headers);
                 const method = request.method;
                 const triggerId = getTriggerId(method, route ?? path);
+                const fullUrl = request.url;
                 await startTracer({
-                    inputData: { body, cookie, headers, params, path, query, route, method },
+                    inputData: {
+                        body,
+                        cookie,
+                        headers,
+                        params,
+                        path,
+                        query,
+                        route,
+                        method,
+                        fullUrl,
+                    },
                     traceId,
                     triggerId,
                     workflowType: "http",
@@ -57,6 +68,7 @@ function createGlobalElysia() {
                 const method = request.method;
                 const triggerId = getTriggerId(method, route ?? path);
                 const traceId = getTraceId(set.headers);
+                const fullUrl = request.url;
                 const status = set.status;
                 let statusNumber = 0;
 
@@ -78,7 +90,17 @@ function createGlobalElysia() {
                         },
                     },
                     {
-                        inputData: { body, cookie, headers, params, path, query, route, method },
+                        inputData: {
+                            body,
+                            cookie,
+                            headers,
+                            params,
+                            path,
+                            query,
+                            route,
+                            method,
+                            fullUrl,
+                        },
                         traceId,
                         triggerId,
                         workflowType: "http",
@@ -91,9 +113,20 @@ function createGlobalElysia() {
                 const method = request.method;
                 const triggerId = getTriggerId(method, route ?? path);
                 const traceId = getTraceId(set.headers);
+                const fullUrl = request.url;
                 await createTracerIfNotExtistsAndAppendEvent(
                     {
-                        inputData: { body, cookie, headers, params, path, query, route, method },
+                        inputData: {
+                            body,
+                            cookie,
+                            headers,
+                            params,
+                            path,
+                            query,
+                            route,
+                            method,
+                            fullUrl,
+                        },
                         traceId,
                         triggerId,
                         workflowType: "http",
