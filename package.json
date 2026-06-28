@@ -1,8 +1,19 @@
 {
     "name": "integra",
+    "description": "Event-driven daemon connecting external services (HTTP, MQTT, Home Assistant, Redis, PostgreSQL, Email/IMAP, Cron) to user scripts. Every execution is auto-traced to MongoDB.",
     "module": "index.ts",
     "type": "module",
     "private": true,
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/gsbenevides2/integra.git"
+    },
+    "author": {
+        "email": "git@gui.dev.br",
+        "name": "Guilherme da Silva Benevides",
+        "url": "https://www.gui.dev.br"
+    },
+    "license": "MIT",
     "scripts": {
         "start": "bun run src/index.ts",
         "dev": "bun run --watch src/index.ts",

@@ -1,47 +1,62 @@
 # Integra — AGENTS.md
 
-## Bun Defaults
+Event-driven daemon connecting external services (HTTP, MQTT, Home Assistant, Redis,
+PostgreSQL, Email/IMAP, Cron) to user scripts. Every execution is auto-traced to MongoDB.
 
-- Use `bun <file>` instead of `node <file>` or `ts-node <file>`
-- Use `bun test` instead of `jest` or `vitest`
-- Use `bun build` instead of `webpack` or `esbuild`
-- Use `bun install` instead of `npm install` or `yarn install` or `pnpm install`
-- Use `bun run <script>` instead of `npm run <script>` or `yarn run <script>`
-- Use `bunx <package> <command>` instead of `npx <package> <command>`
-- Bun automatically loads `.env`, so don't use dotenv.
+## Commands
 
-## APIs
+| Command | Action |
+|---------|--------|
+| `bun run dev` | Start with `--watch` (HMR) |
+| `bun run start` | Start production |
+| `bun run lint` | ESLint (tseslint + prettier) |
+| `bun run format` | Prettier check (`--check`) |
+| `bun run format:fix` | Prettier write |
 
-- `Bun.serve()` supports WebSockets, HTTPS, and routes. Don't use `express`.
-- `Bun.redis` for Redis. Don't use `ioredis`.
-- `Bun.sql` for Postgres. Don't use `pg` or `postgres.js`.
-- `WebSocket` is built-in. Don't use `ws`.
-- Prefer `Bun.file` over `node:fs`'s readFile/writeFile
-- `Bun.$` instead of execa.
+No tests exist yet. No typecheck script (tsc is `noEmit`, errors surface via IDE/ESLint).
 
-## Testing
+## CLI flags (runtime)
 
-Use `bun test` to run tests.
+`bun run src/index.ts --only-run=<triggerId> --debug`
 
-```ts
-import { test, expect } from "bun:test";
-test("hello world", () => { expect(1).toBe(1); });
+- `--only-run` repeatable — skips triggers whose `id` does not match
+- `--debug` — enables `console.debug` (suppressed by default)
+
+## Architecture
+
+**Entrypoint**: `src/index.ts` → `registerTriggers()` in `src/triggers/index.ts`
+
+This is a daemon, not a library. It registers zero or more triggers, then starts
+all six service clients unconditionally (each is a no-op if no subscriptions exist):
+
+```
+HTTP (Elysia) | MQTT | Home Assistant WS | Redis Pub/Sub | Postgres polling | Email IMAP
 ```
 
-## Elysia Skills
+Triggers live in `src/scripts/<service>/<name>/`. Each exports a `Trigger` object
+(`{ id, register() }`) created via one of the factory functions in `src/triggers/`.
 
-This project uses the [Elysia skills](https://github.com/elysiajs/elysia-skills) for AI-assisted development.
+## Conventions
 
-- Use `bunx skills add elysiajs/skills` to install
-- Use `bunx skills` to list available skills
+- **Imports**: bare specifiers from `src/` (tsconfig `baseUrl: "src"`)
+  - e.g. `import onHttp from "triggers/http"` not `../triggers/http`
+- **HTTP triggers**: must use `TypedElysia()` from `triggers/http/types`, not raw `new Elysia()`.
+  The typed variant adds `traceId` (UUID) and `triggerId` decorators.
+- **Validation**: Zod (v4) for request bodies (`package.json`: `"zod": "^4.4.3"`)
+- **Formatting**: tabWidth 4, singleQuote false, trailingComma all, printWidth 100
+- **ESLint**: unused vars error (prefix with `_`); empty object type allowed with single extends
+- **No `console.log` for data**: use `addTracerEvent()` for structured logging to MongoDB
+- **Commits**: GPG-signed (key `1D4BCCE25E8EFD85`, user `git@gui.dev.br`)
 
-## Project-specific
+## Gotchas
 
-- **Lint**: `bun run lint`
-- **Format**: `bun run format`
-- **Start**: `bun run start`
-- **Dev**: `bun run dev`
-- Scripts go in `src/scripts/<service>/<name>/`
-- Triggers are defined in `src/triggers/`
-- Instrumentation is automatic — every execution is traced to MongoDB
-- Import from `src/` using bare specifiers (tsconfig `baseUrl: "src"`)
+- `.env` is gitignored; `safeEnvGet()` throws at module import if a variable is missing.
+  Every trigger module will fail fast if its required env var is absent.
+- MongoDB (`MONGO_LOGS`) is required at startup — the instrumentation layer connects
+  eagerly on import in `src/instrumentation/mongo.ts`.
+- `instumentableFetch(traceId, ...)` wraps `fetch()` to log request/response as a trace
+  event. Use it instead of raw `fetch()` inside trigger callbacks.
+
+## Skills
+
+ElysiaJS skill installed at `.agents/skills/elysiajs/`. Run `bunx skills` to list.
