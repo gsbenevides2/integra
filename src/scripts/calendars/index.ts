@@ -11,7 +11,7 @@ import { schedulleRequests } from "./schedulleRequests";
 
 export const schedullerCalendarMessages = onCron(
     {
-        cron: "@annually",
+        cron: "*/10 * * * *",
         id: "calendars:scheduleMessage",
     },
     async (_, traceId) => {
