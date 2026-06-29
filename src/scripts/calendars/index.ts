@@ -1,13 +1,14 @@
 import onCron from "triggers/cron";
-import { loginInAuthentik } from "utils/authentik/login";
-import { listCalendarsRequest } from "./listCalendarsRequest";
-import { listSchedullersRequest } from "./listSchedullersRequest";
+
+import { listSchedullersRequest } from "utils/httpScheduller/listSchedullersRequest";
 import { makeDatesAndFilterCalendars } from "./makeDatesAndFilterCalendars";
-import { deleteManySchedullerRequests } from "./deleteManySchedullerRequests";
-import { listEventsFromCalendar } from "./listEventsFromCalendar";
+import { deleteManySchedullerRequests } from "utils/httpScheduller/deleteManySchedullerRequests";
+
 import type { CalendarEvents } from "./types";
 import { prepareMessageAndSchedule } from "./prepareMessageAndSchedule";
-import { schedulleRequests } from "./schedulleRequests";
+import { schedulleRequests } from "utils/httpScheduller/schedulleRequests";
+import { listCalendarsRequest } from "utils/google/listCalendarsRequest";
+import { listEventsFromCalendar } from "utils/google/listEventsFromCalendar";
 
 export const schedullerCalendarMessages = onCron(
     {
@@ -15,21 +16,15 @@ export const schedullerCalendarMessages = onCron(
         id: "calendars:scheduleMessage",
     },
     async (_, traceId) => {
-        const { access_token } = await loginInAuthentik(
-            {
-                client_id: "BosazxWMVtAeXMfI7Hm5lPt3Crr5FFFWXdCdQtan",
-            },
-            traceId,
-        );
         const [calendars, schedullers] = await Promise.all([
             listCalendarsRequest(traceId),
-            listSchedullersRequest(access_token, traceId),
+            listSchedullersRequest(traceId),
         ]);
 
         const { startDate, endDate, nonDuplicatedCalendars, schedullersIdsToDelete } =
             await makeDatesAndFilterCalendars(calendars, schedullers);
         if (schedullersIdsToDelete.length)
-            await deleteManySchedullerRequests(schedullersIdsToDelete, access_token, traceId);
+            await deleteManySchedullerRequests(schedullersIdsToDelete, traceId);
         const events = await Promise.all(
             nonDuplicatedCalendars.map<Promise<CalendarEvents>>(async (calendar) => ({
                 events: await listEventsFromCalendar(calendar, startDate, endDate, traceId),
@@ -38,7 +33,6 @@ export const schedullerCalendarMessages = onCron(
         );
 
         const requestsToSchedule = await prepareMessageAndSchedule(events);
-        if (requestsToSchedule.length)
-            await schedulleRequests(requestsToSchedule, access_token, traceId);
+        if (requestsToSchedule.length) await schedulleRequests(requestsToSchedule, traceId);
     },
 );

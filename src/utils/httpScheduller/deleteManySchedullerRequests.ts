@@ -1,10 +1,8 @@
 import { instrumentableFetch } from "instrumentation";
+import { getHttpSchedullerAccessToken } from "./common";
 
-export async function deleteManySchedullerRequests(
-    ids: string[],
-    accessToken: string,
-    traceId: string,
-) {
+export async function deleteManySchedullerRequests(ids: string[], traceId: string) {
+    const accessToken = await getHttpSchedullerAccessToken(traceId);
     const url = "https://http-scheduller.local.gui.dev.br/api/http-scheduller";
     const headers = {
         Authorization: "Bearer " + accessToken,

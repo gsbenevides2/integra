@@ -1,11 +1,9 @@
 import { instrumentableFetch } from "instrumentation";
 import type { SchedulledRequest } from "./types";
+import { getHttpSchedullerAccessToken } from "./common";
 
-export async function schedulleRequests(
-    schedulledRequests: SchedulledRequest[],
-    accessToken: string,
-    traceId: string,
-) {
+export async function schedulleRequests(schedulledRequests: SchedulledRequest[], traceId: string) {
+    const accessToken = await getHttpSchedullerAccessToken(traceId);
     const url = "https://http-scheduller.local.gui.dev.br/api/http-scheduller";
     const headers = {
         Authorization: "Bearer " + accessToken,

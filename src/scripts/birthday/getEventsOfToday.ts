@@ -1,6 +1,6 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { getInstrumentableFetchLink } from "instrumentation";
+import { getInstrumentableFetchClient } from "instrumentation";
 import { loginInAuthentik } from "utils/authentik/login";
 
 export default async function getEventsOfToday(traceId: string) {
@@ -21,7 +21,7 @@ export default async function getEventsOfToday(traceId: string) {
         requestInit: {
             headers,
         },
-        fetch: getInstrumentableFetchLink(traceId),
+        fetch: getInstrumentableFetchClient(traceId),
     });
     await client.connect(transport);
     const result = await client.callTool({

@@ -1,15 +1,13 @@
 import * as jose from "jose";
 import safeEnvGet from "utils/safeEnvGet";
 import { addTracerEvent, instrumentableFetch } from "instrumentation";
+import { CacheClient } from "utils/cacheClient";
 
 interface ServiceAccount {
     client_id: string;
 }
 const username = safeEnvGet("AUTHENTIK_USERNAME");
 const password = safeEnvGet("AUTHENTIK_PASSWORD");
-
-const cacheClient = new Bun.RedisClient(safeEnvGet("REDIS_CACHE_URL"));
-await cacheClient.connect();
 
 async function getAndValidFromCache(clientId: string): Promise<string | null> {
     function getExpirationFromJWT(token: string): number | null {
@@ -34,14 +32,14 @@ async function getAndValidFromCache(clientId: string): Promise<string | null> {
         return exp < currentTime + bufferSeconds;
     }
 
-    const value = await cacheClient.get(`authentik-login:${clientId}`);
+    const value = await CacheClient.get(`authentik-login:${clientId}`);
     if (!value) return null;
     if (isJWTExpired(value)) return null;
     return value;
 }
 
 async function setCache(clientId: string, token: string) {
-    await cacheClient.set(`authentik-login:${clientId}`, token);
+    await CacheClient.set(`authentik-login:${clientId}`, token);
 }
 
 export async function loginInAuthentik(serviceAccount: ServiceAccount, traceId: string) {

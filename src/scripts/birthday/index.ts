@@ -5,7 +5,7 @@ import sendDiscordMessage from "utils/discord/sendMessage";
 const sendBirthDayDiscordMessage = onCron(
     {
         id: "birthday:sendDiscordMessage",
-        cron: "0 9 * * *",
+        cron: "0 12 * * *",
     },
     async (_, traceId) => {
         const birthdays = await getEventsOfToday(traceId);

@@ -1,6 +1,7 @@
 import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport";
 import { runModel } from "./mongo";
 import type { CreateEventData, EndTracerParams, StartTracerParams } from "./types";
+import { type ClientOptions } from "openai";
 
 export async function startTracer(params: StartTracerParams) {
     await runModel.create({
@@ -141,7 +142,14 @@ export async function instrumentableFetch(
     return response;
 }
 
-export function getInstrumentableFetchLink(traceId: string): FetchLike {
+export function getInstrumentableFetchClient(traceId: string): FetchLike {
+    return (input: string | URL | Request, init?: BunFetchRequestInit) =>
+        instrumentableFetch(traceId, input, init);
+}
+
+type OpenAiFetch = Exclude<ClientOptions["fetch"], undefined>;
+
+export function getOpenAIInstrumentableFetchClient(traceId: string): OpenAiFetch {
     return (input: string | URL | Request, init?: BunFetchRequestInit) =>
         instrumentableFetch(traceId, input, init);
 }
