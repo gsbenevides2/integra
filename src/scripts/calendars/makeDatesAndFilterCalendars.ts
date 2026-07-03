@@ -1,5 +1,7 @@
 import { endOfToday, startOfToday } from "date-fns";
-import type { Calendar, MakedDates, SchedulledRequest } from "./types";
+import type { MakedDates } from "./types";
+import type { Calendar } from "utils/google/types";
+import type { SchedulledRequest } from "utils/httpScheduller/types";
 
 export async function makeDatesAndFilterCalendars(
     calendars: Calendar[],

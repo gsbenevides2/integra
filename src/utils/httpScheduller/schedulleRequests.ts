@@ -15,5 +15,5 @@ export async function schedulleRequests(schedulledRequests: SchedulledRequest[],
         body: JSON.stringify(schedulledRequests),
     });
     if (!response.ok) throw new Error(`Failed to schedulle requests: ${response.statusText}`);
-    return await response.json();
+    return;
 }

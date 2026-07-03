@@ -1,7 +1,8 @@
 import { parseISO, differenceInMilliseconds, subMinutes } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
-import type { CalendarEvents, EventWithCalendar, SchedulledRequest } from "./types";
+import type { CalendarEvents, EventWithCalendar } from "./types";
 import { DISCORD_CHANNEL_ID, DISCORD_PUBLIC_KEY } from "utils/discord/sendMessage";
+import type { SchedulledRequest } from "utils/httpScheduller/types";
 
 export function prepareMessageAndSchedule(events: CalendarEvents[]): SchedulledRequest[] {
     function formatEventMessage(data: EventWithCalendar) {

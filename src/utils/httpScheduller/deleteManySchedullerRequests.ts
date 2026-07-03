@@ -17,5 +17,5 @@ export async function deleteManySchedullerRequests(ids: string[], traceId: strin
         throw new Error(
             `Failed to delete schedullers: ${response.status} ${response.statusText}  ${await response.text()}`,
         );
-    return await response.json();
+    return;
 }
