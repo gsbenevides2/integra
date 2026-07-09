@@ -1,6 +1,6 @@
 import { instrumentableFetch } from "instrumentation";
 import type { EmailResponse } from "./types";
-import { getGoogleAccessToken } from "./common";
+import { buildGoogleServiceUrl, getGoogleAccessToken } from "./common";
 
 export async function getEmail(
     email: string,
@@ -8,7 +8,7 @@ export async function getEmail(
     traceId: string,
 ): Promise<EmailResponse> {
     const accessToken = await getGoogleAccessToken(traceId);
-    const url = new URL("https://google.local.gui.dev.br/api/google-gmail/get-email-by-id");
+    const url = buildGoogleServiceUrl("/api/google-gmail/get-email-by-id");
     const headers = {
         Authorization: "Bearer " + accessToken,
     };

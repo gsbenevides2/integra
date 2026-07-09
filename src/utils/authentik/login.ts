@@ -64,16 +64,13 @@ export async function loginInAuthentik(serviceAccount: ServiceAccount, traceId: 
     const base64 = btoa(`${username}:${password}`);
     urlencoded.append("client_secret", base64);
 
-    const response = await instrumentableFetch(
-        traceId,
-        "https://authentikserver.selfhost.gui.dev.br/application/o/token/",
-        {
-            method: "POST",
-            headers: myHeaders,
-            body: urlencoded,
-            redirect: "follow",
-        },
-    );
+    const tokenUrl = new URL("/application/o/token/", authentikBaseUrl).toString();
+    const response = await instrumentableFetch(traceId, tokenUrl, {
+        method: "POST",
+        headers: myHeaders,
+        body: urlencoded,
+        redirect: "follow",
+    });
     if (!response.ok) throw new Error(`Failed to get token: ${response.statusText}`);
     const json = (await response.json()) as { access_token: string };
     await setCache(serviceAccount.client_id, json.access_token);

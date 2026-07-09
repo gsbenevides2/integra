@@ -25,6 +25,20 @@ bun run start
 bun run start --only-run=authentik:loginFailed --debug
 ```
 
+## Environment Variables
+
+Configure the following variables in `.env.local` to enable Authentik login and the downstream services:
+
+- `AUTHENTIK_URL`
+- `AUTHENTIK_USERNAME`
+- `AUTHENTIK_PASSWORD`
+- `GOOGLE_SERVICE_ENDPOINT`
+- `GOOGLE_SERVICE_CLIENT_ID`
+- `HTTP_SCHEDULLER_SERVICE_ENDPOINT`
+- `HTTP_SCHEDULLER_CLIENT_ID`
+- `BIRTHDAY_SERVICE_ENDPOINT`
+- `BIRTHDAY_SERVICE_CLIENT_ID`
+
 ## Code Quality
 
 ```bash

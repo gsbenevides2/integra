@@ -1,6 +1,6 @@
 import { instrumentableFetch } from "instrumentation";
 import type { Calendar, Event } from "./types";
-import { getGoogleAccessToken } from "./common";
+import { buildGoogleServiceUrl, getGoogleAccessToken } from "./common";
 
 export async function listEventsFromCalendar(
     calendar: Calendar,
@@ -9,7 +9,7 @@ export async function listEventsFromCalendar(
     traceId: string,
 ): Promise<Event[]> {
     const accessToken = await getGoogleAccessToken(traceId);
-    const url = new URL(`https://google.local.gui.dev.br/api/google-calendar/list-events`);
+    const url = buildGoogleServiceUrl(`/api/google-calendar/list-events`);
     url.searchParams.append("email", calendar.email);
     url.searchParams.append("calendarId", calendar.calendarId);
     url.searchParams.append("timeMin", startDate);

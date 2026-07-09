@@ -1,9 +1,17 @@
 import { loginInAuthentik } from "utils/authentik/login";
+import safeEnvGet from "utils/safeEnvGet";
+
+const httpSchedullerClientId = safeEnvGet("HTTP_SCHEDULLER_CLIENT_ID");
+const httpSchedullerServiceEndpoint = safeEnvGet("HTTP_SCHEDULLER_SERVICE_ENDPOINT");
+
+export function buildHttpSchedullerUrl(pathname: string = "/api/http-scheduller") {
+    return new URL(pathname, httpSchedullerServiceEndpoint);
+}
 
 export async function getHttpSchedullerAccessToken(traceId: string) {
     const { access_token } = await loginInAuthentik(
         {
-            client_id: "BosazxWMVtAeXMfI7Hm5lPt3Crr5FFFWXdCdQtan",
+            client_id: httpSchedullerClientId,
         },
         traceId,
     );
