@@ -31,7 +31,6 @@ function createGlobalElysia() {
         })
         .use(openapi())
         .get("/favicon.ico", () => Bun.file(`${ICON_PATH}/favicon.ico`))
-        .get("/favicon.svg", () => Bun.file(`${ICON_PATH}/favicon.svg`))
         .get("/favicon-32x32.png", () =>
             Bun.file(`${ICON_PATH}/favicon-32x32.png`),
         )
