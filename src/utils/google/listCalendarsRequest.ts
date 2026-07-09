@@ -1,10 +1,10 @@
 import { instrumentableFetch } from "instrumentation";
 import type { Calendar } from "./types";
-import { getGoogleAccessToken } from "./common";
+import { buildGoogleServiceUrl, getGoogleAccessToken } from "./common";
 
 export async function listCalendarsRequest(traceId: string): Promise<Calendar[]> {
     const accessToken = await getGoogleAccessToken(traceId);
-    const url = "https://google.local.gui.dev.br/api/google-calendar/list-calendars";
+    const url = buildGoogleServiceUrl("/api/google-calendar/list-calendars").toString();
     const headers = {
         Authorization: "Bearer " + accessToken,
     };

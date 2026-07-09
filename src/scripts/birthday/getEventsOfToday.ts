@@ -2,11 +2,15 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { getInstrumentableFetchClient } from "instrumentation";
 import { loginInAuthentik } from "utils/authentik/login";
+import safeEnvGet from "utils/safeEnvGet";
+
+const birthdayServiceClientId = safeEnvGet("BIRTHDAY_SERVICE_CLIENT_ID");
+const birthdayServiceEndpoint = safeEnvGet("BIRTHDAY_SERVICE_ENDPOINT");
 
 export default async function getEventsOfToday(traceId: string) {
     const { access_token } = await loginInAuthentik(
         {
-            client_id: "xhbRL9JJoECA9lvZV7JmmQdWQVUQ1ATY1KMX3DkR",
+            client_id: birthdayServiceClientId,
         },
         traceId,
     );
@@ -15,7 +19,7 @@ export default async function getEventsOfToday(traceId: string) {
         version: "1.0.0",
     });
     const headers = new Headers();
-    const url = new URL("https://birthday.local.gui.dev.br/mcp");
+    const url = new URL("/mcp", birthdayServiceEndpoint);
     headers.set("Authorization", "Bearer " + access_token);
     const transport = new StreamableHTTPClientTransport(url, {
         requestInit: {
