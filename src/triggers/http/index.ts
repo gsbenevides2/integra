@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import openapi from "@elysia/openapi";
 import {
     REQUEST_ID_HEADER,
@@ -14,7 +16,18 @@ declare global {
     var elysiaRoutesMemory: ElysiaRouteMemory | undefined;
 }
 
-const ICON_PATH = "assets/icons" as const;
+function resolveIconPath(): string {
+    const candidates = [
+        join(import.meta.dir, "../assets/icons"),
+        join(process.cwd(), "assets/icons"),
+    ];
+    for (const p of candidates) {
+        if (existsSync(p)) return p;
+    }
+    return candidates[0];
+}
+
+const ICON_PATH = resolveIconPath();
 
 export function getTraceId(headers: HTTPHeaders) {
     return String(headers[REQUEST_ID_HEADER]) ?? crypto.randomUUID();

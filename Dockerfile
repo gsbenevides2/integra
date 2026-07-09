@@ -9,5 +9,6 @@ FROM oven/bun:1-slim
 WORKDIR /app
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/assets ./assets
 USER bun
 CMD ["bun", "run", "dist/index.js"]
