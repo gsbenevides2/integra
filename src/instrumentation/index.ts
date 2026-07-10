@@ -34,6 +34,7 @@ export async function endTracer(params: EndTracerParams, createTracer?: StartTra
 }
 
 export async function addTracerEvent(params: CreateEventData) {
+    console.debug("Adding tracer event", params);
     await runModel.updateOne(
         {
             traceId: params.traceId,

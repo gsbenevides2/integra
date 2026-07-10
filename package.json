@@ -15,9 +15,7 @@
     },
     "license": "MIT",
     "scripts": {
-        "start": "bun run dist/index.js",
         "build": "bun build src/index.ts --outdir dist --target bun --sourcemap=external",
-        "dev": "bun run --watch src/index.ts",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
         "format": "prettier --check .",

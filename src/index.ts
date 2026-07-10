@@ -2,6 +2,7 @@ import { authentikLoginFailed } from "scripts/authentik/loginFailed";
 import sendBirthDayDiscordMessage from "scripts/birthday";
 import { schedullerCalendarMessages } from "scripts/calendars";
 import { gmailSuport } from "scripts/gmail/support";
+import { statusSync } from "scripts/status-sync";
 import registerTriggers from "triggers";
 
 await registerTriggers({
@@ -10,5 +11,6 @@ await registerTriggers({
         sendBirthDayDiscordMessage,
         schedullerCalendarMessages,
         gmailSuport,
+        statusSync,
     ],
 });

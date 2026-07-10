@@ -23,7 +23,6 @@ export interface CliSettings {
     onlyRun: string[];
     debug: boolean;
     test: string;
-    stopBeforeTest: boolean;
 }
 
 function argv0Reader(): CliSettings {
@@ -32,7 +31,6 @@ function argv0Reader(): CliSettings {
         onlyRun: [],
         debug: false,
         test: "",
-        stopBeforeTest: false,
     };
 
     for (const parameter of paramters) {
@@ -44,14 +42,16 @@ function argv0Reader(): CliSettings {
             defaultSettings.debug = true;
         }
         if (key === "test") {
+            defaultSettings.debug = true;
             defaultSettings.test = val ?? "";
-        }
-        if (key === "stopBeforeTest") {
-            defaultSettings.stopBeforeTest = true;
         }
     }
 
     return defaultSettings;
+}
+
+declare global {
+    var retest: () => Promise<void>;
 }
 
 export default async function registerTriggers(config: RegisterConfig) {
@@ -59,14 +59,9 @@ export default async function registerTriggers(config: RegisterConfig) {
     if (settings.debug === false) {
         console.debug = () => {};
     }
+    console.debug("Settings", settings);
 
     console.log("Registrando Triggers");
-
-    for (const trigger of config.triggers) {
-        if (settings.onlyRun.length && !settings.onlyRun.includes(trigger.id)) continue;
-        console.debug("Registrando id: " + trigger.id);
-        await trigger.register();
-    }
 
     startHttpServer();
     startMqttClients();
@@ -79,13 +74,25 @@ export default async function registerTriggers(config: RegisterConfig) {
         const findedTrigger = config.triggers.find((trigger) => trigger.id === settings.test);
         if (!findedTrigger) {
             throw new Error("Trigger not found to test");
-        } else if ("test" in findedTrigger && findedTrigger.test) {
-            await findedTrigger.test();
-            if (settings.stopBeforeTest) {
-                process.exit(0);
-            }
-        } else {
+        }
+        console.debug("Testing trigger: " + findedTrigger.id);
+        await findedTrigger.register();
+        if ("test" in findedTrigger && !findedTrigger.test) {
             throw new Error("Trigger not has method test");
+        }
+        console.debug("Running test for trigger: " + findedTrigger.id);
+        await findedTrigger.test!();
+        console.debug("Test finished for trigger: " + findedTrigger.id);
+        global.retest = async () => {
+            console.debug("Running test for trigger: " + findedTrigger.id);
+            await findedTrigger.test!();
+            console.debug("Test finished for trigger: " + findedTrigger.id);
+        };
+    } else {
+        for (const trigger of config.triggers) {
+            if (settings.onlyRun.length && !settings.onlyRun.includes(trigger.id)) continue;
+            console.debug("Registrando id: " + trigger.id);
+            await trigger.register();
         }
     }
 
