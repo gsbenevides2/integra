@@ -54,6 +54,15 @@ declare global {
     var retest: () => Promise<void>;
 }
 
+const startClientsAndServers = () => {
+    startHttpServer();
+    startMqttClients();
+    startHaClients();
+    startRedisClients();
+    startEmailClients();
+    startPostgresClients();
+}
+
 export default async function registerTriggers(config: RegisterConfig) {
     const settings = argv0Reader();
     if (settings.debug === false) {
@@ -63,12 +72,7 @@ export default async function registerTriggers(config: RegisterConfig) {
 
     console.log("Registrando Triggers");
 
-    startHttpServer();
-    startMqttClients();
-    startHaClients();
-    startRedisClients();
-    startEmailClients();
-    startPostgresClients();
+    
 
     if (settings.test) {
         const findedTrigger = config.triggers.find((trigger) => trigger.id === settings.test);
@@ -77,6 +81,7 @@ export default async function registerTriggers(config: RegisterConfig) {
         }
         console.debug("Testing trigger: " + findedTrigger.id);
         await findedTrigger.register();
+        startClientsAndServers();
         if ("test" in findedTrigger && !findedTrigger.test) {
             throw new Error("Trigger not has method test");
         }
@@ -94,6 +99,7 @@ export default async function registerTriggers(config: RegisterConfig) {
             console.debug("Registrando id: " + trigger.id);
             await trigger.register();
         }
+        startClientsAndServers();
     }
 
     console.log("Triggers registrados. Integra em Operação");
