@@ -1,5 +1,5 @@
 import type { Trigger, TriggerSettings } from "triggers";
-import type { InstanceKey } from "./types";
+import type { InstanceKey, InstancesSettings } from "./types";
 import { instanceSettings } from "./instances";
 import type { TracerStatus } from "instrumentation/types";
 import { startTracer, addTracerEvent, endTracer } from "instrumentation";
@@ -50,13 +50,13 @@ export default function onHassEvent(settings: HassSettings, func: HassCall): Has
 export async function startHaClients() {
     if (!global.haSubscriptions) return;
 
-    for (const [key, instance] of Object.entries(instanceSettings)) {
+    for (const [key, instance] of Object.entries(instanceSettings as InstancesSettings)) {
         const instanceKey = key as InstanceKey;
         const subs = global.haSubscriptions.filter((sub) => sub.instance === instanceKey);
         if (subs.length === 0) continue;
 
-        const { url, token } = instance;
-        const wsUrl = url.replace(/^http/, "ws") + "/api/websocket";
+        const { host, token, useTLS } = instance;
+        const wsUrl = `${useTLS === false ? "ws" : "wss"}//${host}`;
 
         const ws = new WebSocket(wsUrl);
 

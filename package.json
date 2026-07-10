@@ -25,6 +25,7 @@
         "@types/bun": "latest",
         "@types/imap": "^0.8.43",
         "@types/mailparser": "^3.4.6",
+        "@types/ssh2": "^1.15.5",
         "eslint": "^10.6.0",
         "eslint-config-prettier": "^10.1.8",
         "prettier": "^3.8.5",
@@ -46,6 +47,7 @@
         "mongoose": "^9.7.3",
         "mqtt": "^5.15.1",
         "openai": "^6.45.0",
+        "ssh2": "^1.17.0",
         "zod": "^4.4.3"
     }
 }
