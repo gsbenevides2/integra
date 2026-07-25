@@ -1,8 +1,10 @@
 {
-    "name": "integra",
+    "name": "@gsbenevides2/integra",
+    "displayName": "Integra",
     "description": "Event-driven daemon connecting external services (HTTP, MQTT, Home Assistant, Redis, PostgreSQL, Email/IMAP, Cron) to user scripts. Every execution is auto-traced to MongoDB.",
     "module": "index.ts",
     "type": "module",
+    "version": "1.0.1",
     "private": true,
     "repository": {
         "type": "git",
@@ -16,10 +18,10 @@
     "license": "MIT",
     "scripts": {
         "build": "bun build src/index.ts --outdir dist --target bun --sourcemap=external",
-        "lint": "eslint .",
-        "lint:fix": "eslint . --fix",
-        "format": "prettier --check .",
-        "format:fix": "prettier --write ."
+        "lint": "bun --bun eslint .",
+        "lint:fix": "bun --bun eslint . --fix",
+        "format": "bun --bun prettier --check .",
+        "format:fix": "bun --bun prettier --write ."
     },
     "devDependencies": {
         "@types/bun": "latest",
@@ -35,7 +37,9 @@
         "typescript": "^5"
     },
     "dependencies": {
+        "@elysia/eden": "^1.4.10",
         "@elysia/openapi": "^1.4.15",
+        "@gsbenevides2/http-scheduller": "^1.0.17",
         "@modelcontextprotocol/sdk": "^1.29.0",
         "bson": "7.2.0",
         "date-fns": "^4.4.0",

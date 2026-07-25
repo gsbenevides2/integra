@@ -1,0 +1,34 @@
+name: PR Build
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.x
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build
+        run: bun run build
+        env:
+          NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: G2JJQRhnVO8lj37ZFRmB2/s+nBCVz2dp3OAJ9rQzH7M=
+          DATABASE_URL: postgresql://usuario:senha@localhost:5432/http-scheduller
+          PORT: 3000
+          TZ: America/Sao_Paulo
+          AUTHENTIK_USERNAME: http-scheduller-service-account
+          AUTHENTIK_PASSWORD: sua-senha
+          AUTHENTIK_URL: https://sso.seudominio.com
+          REDIS_CACHE_URL: redis://localhost:6379

@@ -1,3 +1,6 @@
+import { treaty } from "@elysia/eden";
+import type { App } from "@gsbenevides2/http-scheduller";
+import { getBunFetchInstrumentableFetchClient } from "instrumentation";
 import { loginInAuthentik } from "utils/authentik/login";
 import safeEnvGet from "utils/safeEnvGet";
 
@@ -16,4 +19,15 @@ export async function getHttpSchedullerAccessToken(traceId: string) {
         traceId,
     );
     return access_token;
+}
+
+export async function getClient(traceId: string) {
+    const accessToken = await getHttpSchedullerAccessToken(traceId);
+    const app = treaty<App>(httpSchedullerServiceEndpoint, {
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+        },
+        fetcher: getBunFetchInstrumentableFetchClient(traceId),
+    });
+    return app;
 }

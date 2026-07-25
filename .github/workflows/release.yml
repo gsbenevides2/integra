@@ -1,0 +1,78 @@
+name: Release
+
+on:
+    push:
+        branches:
+            - main
+        paths:
+            - package.json
+
+permissions:
+    contents: write
+    packages: write
+
+jobs:
+    prepare-release:
+        runs-on: ubuntu-latest
+        outputs:
+            version: ${{ steps.get_version.outputs.version }}
+            prev_tag: ${{ steps.get_version.outputs.prev_tag }}
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+            - name: Run Version Preparation Script
+              id: get_version
+              run: |
+                  chmod +x .github/workflows/release/prepare-release.sh
+                  .github/workflows/release/prepare-release.sh
+    release:
+        needs: prepare-release
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+            - name: Run release script
+              env:
+                  VERSION: ${{ needs.prepare-release.outputs.version }}
+                  PREV_TAG: ${{ needs.prepare-release.outputs.prev_tag }}
+                  OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+                  TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+                  FULL_REPO: ${{ github.repository }}
+              run: |
+                  chmod +x .github/workflows/release/release.sh
+                  .github/workflows/release/release.sh
+    docker:
+        needs: prepare-release
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+            - name: Run Build and Push Docker Image
+              env:
+                  VERSION: ${{ needs.prepare-release.outputs.version }}
+                  TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+                  FULL_REPO: ${{ github.repository }}
+              run: |
+                  chmod +x .github/workflows/release/docker.sh
+                  .github/workflows/release/docker.sh
+    coolify:
+        needs: docker
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout Code
+              uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+            - name: Run Coolify Deployment Script
+              env:
+                  COOLIFY_WEBHOOK_URL: ${{ vars.COOLIFY_WEBHOOK_URL }}
+                  COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+              run: |
+                  chmod +x .github/workflows/release/coolify.sh
+                  .github/workflows/release/coolify.sh

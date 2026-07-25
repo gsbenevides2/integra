@@ -14,7 +14,7 @@ export async function makeDatesAndFilterCalendars(
             self.findIndex((fc) => fc.calendarId === calendar.calendarId) === index,
     );
     const schedullersIdsToDelete = schedullers
-        .map((m) => m.externalId)
-        .filter((id) => id.startsWith("calendar-scheduller"));
+        .filter((s) => s.name?.startsWith("calendar-scheduller"))
+        .map((s) => s.externalId);
     return { startDate, endDate, nonDuplicatedCalendars, schedullersIdsToDelete };
 }

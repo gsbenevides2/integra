@@ -1,21 +1,10 @@
-import { instrumentableFetch } from "instrumentation";
-import { buildHttpSchedullerUrl, getHttpSchedullerAccessToken } from "./common";
+import { getClient } from "./common";
 
 export async function deleteManySchedullerRequests(ids: string[], traceId: string) {
-    const accessToken = await getHttpSchedullerAccessToken(traceId);
-    const url = buildHttpSchedullerUrl().toString();
-    const headers = {
-        Authorization: "Bearer " + accessToken,
-        "Content-Type": "application/json",
-    };
-    const response = await instrumentableFetch(traceId, url, {
-        method: "DELETE",
-        headers,
-        body: JSON.stringify(ids),
-    });
-    if (!response.ok)
-        throw new Error(
-            `Failed to delete schedullers: ${response.status} ${response.statusText}  ${await response.text()}`,
-        );
-    return;
+    const client = await getClient(traceId);
+    const response = await client.api.schedulled_requests.delete(ids);
+
+    if (response.error) throw new Error(`Failed to delete schedullers: ${response.error}`);
+
+    return response.data;
 }

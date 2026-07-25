@@ -2,9 +2,9 @@ import { parseISO, differenceInMilliseconds, subMinutes } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import type { CalendarEvents, EventWithCalendar } from "./types";
 import { DISCORD_CHANNEL_ID, DISCORD_PUBLIC_KEY } from "utils/discord/sendMessage";
-import type { SchedulledRequest } from "utils/httpScheduller/types";
+import type { AddSchedulledRequest } from "utils/httpScheduller/types";
 
-export function prepareMessageAndSchedule(events: CalendarEvents[]): SchedulledRequest[] {
+export function prepareMessageAndSchedule(events: CalendarEvents[]): AddSchedulledRequest[] {
     function formatEventMessage(data: EventWithCalendar) {
         const email = data.calendar.email;
         const dateTime = parseISO(data.start_date);
@@ -69,12 +69,14 @@ export function prepareMessageAndSchedule(events: CalendarEvents[]): SchedulledR
         .filter((event) => checkIsEconverseEvent(event) && (isHoliday || isFerias) === false) // Filtra eventos da econverse e se não for ferias ou feriado
         .filter((event) => checkIfEventIsInTheFuture(event)); // Filtra eventos que ainda não aconteceram
 
-    const schedulledRequests = eventsToSchedule.map<SchedulledRequest>((event) => {
+    const schedulledRequests = eventsToSchedule.map<AddSchedulledRequest>((event) => {
         const { message } = formatEventMessage(event);
         const triggerValue = getTriggerValue(event);
-        const externalId = `calendar-scheduller-${event.id}`;
+        const externalId = crypto.randomUUID();
+        const name = `calendar-scheduller-${event.id}`;
         return {
             externalId,
+            name,
             triggerType: "date",
             excludeBeforeExecution: true,
             triggerValue,
@@ -87,6 +89,7 @@ export function prepareMessageAndSchedule(events: CalendarEvents[]): SchedulledR
             body: JSON.stringify({
                 content: message,
             }),
+            useAuthentikServiceAccount: false,
         };
     });
     return schedulledRequests;

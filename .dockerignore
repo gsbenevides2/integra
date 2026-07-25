@@ -4,3 +4,4 @@ node_modules
 .vscode
 AGENTS.md
 opencode.json
+.env
