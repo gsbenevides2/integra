@@ -1,19 +1,14 @@
-import { instrumentableFetch } from "instrumentation";
-import type { SchedulledRequest } from "./types";
-import { buildHttpSchedullerUrl, getHttpSchedullerAccessToken } from "./common";
+import type { AddSchedulledRequest } from "./types";
+import { getClient } from "./common";
 
-export async function schedulleRequests(schedulledRequests: SchedulledRequest[], traceId: string) {
-    const accessToken = await getHttpSchedullerAccessToken(traceId);
-    const url = buildHttpSchedullerUrl().toString();
-    const headers = {
-        Authorization: "Bearer " + accessToken,
-        "Content-Type": "application/json",
-    };
-    const response = await instrumentableFetch(traceId, url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(schedulledRequests),
-    });
-    if (!response.ok) throw new Error(`Failed to schedulle requests: ${response.statusText}`);
-    return;
+export async function schedulleRequests(
+    schedulledRequests: AddSchedulledRequest[],
+    traceId: string,
+) {
+    const client = await getClient(traceId);
+    const response = await client.api.schedulled_requests.post(schedulledRequests);
+
+    if (response.error) throw new Error(`Failed to fetch schedullers: ${response.error}`);
+
+    return response.data;
 }

@@ -2,6 +2,8 @@ import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport";
 import { runModel } from "./mongo";
 import type { CreateEventData, EndTracerParams, StartTracerParams } from "./types";
 import { type ClientOptions } from "openai";
+import type { Treaty } from "@elysia/eden";
+import { fetch } from "bun";
 
 export async function startTracer(params: StartTracerParams) {
     await runModel.create({
@@ -153,4 +155,14 @@ type OpenAiFetch = Exclude<ClientOptions["fetch"], undefined>;
 export function getOpenAIInstrumentableFetchClient(traceId: string): OpenAiFetch {
     return (input: string | URL | Request, init?: BunFetchRequestInit) =>
         instrumentableFetch(traceId, input, init);
+}
+
+type EdenFetch = Treaty.Config["fetcher"];
+
+export function getBunFetchInstrumentableFetchClient(traceId: string): EdenFetch {
+    function f(input: string | URL | Request, init?: BunFetchRequestInit) {
+        return instrumentableFetch(traceId, input, init);
+    }
+    f.preconnect = fetch.preconnect;
+    return f;
 }

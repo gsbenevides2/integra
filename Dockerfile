@@ -1,9 +1,13 @@
 FROM oven/bun:1 AS build
+ARG TOKEN_GITHUB
 WORKDIR /app
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile --production
+RUN printf '%s\n' "//npm.pkg.github.com/:_authToken=${TOKEN_GITHUB}" "@gsbenevides2:registry=https://npm.pkg.github.com" > /root/.npmrc && \
+    bun install --frozen-lockfile --production && \
+    rm -f /root/.npmrc
 COPY . .
 RUN bun build src/index.ts --outdir dist --target bun --sourcemap=external
+
 
 FROM oven/bun:1-slim
 WORKDIR /app
