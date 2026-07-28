@@ -4,11 +4,10 @@ import {
     upsertMultipleSensors,
     type Sensor,
 } from "utils/hass/createSensor";
-import { sendStatusUpdates, type StatusPlataform } from "utils/hass/plus/sendStatus";
 import { numberToWords } from "utils/numbersToWords";
 import { getServerStatus } from "utils/ssh/getServerStatus";
 import type { SistemaStatus } from "utils/ssh/types";
-import { getStatusOfPlataforms } from "utils/status/getStatus";
+import { getStatusOfPlataforms, type ReceivedStatusPlataform } from "utils/status/getStatus";
 import { getTrainStatus } from "utils/train-status/getStatus";
 import type { TrainStatusPlataform } from "utils/train-status/types";
 
@@ -143,6 +142,22 @@ function createTrainsSensors(linesData: TrainStatusPlataform[]): Sensor[] {
     });
 }
 
+function createStatusSensors(plataforms: ReceivedStatusPlataform[]): Sensor[] {
+    function normalizeName(name: string): string {
+        return name.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
+    }
+    return plataforms.map<Sensor>((plataform) => ({
+        state: plataform.status !== "OK" ? "on" : "off",
+        attributtes: convertRecordToAttributteArray({
+            friendly_name: plataform.name,
+            device_class: "problem",
+            status_url: plataform.statusPage,
+            problem_description: plataform.problemDescription,
+        }),
+        sensorEntityId: `binary_sensor.status_plataform_${normalizeName(plataform.name)}`,
+    }));
+}
+
 export const statusSync = onCron(
     {
         cron: "*/2 * * * *",
@@ -150,13 +165,8 @@ export const statusSync = onCron(
     },
     async (_, traceId) => {
         const status = await getStatusOfPlataforms(traceId);
-        const tansformatedStatus = status.map<StatusPlataform>((plataform) => ({
-            hasProblem: plataform.status !== "OK",
-            name: plataform.name,
-            status_url: plataform.statusPage,
-            problem_description: plataform.problemDescription,
-        }));
-        await sendStatusUpdates(tansformatedStatus, traceId);
+        const statusSensors = createStatusSensors(status);
+        await upsertMultipleSensors(statusSensors, traceId, "default");
         const trains = await getTrainStatus(traceId);
         const transSensors = createTrainsSensors(trains);
         await upsertMultipleSensors(transSensors, traceId, "default");
