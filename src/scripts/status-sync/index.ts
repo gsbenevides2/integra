@@ -126,7 +126,7 @@ function createServerStatsSensor(serverStatus: SistemaStatus): Sensor[] {
 
 function createTrainsSensors(linesData: TrainStatusPlataform[]): Sensor[] {
     return linesData.map<Sensor>((lineData) => {
-        const lineCodeName = numberToWords(lineData.codigo);
+        const lineCodeName = (numberToWords(lineData.codigo) || "").toLowerCase();
         return {
             state: lineData.status,
             attributtes: convertRecordToAttributteArray({
