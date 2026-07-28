@@ -1,7 +1,7 @@
 import { instrumentableFetch } from "instrumentation";
 import { buildPlataformStatusUrl, getStatusAccessToken } from "./common";
 
-interface ReceivedStatusPlataform {
+export interface ReceivedStatusPlataform {
     name: string;
     status: string;
     statusPage: string;
