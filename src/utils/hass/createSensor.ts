@@ -7,13 +7,20 @@ export interface Attribute {
     value: string;
 }
 
+export function convertRecordToAttributteArray(record: Record<string, string>): Attribute[] {
+    return Object.entries(record).map(([name, value]) => ({
+        name,
+        value,
+    }));
+}
+
 export interface Sensor {
     sensorEntityId: string;
     state: string;
     attributtes: Attribute[];
 }
 
-export async function updateSensor(sensor: Sensor, traceId: string, instanceKey: InstanceKey) {
+export async function upsertSensor(sensor: Sensor, traceId: string, instanceKey: InstanceKey) {
     const { host, token, useTLS } = instanceSettings[instanceKey] as InstanceSetting;
     const body = JSON.stringify({
         state: sensor.state,
@@ -41,4 +48,12 @@ export async function updateSensor(sensor: Sensor, traceId: string, instanceKey:
         status: response.status,
         body: await response.text(),
     };
+}
+
+export async function upsertMultipleSensors(
+    sensors: Sensor[],
+    traceId: string,
+    instanceKey: InstanceKey,
+) {
+    return await Promise.all(sensors.map((sensor) => upsertSensor(sensor, traceId, instanceKey)));
 }
