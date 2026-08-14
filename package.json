@@ -4,7 +4,7 @@
     "description": "Event-driven daemon connecting external services (HTTP, MQTT, Home Assistant, Redis, PostgreSQL, Email/IMAP, Cron) to user scripts. Every execution is auto-traced to MongoDB.",
     "module": "index.ts",
     "type": "module",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "private": true,
     "repository": {
         "type": "git",

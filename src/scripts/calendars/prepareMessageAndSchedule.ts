@@ -62,12 +62,20 @@ export function prepareMessageAndSchedule(events: CalendarEvents[]): AddSchedull
         event.calendar.email.endsWith("@econverse.com.br");
     const checkIfEventIsInTheFuture = (event: EventWithCalendar) =>
         differenceInMilliseconds(parseISO(event.start_date), new Date()) > 0;
+    const checkIfEventHasNoConfirmation = (event: EventWithCalendar) => {
+        const hasEconverse = event.attendees.find(
+            ({ email }) => email === "guilherme.benevides@econverse.com.br",
+        );
+        if (hasEconverse?.response_status === "declined") return false;
+        return true;
+    };
     const NON_EVENTS = ["workingLocation", "focusTime", "birthday", "outOfOffice"];
 
     const eventsToSchedule = allEvents
         .filter((event) => !NON_EVENTS.includes(event.event_type))
         .filter((event) => checkIsEconverseEvent(event) && (isHoliday || isFerias) === false) // Filtra eventos da econverse e se não for ferias ou feriado
-        .filter((event) => checkIfEventIsInTheFuture(event)); // Filtra eventos que ainda não aconteceram
+        .filter((event) => checkIfEventIsInTheFuture(event)) // Filtra eventos que ainda não aconteceram
+        .filter((event) => checkIfEventHasNoConfirmation(event)); // Filtra eventos do calendario da econverse que foram recusados
 
     const schedulledRequests = eventsToSchedule.map<AddSchedulledRequest>((event) => {
         const { message } = formatEventMessage(event);
