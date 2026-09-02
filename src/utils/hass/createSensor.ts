@@ -57,3 +57,25 @@ export async function upsertMultipleSensors(
 ) {
     return await Promise.all(sensors.map((sensor) => upsertSensor(sensor, traceId, instanceKey)));
 }
+
+export async function getSensorState<T>(
+    sensorEntityId: string,
+    traceId: string,
+    instanceKey: InstanceKey,
+) {
+    const { host, token, useTLS } = instanceSettings[instanceKey] as InstanceSetting;
+    const response = await instrumentableFetch(
+        traceId,
+        `${useTLS === false ? "http" : "https"}://${host}/api/states/${sensorEntityId}`,
+        {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        },
+    );
+    return {
+        status: response.status,
+        body: (await response.json()) as T,
+    };
+}

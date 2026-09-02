@@ -4,7 +4,7 @@
     "description": "Event-driven daemon connecting external services (HTTP, MQTT, Home Assistant, Redis, PostgreSQL, Email/IMAP, Cron) to user scripts. Every execution is auto-traced to MongoDB.",
     "module": "index.ts",
     "type": "module",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "private": true,
     "repository": {
         "type": "git",
@@ -17,7 +17,9 @@
     },
     "license": "MIT",
     "scripts": {
+        "start": "bun run src/index.ts",
         "build": "bun build src/index.ts --outdir dist --target bun --sourcemap=external",
+        "install-deps": "export GITHUB_TOKEN=$(gh auth token) && bun install",
         "lint": "bun --bun eslint .",
         "lint:fix": "bun --bun eslint . --fix",
         "format": "bun --bun prettier --check .",

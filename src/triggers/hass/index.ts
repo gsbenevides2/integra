@@ -10,39 +10,44 @@ export interface HassSettings extends TriggerSettings {
     entityId?: string;
 }
 
-export interface HassSubscription {
+export interface HassSubscription<T extends Record<string, unknown> = Record<string, unknown>> {
     instance: InstanceKey;
     eventType: string;
     entityId?: string;
-    call: HassCall;
+    call: HassCall<T>;
     triggerId: string;
 }
 
 export interface HassTrigger extends Trigger {}
 
-export type HassCall = (event: Record<string, unknown>, traceId: string) => Promise<void>;
+export type HassCall<T extends Record<string, unknown>> = (
+    event: T,
+    traceId: string,
+) => Promise<void>;
 
 declare global {
     var haWebSockets: Map<InstanceKey, WebSocket> | undefined;
     var haSubscriptions: HassSubscription[] | undefined;
 }
 
-export default function onHassEvent(settings: HassSettings, func: HassCall): HassTrigger {
+export default function onHassEvent<T extends Record<string, unknown>>(
+    settings: HassSettings,
+    func: HassCall<T>,
+): HassTrigger {
     return {
         id: settings.id,
         register: async () => {
             if (!global.haSubscriptions) global.haSubscriptions = [];
 
-            global.haSubscriptions = [
-                ...global.haSubscriptions,
-                {
-                    instance: settings.instance,
-                    eventType: settings.eventType ?? "state_changed",
-                    entityId: settings.entityId,
-                    call: func,
-                    triggerId: settings.id,
-                },
-            ];
+            const subscription: HassSubscription<T> = {
+                instance: settings.instance,
+                eventType: settings.eventType ?? "state_changed",
+                entityId: settings.entityId,
+                call: func,
+                triggerId: settings.id,
+            };
+
+            global.haSubscriptions = [...global.haSubscriptions, subscription as HassSubscription];
         },
     };
 }
@@ -56,8 +61,7 @@ export async function startHaClients() {
         if (subs.length === 0) continue;
 
         const { host, token, useTLS } = instance;
-        const wsUrl = `${useTLS === false ? "ws" : "wss"}//${host}`;
-
+        const wsUrl = `${useTLS === false ? "ws" : "wss"}://${host}/api/websocket`;
         const ws = new WebSocket(wsUrl);
 
         if (!global.haWebSockets) global.haWebSockets = new Map();
