@@ -1,4 +1,5 @@
 import { authentikLoginFailed } from "scripts/authentik/loginFailed";
+import { autoClean } from "scripts/auto-clean";
 import sendBirthDayDiscordMessage from "scripts/birthday";
 import { schedullerCalendarMessages } from "scripts/calendars";
 import { gmailSuport } from "scripts/gmail/support";
@@ -17,5 +18,6 @@ await registerTriggers({
         sinalMonitor,
         sinalAPIMonitor,
         syncTpLinkData,
+        autoClean,
     ],
 });

@@ -166,3 +166,10 @@ export function getBunFetchInstrumentableFetchClient(traceId: string): EdenFetch
     f.preconnect = fetch.preconnect;
     return f;
 }
+
+export function clearOldTraces() {
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    return runModel.deleteMany({
+        endTime: { $lt: oneDayAgo },
+    });
+}
