@@ -191,7 +191,7 @@ function createDevicesConnectivitySensors(devices: Device[], check: LatestCheck)
 
 export const syncTpLinkData = onCron(
     {
-        cron: "0/10 * * * *", // every 10 minutes,
+        cron: "0/2 * * * *", // every 2 minutes,
         id: "sync-tp-link-data",
     },
     async (_, traceId) => {
