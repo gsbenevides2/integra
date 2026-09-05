@@ -4,6 +4,7 @@ import { schedullerCalendarMessages } from "scripts/calendars";
 import { gmailSuport } from "scripts/gmail/support";
 import { sinalMonitor, sinalAPIMonitor } from "scripts/sinal";
 import { statusSync } from "scripts/status-sync";
+import { syncTpLinkData } from "scripts/tp-link-center";
 import registerTriggers from "triggers";
 
 await registerTriggers({
@@ -15,5 +16,6 @@ await registerTriggers({
         statusSync,
         sinalMonitor,
         sinalAPIMonitor,
+        syncTpLinkData,
     ],
 });

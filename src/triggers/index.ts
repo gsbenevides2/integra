@@ -61,18 +61,15 @@ const startClientsAndServers = () => {
     startRedisClients();
     startEmailClients();
     startPostgresClients();
-}
+};
 
 export default async function registerTriggers(config: RegisterConfig) {
     const settings = argv0Reader();
     if (settings.debug === false) {
         console.debug = () => {};
     }
-    console.debug("Settings", settings);
 
     console.log("Registrando Triggers");
-
-    
 
     if (settings.test) {
         const findedTrigger = config.triggers.find((trigger) => trigger.id === settings.test);
