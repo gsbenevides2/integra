@@ -1,0 +1,42 @@
+[
+    {
+        "from": "/favicon.ico",
+        "to": "/assets/favicon.ico",
+        "status": 307
+    },
+    {
+        "from": "/favicon-32x32.png",
+        "to": "/assets/favicon-32x32.png",
+        "status": 307
+    },
+    {
+        "from": "/favicon-16x16.png",
+        "to": "/assets/favicon-16x16.png",
+        "status": 307
+    },
+    {
+        "from": "/apple-touch-icon.png",
+        "to": "/assets/apple-touch-icon.png",
+        "status": 307
+    },
+    {
+        "from": "/android-chrome-192x192.png",
+        "to": "/assets/android-chrome-192x192.png",
+        "status": 307
+    },
+    {
+        "from": "/android-chrome-512x512.png",
+        "to": "/assets/android-chrome-512x512.png",
+        "status": 307
+    },
+    {
+        "from": "/safari-pinned-tab.svg",
+        "to": "/assets/safari-pinned-tab.svg",
+        "status": 307
+    },
+    {
+        "from": "/site.webmanifest",
+        "to": "/assets/site.webmanifest",
+        "status": 307
+    }
+]
