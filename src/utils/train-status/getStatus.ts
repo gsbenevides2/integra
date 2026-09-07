@@ -1,4 +1,4 @@
-import { instrumentableFetch } from "instrumentation";
+import { instrumentableFetch } from "core/instrumentation";
 import { buildTrainStatusUrl, getStatusAccessToken } from "./common";
 import type { TrainStatusPlataform } from "./types";
 

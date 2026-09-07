@@ -1,6 +1,6 @@
 import * as jose from "jose";
 import safeEnvGet from "utils/safeEnvGet";
-import { addTracerEvent, instrumentableFetch } from "instrumentation";
+import { addTracerEvent, instrumentableFetch } from "core/instrumentation";
 import { CacheClient } from "utils/cacheClient";
 
 interface ServiceAccount {

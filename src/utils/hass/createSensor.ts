@@ -1,6 +1,6 @@
-import { instrumentableFetch } from "instrumentation";
-import { instanceSettings } from "triggers/hass/instances";
-import type { InstanceKey, InstanceSetting } from "triggers/hass/types";
+import { instrumentableFetch } from "core/instrumentation";
+import { instanceSettings } from "core/triggers/hass/instances";
+import type { InstanceKey, InstanceSetting } from "core/triggers/hass/types";
 
 export interface Attribute {
     name: string;

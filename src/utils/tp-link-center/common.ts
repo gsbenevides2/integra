@@ -1,6 +1,6 @@
 import { treaty } from "@elysia/eden";
 import type { app } from "@gsbenevides2/tp-link-center";
-import { getBunFetchInstrumentableFetchClient } from "instrumentation";
+import { getBunFetchInstrumentableFetchClient } from "core/instrumentation";
 import { loginInAuthentik } from "utils/authentik/login";
 import safeEnvGet from "utils/safeEnvGet";
 

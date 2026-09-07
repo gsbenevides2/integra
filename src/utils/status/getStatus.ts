@@ -1,4 +1,4 @@
-import { instrumentableFetch } from "instrumentation";
+import { instrumentableFetch } from "core/instrumentation";
 import { buildPlataformStatusUrl, getStatusAccessToken } from "./common";
 
 export interface ReceivedStatusPlataform {

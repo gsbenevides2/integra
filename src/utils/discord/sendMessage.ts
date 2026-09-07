@@ -1,4 +1,4 @@
-import { instrumentableFetch } from "instrumentation";
+import { instrumentableFetch } from "core/instrumentation";
 import safeEnvGet from "utils/safeEnvGet";
 
 export const DISCORD_CHANNEL_ID = "1444824842225582252";

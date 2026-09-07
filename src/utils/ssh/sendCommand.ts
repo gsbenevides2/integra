@@ -1,4 +1,4 @@
-import { addTracerEvent } from "instrumentation";
+import { addTracerEvent } from "core/instrumentation";
 import { Client } from "ssh2";
 import safeEnvGet from "utils/safeEnvGet";
 

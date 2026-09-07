@@ -1,4 +1,4 @@
-import { instrumentableFetch } from "instrumentation";
+import { instrumentableFetch } from "core/instrumentation";
 import type { EmailResponse } from "./types";
 import { buildGoogleServiceUrl, getGoogleAccessToken } from "./common";
 
