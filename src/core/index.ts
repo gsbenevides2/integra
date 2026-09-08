@@ -8,7 +8,6 @@ import type { Trigger } from "core/triggers";
 
 export interface RegisterConfig {
     triggers: Trigger[];
-    dashboards: unknown[];
 }
 
 export interface CliSettings {

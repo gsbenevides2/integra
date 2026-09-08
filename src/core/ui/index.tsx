@@ -33,27 +33,10 @@ export const uiFactory = () =>
             headers.set("content-type", "text/html");
             return new Response(
                 await renderToReadableStream(<App />, {
-                    bootstrapScripts: ["bundle.js"],
+                    bootstrapScripts: ["assets/client-bundle.js"],
                 }),
                 {
                     headers,
                 },
             );
-        })
-        .get("/bundle.js", async () => {
-            const output = await Bun.build({
-                entrypoints: ["/Users/gsbenevides2/personal/integra/src/core/ui/client-bundle.tsx"],
-
-                minify: true,
-                sourcemap: "inline",
-            });
-            const js = output.outputs[0];
-
-            return () => {
-                return new Response(js, {
-                    headers: {
-                        "Content-Type": "application/javascript",
-                    },
-                });
-            };
         });

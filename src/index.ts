@@ -7,6 +7,7 @@ import { sinalMonitor, sinalAPIMonitor } from "extensions/scripts/sinal";
 import { statusSync } from "extensions/scripts/status-sync";
 import { syncTpLinkData } from "extensions/scripts/tp-link-center";
 import registerSettings from "core";
+import { plataformStatusRoutes } from "extensions/scripts/plataform-status/routes";
 
 await registerSettings({
     triggers: [
@@ -19,6 +20,6 @@ await registerSettings({
         sinalAPIMonitor,
         syncTpLinkData,
         autoClean,
+        plataformStatusRoutes,
     ],
-    dashboards: [],
 });

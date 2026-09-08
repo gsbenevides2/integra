@@ -17,13 +17,17 @@
     },
     "license": "MIT",
     "scripts": {
-        "dev": "concurrently \"bun run dev:css\" \"bun run dev:server\"",
+        "dev": "concurrently \"bun run dev:css\" \"bun run dev:server\" \"bun run dev:client\"",
         "dev:css": "bunx @tailwindcss/cli -i ./src/input.css -o ./assets/output.css --watch",
         "dev:server": "bun run --watch src/index.ts",
-        "build": "bun run build:css && bun run build:server",
+        "dev:client": "bun build src/core/ui/client-bundle.tsx --outdir assets --minify --sourceap=inline",
+        "build": "bun run build:css && bun run build:server && bun run build:client",
         "build:css": "bunx @tailwindcss/cli -i ./src/input.css -o ./assets/output.css  --minify",
         "build:server": "bun build src/index.ts --outdir dist --target bun --sourcemap=external",
+        "build:client": "bun build src/core/ui/client-bundle.tsx --outdir assets --minify --sourceap=inline",
         "install-deps": "export GITHUB_TOKEN=$(gh auth token) && bun install",
+        "db:sync": "bun --bun run drizzle-kit push --config src/core/db/drizzle.config.ts",
+        "db:studio": "bun --bun run drizzle-kit studio --config src/core/db/drizzle.config.ts",
         "lint": "bun --bun eslint .",
         "lint:fix": "bun --bun eslint . --fix",
         "format": "bun --bun prettier --check .",
@@ -40,7 +44,8 @@
         "eslint": "^10.6.0",
         "eslint-config-prettier": "^10.1.8",
         "prettier": "^3.8.5",
-        "typescript-eslint": "^8.62.0"
+        "typescript-eslint": "^8.62.0",
+        "drizzle-kit": "^1.0.0-rc.4"
     },
     "peerDependencies": {
         "typescript": "^5"
@@ -48,6 +53,7 @@
     "dependencies": {
         "@elysia/eden": "^1.4.10",
         "@elysia/openapi": "^1.4.15",
+        "drizzle-orm": "^1.0.0-rc.4",
         "@gsbenevides2/http-scheduller": "^1.0.17",
         "@gsbenevides2/tp-link-center": "^0.0.26",
         "@heroicons/react": "^2.2.0",
