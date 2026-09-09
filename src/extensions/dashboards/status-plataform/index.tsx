@@ -9,9 +9,11 @@ function Dashboard() {
     const [isAddPlataformOpen, setIsAddPlataformOpen] = useState(false);
     return (
         <div className="p-3 flex flex-col gap-4">
-            {isAddPlataformOpen && (
-                <AddPlataform onClose={() => setIsAddPlataformOpen(false)} />
-            )}
+            <AddPlataform
+                onClose={() => setIsAddPlataformOpen(false)}
+                isOpen={isAddPlataformOpen}
+            />
+
             <div className="flex justify-between">
                 <h1 className="text-xl">Status Plataform</h1>
                 <Button onClick={() => setIsAddPlataformOpen(true)}>

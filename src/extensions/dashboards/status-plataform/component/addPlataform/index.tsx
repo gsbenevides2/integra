@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { PLATAFORMS } from "extensions/db/plataform-status";
 import { Button } from "core/ui/components/button";
@@ -8,20 +7,14 @@ import { Select } from "core/ui/components/select";
 
 interface Props {
     onClose: () => void;
+    isOpen: boolean;
 }
 
-export function AddPlataform({ onClose }: Props) {
-    const [isVisible, setIsVisible] = useState(false);
-
-    useEffect(() => {
-        const frame = requestAnimationFrame(() => setIsVisible(true));
-        return () => cancelAnimationFrame(frame);
-    }, []);
-
+export function AddPlataform({ onClose, isOpen }: Props) {
     return (
         <div
             className={`fixed inset-0 z-50 bg-mist-950/90 backdrop-blur-sm flex justify-center items-center p-4 transition-opacity duration-200 ${
-                isVisible ? "opacity-100" : "opacity-0"
+                isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
             }`}
             onClick={(e) => {
                 if (e.target === e.currentTarget) onClose();
@@ -29,7 +22,7 @@ export function AddPlataform({ onClose }: Props) {
         >
             <div
                 className={`bg-gray-800 w-full max-w-sm rounded-lg shadow-xl flex flex-col gap-4 p-4 transition-all duration-200 ${
-                    isVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"
+                    isOpen ? "opacity-100 scale-100" : "opacity-0 scale-95"
                 }`}
             >
                 <div className="flex items-center justify-between">
