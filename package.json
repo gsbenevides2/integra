@@ -20,7 +20,7 @@
         "dev": "concurrently \"bun run dev:css\" \"bun run dev:server\" \"bun run dev:client\"",
         "dev:css": "bunx @tailwindcss/cli -i ./src/input.css -o ./assets/output.css --watch",
         "dev:server": "bun run --watch src/index.ts",
-        "dev:client": "bun build src/core/ui/client-bundle.tsx --outdir assets --minify --sourceap=inline",
+        "dev:client": "bun build --watch src/core/ui/client-bundle.tsx --outdir assets --minify --sourceap=inline",
         "build": "bun run build:css && bun run build:server && bun run build:client",
         "build:css": "bunx @tailwindcss/cli -i ./src/input.css -o ./assets/output.css  --minify",
         "build:server": "bun build src/index.ts --outdir dist --target bun --sourcemap=external",
@@ -53,7 +53,6 @@
     "dependencies": {
         "@elysia/eden": "^1.4.10",
         "@elysia/openapi": "^1.4.15",
-        "drizzle-orm": "^1.0.0-rc.4",
         "@gsbenevides2/http-scheduller": "^1.0.17",
         "@gsbenevides2/tp-link-center": "^0.0.26",
         "@heroicons/react": "^2.2.0",
@@ -62,6 +61,7 @@
         "bson": "7.2.0",
         "date-fns": "^4.4.0",
         "date-fns-tz": "^3.2.0",
+        "drizzle-orm": "^1.0.0-rc.4",
         "elysia": "^1.4.29",
         "imap": "^0.8.19",
         "jose": "^6.2.3",
@@ -73,6 +73,6 @@
         "react-dom": "^19.2.8",
         "ssh2": "^1.17.0",
         "tailwindcss": "^4.3.3",
-        "zod": "^4.4.3"
+        "zod": "^4.5.4"
     }
 }
