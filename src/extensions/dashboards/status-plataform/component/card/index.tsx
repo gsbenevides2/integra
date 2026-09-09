@@ -1,4 +1,5 @@
 import { PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { IconButton } from "core/ui/components/iconButton";
 
 export function Card() {
     return (
@@ -10,12 +11,12 @@ export function Card() {
                     <p>Tipo: Atlasian</p>
                 </div>
                 <div className="flex flex-col gap-0.5">
-                    <button className="cursor-pointer hover:bg-gray-500 p-1 rounded-full">
+                    <IconButton className="hover:bg-gray-500">
                         <PencilIcon className="size-4.5" />
-                    </button>
-                    <button className="cursor-pointer hover:bg-gray-500 p-1 rounded-full">
+                    </IconButton>
+                    <IconButton className="hover:bg-gray-500">
                         <TrashIcon className="size-4.5" />
-                    </button>
+                    </IconButton>
                 </div>
             </div>
             <div>

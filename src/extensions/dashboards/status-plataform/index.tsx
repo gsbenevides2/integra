@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { PlusIcon, ShieldCheckIcon } from "@heroicons/react/24/outline";
 import type { DashboardData } from "core/ui/createDashboard";
+import { Button } from "core/ui/components/button";
 import { Card } from "./component/card";
 import { AddPlataform } from "./component/addPlataform";
 
@@ -13,13 +14,10 @@ function Dashboard() {
             )}
             <div className="flex justify-between">
                 <h1 className="text-xl">Status Plataform</h1>
-                <button
-                    onClick={() => setIsAddPlataformOpen(true)}
-                    className="text-sm flex bg-mist-800 p-2 rounded-sm hover:bg-mist-600 cursor-pointer"
-                >
+                <Button onClick={() => setIsAddPlataformOpen(true)}>
                     <PlusIcon className="size-4.5" />
                     <span>Add Plataform</span>
-                </button>
+                </Button>
             </div>
             <div className="grid grid-cols-3 gap-2">
                 <Card />

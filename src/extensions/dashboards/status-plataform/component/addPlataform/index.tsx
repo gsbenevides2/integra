@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
+import { PLATAFORMS } from "extensions/db/plataform-status";
+import { Button } from "core/ui/components/button";
+import { IconButton } from "core/ui/components/iconButton";
+import { Input } from "core/ui/components/input";
+import { Select } from "core/ui/components/select";
 
 interface Props {
     onClose: () => void;
@@ -29,51 +34,35 @@ export function AddPlataform({ onClose }: Props) {
             >
                 <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold">Add Plataform</h3>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="cursor-pointer hover:bg-gray-700 p-1 rounded-full"
-                    >
-                        <XMarkIcon className="size-5" />
-                    </button>
+                    <IconButton type="button" onClick={onClose}>
+                        <XMarkIcon className="size-4.5" />
+                    </IconButton>
                 </div>
                 <form className="flex flex-col gap-3">
-                    <div className="flex flex-col gap-1">
-                        <label htmlFor="name" className="text-xs text-mist-300">
-                            Name
-                        </label>
-                        <input
-                            className="border border-mist-600 bg-gray-900 p-2 rounded-md outline-0 focus:border-mist-300 transition-colors"
-                            type="text"
-                            id="name"
-                            placeholder="Type the plataform name"
-                        />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                        <label htmlFor="url" className="text-xs text-mist-300">
-                            Url
-                        </label>
-                        <input
-                            className="border border-mist-600 bg-gray-900 p-2 rounded-md outline-0 focus:border-mist-300 transition-colors"
-                            type="text"
-                            id="url"
-                            placeholder="Type the plataform url"
-                        />
-                    </div>
+                    <Input
+                        label="Name"
+                        type="text"
+                        id="name"
+                        placeholder="Type the plataform name"
+                    />
+                    <Input label="Url" type="text" id="url" placeholder="Type the plataform url" />
+                    <Select
+                        label="Type"
+                        id="type"
+                        defaultValue=""
+                        placeholder="Select the plataform type"
+                        options={PLATAFORMS.map((plataform) => ({
+                            label: plataform,
+                            value: plataform,
+                        }))}
+                    />
                     <div className="flex justify-end gap-2 mt-1">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="text-sm px-3 py-1.5 rounded-md hover:bg-gray-700 cursor-pointer"
-                        >
+                        <Button type="button" variant="secondary" onClick={onClose}>
                             Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            className="text-sm px-3 py-1.5 rounded-md bg-mist-900 hover:bg-mist-600 cursor-pointer"
-                        >
+                        </Button>
+                        <Button type="submit" variant="primary">
                             Save
-                        </button>
+                        </Button>
                     </div>
                 </form>
             </div>
