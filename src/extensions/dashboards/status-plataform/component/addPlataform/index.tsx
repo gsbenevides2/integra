@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 
 interface Props {
@@ -5,14 +6,27 @@ interface Props {
 }
 
 export function AddPlataform({ onClose }: Props) {
+    const [isVisible, setIsVisible] = useState(false);
+
+    useEffect(() => {
+        const frame = requestAnimationFrame(() => setIsVisible(true));
+        return () => cancelAnimationFrame(frame);
+    }, []);
+
     return (
         <div
-            className="fixed inset-0 z-50 bg-mist-950/90 backdrop-blur-sm flex justify-center items-center p-4"
+            className={`fixed inset-0 z-50 bg-mist-950/90 backdrop-blur-sm flex justify-center items-center p-4 transition-opacity duration-200 ${
+                isVisible ? "opacity-100" : "opacity-0"
+            }`}
             onClick={(e) => {
                 if (e.target === e.currentTarget) onClose();
             }}
         >
-            <div className="bg-gray-800 w-full max-w-sm rounded-lg shadow-xl flex flex-col gap-4 p-4">
+            <div
+                className={`bg-gray-800 w-full max-w-sm rounded-lg shadow-xl flex flex-col gap-4 p-4 transition-all duration-200 ${
+                    isVisible ? "opacity-100 scale-100" : "opacity-0 scale-95"
+                }`}
+            >
                 <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold">Add Plataform</h3>
                     <button
