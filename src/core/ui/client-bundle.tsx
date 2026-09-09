@@ -2,5 +2,6 @@ import React from "react";
 import { hydrateRoot } from "react-dom/client";
 import { App } from "./App";
 
-// Connects client-side React logic to the server HTML
-hydrateRoot(document.getElementById("root") as Element, <App />);
+// App renders the full <html> document, so hydration must target
+// `document` itself, not an element inside <body>.
+hydrateRoot(document, <App />);

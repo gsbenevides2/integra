@@ -18,7 +18,7 @@ export function App() {
                 <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
                 <link rel="manifest" href="/site.webmanifest" />
             </head>
-            <body id="root">
+            <body>
                 <main className="grid grid-cols-[280px_auto]">
                     <SideBar updateDash={setSelectedDash} />
                     <Content selectedDash={selectedDash} />
