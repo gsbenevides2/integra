@@ -1,13 +1,23 @@
 import { XMarkIcon } from "@heroicons/react/24/outline";
 
-export function AddPlataform() {
+interface Props {
+    onClose: () => void;
+}
+
+export function AddPlataform({ onClose }: Props) {
     return (
-        <div className="fixed inset-0 z-50 bg-mist-950/90 backdrop-blur-sm flex justify-center items-center p-4">
+        <div
+            className="fixed inset-0 z-50 bg-mist-950/90 backdrop-blur-sm flex justify-center items-center p-4"
+            onClick={(e) => {
+                if (e.target === e.currentTarget) onClose();
+            }}
+        >
             <div className="bg-gray-800 w-full max-w-sm rounded-lg shadow-xl flex flex-col gap-4 p-4">
                 <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold">Add Plataform</h3>
                     <button
                         type="button"
+                        onClick={onClose}
                         className="cursor-pointer hover:bg-gray-700 p-1 rounded-full"
                     >
                         <XMarkIcon className="size-5" />
@@ -39,6 +49,7 @@ export function AddPlataform() {
                     <div className="flex justify-end gap-2 mt-1">
                         <button
                             type="button"
+                            onClick={onClose}
                             className="text-sm px-3 py-1.5 rounded-md hover:bg-gray-700 cursor-pointer"
                         >
                             Cancel
