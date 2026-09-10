@@ -4,6 +4,7 @@ import assetsAllowedPaths from "assetsAllowedPaths.json";
 import redirects from "redirects.json";
 import { renderToReadableStream } from "react-dom/server";
 import { App } from "./App";
+import { BUILD_ID } from "./buildId";
 
 const ASSETS_PATH = getAssetsPath();
 
@@ -33,7 +34,7 @@ export const uiFactory = () =>
             headers.set("content-type", "text/html");
             return new Response(
                 await renderToReadableStream(<App />, {
-                    bootstrapScripts: ["assets/client-bundle.js"],
+                    bootstrapScripts: [`assets/client-bundle.js?v=${BUILD_ID}`],
                 }),
                 {
                     headers,

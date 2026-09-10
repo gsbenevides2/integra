@@ -4,6 +4,7 @@ import { dashboards } from "extensions/dashboards";
 import { Content } from "./components/content";
 import { ToastProvider, ToastContainer } from "./components/toast";
 import { ConfirmProvider, ConfirmDialog } from "./components/confirm";
+import { BUILD_ID } from "./buildId";
 
 export function App() {
     const [selectedDash, setSelectedDash] = useState(dashboards.at(0)?.id);
@@ -13,12 +14,12 @@ export function App() {
                 <meta charSet="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>Integra</title>
-                <link rel="stylesheet" href="/assets/output.css" />
-                <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-                <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
-                <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-                <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-                <link rel="manifest" href="/site.webmanifest" />
+                <link rel="stylesheet" href={`/assets/output.css?v=${BUILD_ID}`} />
+                <link rel="icon" type="image/x-icon" href="/assets/favicon.ico" />
+                <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32.png" />
+                <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
+                <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
+                <link rel="manifest" href="/assets/site.webmanifest" />
             </head>
             <body>
                 <ToastProvider>
