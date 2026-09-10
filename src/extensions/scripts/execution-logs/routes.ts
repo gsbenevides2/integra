@@ -2,6 +2,7 @@ import onHttp from "core/triggers/http";
 import Elysia from "elysia";
 import z from "zod";
 import {
+    clearAllRuns,
     fetchRunByTraceId,
     fetchRuns,
     getDistinctTriggerIds,
@@ -63,6 +64,10 @@ export const executionLogsElysiaClient = new Elysia({
     .get("/workflow-types", async () => {
         const workflowTypes = await getDistinctWorkflowTypes();
         return { workflowTypes };
+    })
+    .delete("/runs", async () => {
+        await clearAllRuns();
+        return { success: true };
     });
 
 export const executionLogsRoutes = onHttp(

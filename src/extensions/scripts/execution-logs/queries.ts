@@ -109,3 +109,7 @@ export async function getDistinctWorkflowTypes(): Promise<string[]> {
     const rows = await db.selectDistinct({ workflowType: runs.workflowType }).from(runs);
     return rows.map((row) => row.workflowType).sort();
 }
+
+export async function clearAllRuns() {
+    await db.delete(runs);
+}
