@@ -96,5 +96,6 @@ export default function onCron(settings: CronSettings, func: CronCall): CronTrig
                 });
             }
         },
+        type: "cron",
     };
 }

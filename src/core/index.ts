@@ -14,6 +14,7 @@ export interface CliSettings {
     onlyRun: string[];
     debug: boolean;
     test: string;
+    disableCrons: boolean;
 }
 
 function argv0Reader(): CliSettings {
@@ -22,6 +23,7 @@ function argv0Reader(): CliSettings {
         onlyRun: [],
         debug: false,
         test: "",
+        disableCrons: false,
     };
 
     for (const parameter of paramters) {
@@ -31,6 +33,9 @@ function argv0Reader(): CliSettings {
         }
         if (key === "debug") {
             defaultSettings.debug = true;
+        }
+        if (key === "disableCrons") {
+            defaultSettings.disableCrons = true;
         }
         if (key === "test") {
             defaultSettings.debug = true;
@@ -86,6 +91,7 @@ export default async function registerSettings(config: RegisterConfig) {
         };
     } else {
         for (const trigger of config.triggers) {
+            if (trigger.type === "cron" && settings.disableCrons) continue;
             if (settings.onlyRun.length && !settings.onlyRun.includes(trigger.id)) continue;
             console.debug("Registrando id: " + trigger.id);
             await trigger.register();
