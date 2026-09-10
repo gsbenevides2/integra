@@ -9,6 +9,8 @@ import { syncTpLinkData } from "extensions/scripts/tp-link-center";
 import registerSettings from "core";
 import { platformStatusRoutes } from "extensions/scripts/platform-status/routes";
 import { platformStatusCheckCron } from "extensions/scripts/platform-status/cron";
+import { trainStatusRoutes } from "extensions/scripts/train-status/routes";
+import { trainStatusCheckCron } from "extensions/scripts/train-status/cron";
 
 await registerSettings({
     triggers: [
@@ -22,5 +24,7 @@ await registerSettings({
         autoClean,
         platformStatusRoutes,
         platformStatusCheckCron,
+        trainStatusRoutes,
+        trainStatusCheckCron,
     ],
 });

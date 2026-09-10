@@ -4,11 +4,8 @@ import {
     upsertMultipleSensors,
     type Sensor,
 } from "utils/hass/createSensor";
-import { numberToWords } from "utils/numbersToWords";
 import { getServerStatus } from "utils/ssh/getServerStatus";
 import type { SistemaStatus } from "utils/ssh/types";
-import { getTrainStatus } from "utils/train-status/getStatus";
-import type { TrainStatusPlataform } from "utils/train-status/types";
 
 function createServerStatsSensor(serverStatus: SistemaStatus): Sensor[] {
     const sensors: Sensor[] = [
@@ -123,34 +120,12 @@ function createServerStatsSensor(serverStatus: SistemaStatus): Sensor[] {
     return sensors;
 }
 
-function createTrainsSensors(linesData: TrainStatusPlataform[]): Sensor[] {
-    return linesData.map<Sensor>((lineData) => {
-        const lineCodeName = (numberToWords(lineData.codigo) || "").toLowerCase();
-        return {
-            state: lineData.status,
-            attributtes: convertRecordToAttributteArray({
-                friendly_name: `Linha ${lineData.codigo} - ${lineData.cor}`,
-                icon: "mdi:train",
-                status: lineData.status,
-                codigo: lineData.codigo.toString(),
-                cor: lineData.cor,
-                descricao: lineData.descricao ?? "",
-            }),
-            sensorEntityId: `sensor.sp_train_${lineCodeName}`,
-        };
-    });
-}
-
 export const statusSync = onCron(
     {
         cron: "*/2 * * * *",
         id: "status-sync",
     },
     async (_, traceId) => {
-        const trains = await getTrainStatus(traceId);
-        const transSensors = createTrainsSensors(trains);
-        await upsertMultipleSensors(transSensors, traceId, "default");
-
         const serverStatus = await getServerStatus(traceId);
         const serverSensors = await createServerStatsSensor(serverStatus);
         await upsertMultipleSensors(serverSensors, traceId, "default");
