@@ -2,6 +2,7 @@ import { useState } from "react";
 import { SideBar } from "./components/sidebar";
 import { dashboards } from "extensions/dashboards";
 import { Content } from "./components/content";
+import { ToastProvider, ToastContainer } from "./components/toast";
 
 export function App() {
     const [selectedDash, setSelectedDash] = useState(dashboards.at(0)?.id);
@@ -19,10 +20,13 @@ export function App() {
                 <link rel="manifest" href="/site.webmanifest" />
             </head>
             <body>
-                <main className="grid grid-cols-[280px_auto]">
-                    <SideBar updateDash={setSelectedDash} />
-                    <Content selectedDash={selectedDash} />
-                </main>
+                <ToastProvider>
+                    <main className="grid grid-cols-[280px_auto]">
+                        <SideBar updateDash={setSelectedDash} />
+                        <Content selectedDash={selectedDash} />
+                    </main>
+                    <ToastContainer />
+                </ToastProvider>
             </body>
         </html>
     );

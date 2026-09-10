@@ -4,7 +4,8 @@ import { Button } from "core/ui/components/button";
 import { IconButton } from "core/ui/components/iconButton";
 import { Input } from "core/ui/components/input";
 import { Select } from "core/ui/components/select";
-import { useCallback } from "react";
+import { useToast } from "core/ui/components/toast";
+import { useCallback, useState } from "react";
 import { getPlataformStatusEdenClient } from "extensions/scripts/plataform-status/client";
 
 interface Props {
@@ -17,32 +18,43 @@ function isValidPlataform(value: string): value is Plataform {
 }
 
 export function AddPlataform({ onClose, isOpen }: Props) {
-    const savePlataform = useCallback((event: React.SubmitEvent<HTMLFormElement>) => {
-        event.preventDefault();
-        const formData = new FormData(event.currentTarget);
-        const name = formData.get("name")?.toString();
-        const type = formData.get("type")?.toString();
-        const url = formData.get("url")?.toString();
-        if (!name) return alert("Missing name!");
-        if (!type) return alert("Missing type");
-        if (!url) return alert("Missing url");
-        if (!isValidPlataform(type)) return alert("Invalid type");
+    const [isSaving, setIsSaving] = useState(false);
+    const { showToast } = useToast();
 
-        const client = getPlataformStatusEdenClient();
+    const savePlataform = useCallback(
+        (event: React.SubmitEvent<HTMLFormElement>) => {
+            event.preventDefault();
+            const formData = new FormData(event.currentTarget);
+            const name = formData.get("name")?.toString();
+            const type = formData.get("type")?.toString();
+            const url = formData.get("url")?.toString();
+            if (!name) return showToast("Missing name!", "error");
+            if (!type) return showToast("Missing type", "error");
+            if (!url) return showToast("Missing url", "error");
+            if (!isValidPlataform(type)) return showToast("Invalid type", "error");
 
-        client["plataform-stats"].new
-            .post({
-                name,
-                type,
-                url,
-            })
-            .then(() => {
-                alert("Salvo com sucesso");
-            })
-            .catch(() => {
-                alert("Erro ao salvar");
-            });
-    }, []);
+            const client = getPlataformStatusEdenClient();
+
+            setIsSaving(true);
+            client["plataform-stats"].new
+                .post({
+                    name,
+                    type,
+                    url,
+                })
+                .then(() => {
+                    showToast("Salvo com sucesso", "success");
+                    onClose();
+                })
+                .catch(() => {
+                    showToast("Erro ao salvar", "error");
+                })
+                .finally(() => {
+                    setIsSaving(false);
+                });
+        },
+        [onClose, showToast],
+    );
     return (
         <div
             className={`fixed inset-0 z-50 bg-mist-950/90 backdrop-blur-sm flex justify-center items-center p-4 transition-opacity duration-200 ${
@@ -82,10 +94,15 @@ export function AddPlataform({ onClose, isOpen }: Props) {
                         }))}
                     />
                     <div className="flex justify-end gap-2 mt-1">
-                        <Button type="button" variant="secondary" onClick={onClose}>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={onClose}
+                            disabled={isSaving}
+                        >
                             Cancel
                         </Button>
-                        <Button type="submit" variant="primary">
+                        <Button type="submit" variant="primary" isLoading={isSaving}>
                             Save
                         </Button>
                     </div>
