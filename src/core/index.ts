@@ -43,6 +43,7 @@ function argv0Reader(): CliSettings {
 
 declare global {
     var retest: () => Promise<void>;
+    var triggers: Trigger[];
 }
 
 const startClientsAndServers = () => {
@@ -60,6 +61,7 @@ export default async function registerSettings(config: RegisterConfig) {
     if (settings.debug === false) {
         console.debug = () => {};
     }
+    global.triggers = config.triggers;
 
     console.log("Registrando Triggers");
 

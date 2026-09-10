@@ -5,6 +5,7 @@ export const platformStatusCheckCron = onCron(
     {
         cron: "*/2 * * * *",
         id: "platform-status-check",
+        runTriggerOnEnds: "sinal-monitor",
     },
     async (_, traceId) => {
         await checkPlatformsStatus(traceId);

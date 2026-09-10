@@ -3,7 +3,7 @@ import { autoClean } from "extensions/scripts/auto-clean";
 import sendBirthDayDiscordMessage from "extensions/scripts/birthday";
 import { schedullerCalendarMessages } from "extensions/scripts/calendars";
 import { gmailSuport } from "extensions/scripts/gmail/support";
-import { sinalMonitor, sinalAPIMonitor } from "extensions/scripts/sinal";
+import { sinalMonitor } from "extensions/scripts/sinal";
 import { statusSync } from "extensions/scripts/status-sync";
 import { syncTpLinkData } from "extensions/scripts/tp-link-center";
 import registerSettings from "core";
@@ -18,7 +18,6 @@ await registerSettings({
         gmailSuport,
         statusSync,
         sinalMonitor,
-        sinalAPIMonitor,
         syncTpLinkData,
         autoClean,
         platformStatusRoutes,

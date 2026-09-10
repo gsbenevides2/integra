@@ -1,90 +1,68 @@
-import onHassEvent from "core/triggers/hass";
+import { db } from "core/db";
+import onManual from "core/triggers/manual";
+import { desc, eq, like } from "drizzle-orm";
+import { platforms, platformStatusChecks } from "extensions/db/platform-status";
+import { CacheClient } from "utils/cacheClient";
 import sendDiscordMessage from "utils/discord/sendMessage";
-import { getSensorState } from "utils/hass/createSensor";
 
-interface EventData extends Record<string, unknown> {
-    data: {
-        entity_id: string;
-        old_state: {
-            state: string;
-        };
-        new_state: {
-            state: string;
-        };
-    };
-}
-interface SensorResponse {
-    entity_id: string;
-    state: string;
-    attributes: Record<string, unknown>;
-    last_changed: string;
-    last_updated: string;
-    context: {
-        id: string;
-        user_id: string | null;
-    };
+function latestChecksSubquery() {
+    return db
+        .selectDistinctOn([platformStatusChecks.platformId], {
+            platformId: platformStatusChecks.platformId,
+            status: platformStatusChecks.status,
+            prxoblemDescription: platformStatusChecks.problemDescription,
+            checkedAt: platformStatusChecks.checkedAt,
+        })
+        .from(platformStatusChecks)
+        .orderBy(platformStatusChecks.platformId, desc(platformStatusChecks.checkedAt))
+        .as("latest_checks");
 }
 
-const timeWait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const DEFAULT_WAIT_TIME = 1000 * 60 * 5; // 5 minutes
-const SITE_ENTITY_ID = "binary_sensor.status_plataform_grupo_sinal";
-const HASS_INSTANCE_KEY = "default" as const;
+async function getPlatformsWithLatestStatus() {
+    const latestChecks = latestChecksSubquery();
+    const query = db
+        .select({
+            name: platforms.name,
+            status: latestChecks.status,
+            problemDescription: latestChecks.prxoblemDescription,
+        })
+        .from(platforms)
+        .leftJoin(latestChecks, eq(platforms.id, latestChecks.platformId))
+        .where(like(platforms.name, "%Grupo Sinal%"));
 
-export const sinalMonitor = onHassEvent<EventData>(
+    return query;
+}
+
+export const sinalMonitor = onManual(
     {
         id: "sinal-monitor",
-        instance: HASS_INSTANCE_KEY,
-        eventType: "state_changed",
-        entityId: SITE_ENTITY_ID,
     },
-    async (event, traceId) => {
-        const hasIssue = event?.data?.new_state?.state === "on";
-        if (!hasIssue) {
-            return;
-        }
-        await timeWait(DEFAULT_WAIT_TIME);
-        const sensorData = await getSensorState<SensorResponse>(
-            SITE_ENTITY_ID,
-            traceId,
-            HASS_INSTANCE_KEY,
-        );
-        const continueIssue = sensorData?.body?.state === "on";
-        if (!continueIssue) {
-            return;
-        }
-        await sendDiscordMessage(
-            `Atenção! O site de Grupo Sinal está com problemas de acesso há mais de 5 minutos. Verifique o status do site: https://www.gruposinal.com.br`,
-            traceId,
-        );
-    },
-);
+    async (traceId) => {
+        const plataforms = await getPlatformsWithLatestStatus();
+        const apiHasIssue = plataforms.find((p) => p.name.includes("API"))?.status === "DOWN";
+        const siteHasIssue = plataforms.find((p) => !p.name.includes("API"))?.status === "DOWN";
+        let keyData = JSON.parse(
+            (await CacheClient.get("sinal_discord_monitor")) ?? "[]",
+        ) as string[];
 
-const API_ENTITY_ID = "binary_sensor.status_plataform_grupo_sinal_api";
-export const sinalAPIMonitor = onHassEvent<EventData>(
-    {
-        id: "sinal-api-monitor",
-        instance: HASS_INSTANCE_KEY,
-        eventType: "state_changed",
-        entityId: API_ENTITY_ID,
-    },
-    async (event, traceId) => {
-        const hasIssue = event?.data?.new_state?.state === "on";
-        if (!hasIssue) {
-            return;
+        if (apiHasIssue && !keyData.includes("api")) {
+            await sendDiscordMessage(
+                `Atenção! A API de Grupo Sinal está com problemas de acesso. Verifique o status do site: https://api.gruposinal.com.br`,
+                traceId,
+            );
+            keyData.push("api");
+        } else if (!apiHasIssue) {
+            keyData = keyData.filter((k) => k !== "api");
         }
-        await timeWait(DEFAULT_WAIT_TIME);
-        const sensorData = await getSensorState<SensorResponse>(
-            API_ENTITY_ID,
-            traceId,
-            HASS_INSTANCE_KEY,
-        );
-        const continueIssue = sensorData?.body?.state === "on";
-        if (!continueIssue) {
-            return;
+        if (siteHasIssue && !keyData.includes("site")) {
+            await sendDiscordMessage(
+                `Atenção! O site de Grupo Sinal está com problemas de acesso. Verifique o status do site: https://www.gruposinal.com.br`,
+                traceId,
+            );
+        } else if (!siteHasIssue) {
+            keyData = keyData.filter((k) => k !== "site");
         }
-        await sendDiscordMessage(
-            `Atenção! A API de Grupo Sinal está com problemas de acesso há mais de 5 minutos. Verifique o status do site: https://api.gruposinal.com.br`,
-            traceId,
-        );
+
+        await CacheClient.set("sinal_discord_monitor", JSON.stringify(keyData));
     },
 );

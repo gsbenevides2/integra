@@ -4,6 +4,7 @@ import type { Trigger, TriggerSettings } from "core/triggers";
 
 export interface CronSettings extends TriggerSettings {
     cron: Bun.CronWithAutocomplete;
+    runTriggerOnEnds?: string;
 }
 export interface CronTrigger extends Trigger {}
 
@@ -40,6 +41,14 @@ export default function onCron(settings: CronSettings, func: CronCall): CronTrig
                         status,
                         traceId,
                     });
+                    if (settings.runTriggerOnEnds) {
+                        const trigger = global.triggers.find(
+                            (t) => t.id === settings.runTriggerOnEnds,
+                        );
+                        if (trigger && trigger.test) {
+                            trigger.test();
+                        }
+                    }
                 }
             });
         },
