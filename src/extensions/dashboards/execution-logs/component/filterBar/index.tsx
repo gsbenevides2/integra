@@ -81,7 +81,7 @@ export function FilterBar({ onFilterChange }: Props) {
                         emit({ workflowType: e.target.value });
                     }}
                 >
-                    <option value="">Todos</option>
+                    <option value="">All</option>
                     {workflowTypes.map((t) => (
                         <option key={t} value={t}>
                             {t}
@@ -100,7 +100,7 @@ export function FilterBar({ onFilterChange }: Props) {
                         emit({ status: e.target.value as FilterValues["status"] });
                     }}
                 >
-                    <option value="">Todos</option>
+                    <option value="">All</option>
                     {STATUSES.map((s) => (
                         <option key={s} value={s}>
                             {s}
@@ -119,7 +119,7 @@ export function FilterBar({ onFilterChange }: Props) {
                         emit({ triggerId: e.target.value });
                     }}
                 >
-                    <option value="">Todos</option>
+                    <option value="">All</option>
                     {triggerIds.map((t) => (
                         <option key={t} value={t}>
                             {t}
@@ -129,7 +129,7 @@ export function FilterBar({ onFilterChange }: Props) {
             </label>
 
             <div className="flex flex-col gap-0.5">
-                <span className="text-xs text-mist-400">Período</span>
+                <span className="text-xs text-mist-400">Period</span>
                 <div className="flex rounded-md overflow-hidden border border-gray-700">
                     {DATE_PRESETS.map((p) => (
                         <button
@@ -153,7 +153,7 @@ export function FilterBar({ onFilterChange }: Props) {
                 className="text-xs px-2 py-1 rounded-md hover:bg-gray-700 cursor-pointer"
                 onClick={clearAll}
             >
-                Limpar filtros
+                Clear filters
             </button>
         </div>
     );

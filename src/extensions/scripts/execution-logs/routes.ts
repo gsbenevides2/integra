@@ -46,7 +46,7 @@ export const executionLogsElysiaClient = new Elysia({
             const run = await fetchRunByTraceId(params.traceId);
             if (!run) {
                 set.status = 404;
-                return { error: "Run não encontrado" };
+                return { error: "Run not found" };
             }
             return run;
         },

@@ -78,12 +78,12 @@ function EventCard({ event }: { event: TracerEvent }) {
                                 <span>{url}</span>
                             </p>
                             <p className="text-xs break-all">
-                                <span className="font-bold">Método: </span>
+                                <span className="font-bold">Method: </span>
                                 <span>{method}</span>
                                 {duration !== undefined ? (
                                     <>
                                         <span> - </span>
-                                        <span className="font-bold">Duração: </span>
+                                        <span className="font-bold">Duration: </span>
                                         <span>{duration} ms</span>
                                     </>
                                 ) : null}
@@ -126,7 +126,7 @@ function EventCard({ event }: { event: TracerEvent }) {
                                 className="text-xs px-2 py-0.5 rounded-md hover:bg-gray-700 cursor-pointer"
                                 onClick={() => setShowFullJson((prev) => !prev)}
                             >
-                                {showFullJson ? "Ocultar" : "Ver JSON completo"}
+                                {showFullJson ? "Hide" : "View full JSON"}
                             </button>
                         ) : null}
                         {showFullJson && (

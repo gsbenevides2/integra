@@ -32,9 +32,9 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-    SUCCESS: "Sucesso",
-    ERROR: "Erro",
-    running: "Em execução",
+    SUCCESS: "Success",
+    ERROR: "Error",
+    running: "Running",
 };
 
 function formatDate(ts: number) {
@@ -70,10 +70,10 @@ function CustomTooltip({
                 <strong>triggerId:</strong> {p.triggerId}
             </p>
             <p>
-                <strong>início:</strong> {formatDate(p.startTime)}
+                <strong>start:</strong> {formatDate(p.startTime)}
             </p>
             <p>
-                <strong>duração:</strong> {formatDuration(p.durationMs)}
+                <strong>duration:</strong> {formatDuration(p.durationMs)}
             </p>
             <p>
                 <strong>status:</strong>{" "}
@@ -155,7 +155,7 @@ export function DotChart({ runs, onSelectRun }: Props) {
     return (
         <div className="bg-gray-800 rounded-md p-3 flex flex-col gap-2">
             <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold">Duração vs. Início</h3>
+                <h3 className="text-sm font-semibold">Duration vs. Start</h3>
                 {zoomDomain && (
                     <button
                         type="button"

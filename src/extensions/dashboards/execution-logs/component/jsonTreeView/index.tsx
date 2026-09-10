@@ -20,7 +20,7 @@ export function JsonTreeView({ data }: Props) {
                         setViewerKey((prev) => prev + 1);
                     }}
                 >
-                    Expandir tudo
+                    Expand all
                 </button>
                 <button
                     type="button"
@@ -30,7 +30,7 @@ export function JsonTreeView({ data }: Props) {
                         setViewerKey((prev) => prev + 1);
                     }}
                 >
-                    Colapsar tudo
+                    Collapse all
                 </button>
             </div>
             <div className="bg-gray-900 border border-gray-700 rounded-md p-2">

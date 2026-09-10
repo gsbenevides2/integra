@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { DotChart } from "./component/dotChart";
 import { FilterBar, type FilterValues } from "./component/filterBar";
 import { RunDetailModal } from "./component/runDetailModal";
+import { RunsTable } from "./component/runsTable";
 
 function Dashboard() {
     const [filters, setFilters] = useState<FilterValues>({
@@ -53,7 +54,7 @@ function Dashboard() {
 
             <div className="flex justify-between items-center">
                 <h1 className="text-xl">Execution History</h1>
-                <span className="text-sm text-mist-400">{runs.length} execuções</span>
+                <span className="text-sm text-mist-400">{runs.length} executions</span>
             </div>
 
             <FilterBar onFilterChange={setFilters} />
@@ -73,6 +74,11 @@ function Dashboard() {
             ) : (
                 <DotChart runs={runs} onSelectRun={setSelectedTraceId} />
             )}
+
+            <div>
+                <h2 className="text-lg mb-2">Runs</h2>
+                <RunsTable filters={filters} onSelectRun={setSelectedTraceId} />
+            </div>
         </div>
     );
 }

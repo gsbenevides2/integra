@@ -54,9 +54,7 @@ export function RunDetailModal({ isOpen, onClose, traceId }: Props) {
 
     const durationMs =
         run?.durationMs ??
-        (run?.endTime
-            ? new Date(run.endTime).getTime() - new Date(run.startTime).getTime()
-            : null);
+        (run?.endTime ? new Date(run.endTime).getTime() - new Date(run.startTime).getTime() : null);
 
     return (
         <div
@@ -95,7 +93,7 @@ export function RunDetailModal({ isOpen, onClose, traceId }: Props) {
                                         className="text-xs px-2 py-0.5 rounded-md hover:bg-gray-700 cursor-pointer"
                                         onClick={copyTraceId}
                                     >
-                                        {copied ? "Copiado ✓" : "Copiar"}
+                                        {copied ? "Copied ✓" : "Copy"}
                                     </button>
                                 </div>
                                 {run.endTime ? (
@@ -110,7 +108,7 @@ export function RunDetailModal({ isOpen, onClose, traceId }: Props) {
                                     </span>
                                 ) : (
                                     <span className="text-xs px-2 py-0.5 rounded-sm font-semibold bg-yellow-900 text-yellow-300">
-                                        🟡 Em andamento
+                                        🟡 In progress
                                     </span>
                                 )}
                             </div>
@@ -125,19 +123,19 @@ export function RunDetailModal({ isOpen, onClose, traceId }: Props) {
                                     <span className="ml-2">{run.workflowType}</span>
                                 </div>
                                 <div>
-                                    <span className="text-mist-400">Duração:</span>
+                                    <span className="text-mist-400">Duration:</span>
                                     <span className="ml-2">
                                         {durationMs !== null ? formatDuration(durationMs) : "—"}
                                     </span>
                                 </div>
                                 <div>
-                                    <span className="text-mist-400">Início:</span>
+                                    <span className="text-mist-400">Start:</span>
                                     <span className="ml-2">
                                         {formatDateTime(new Date(run.startTime))}
                                     </span>
                                 </div>
                                 <div>
-                                    <span className="text-mist-400">Fim:</span>
+                                    <span className="text-mist-400">End:</span>
                                     <span className="ml-2">
                                         {run.endTime ? formatDateTime(new Date(run.endTime)) : "—"}
                                     </span>
@@ -165,7 +163,7 @@ export function RunDetailModal({ isOpen, onClose, traceId }: Props) {
 
                         <div>
                             <h4 className="mb-2 font-semibold text-sm">
-                                Eventos ({run.events.length})
+                                Events ({run.events.length})
                             </h4>
                             <EventList events={run.events} />
                         </div>
