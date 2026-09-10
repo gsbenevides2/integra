@@ -10,6 +10,7 @@ import { getPlataformStatusEdenClient } from "extensions/scripts/plataform-statu
 
 interface Props {
     onClose: () => void;
+    onSaved: () => void;
     isOpen: boolean;
 }
 
@@ -17,7 +18,7 @@ function isValidPlataform(value: string): value is Plataform {
     return PLATAFORMS.includes(value as Plataform);
 }
 
-export function AddPlataform({ onClose, isOpen }: Props) {
+export function AddPlataform({ onClose, onSaved, isOpen }: Props) {
     const [isSaving, setIsSaving] = useState(false);
     const { showToast } = useToast();
 
@@ -44,6 +45,7 @@ export function AddPlataform({ onClose, isOpen }: Props) {
                 })
                 .then(() => {
                     showToast("Salvo com sucesso", "success");
+                    onSaved();
                     onClose();
                 })
                 .catch(() => {
@@ -53,8 +55,9 @@ export function AddPlataform({ onClose, isOpen }: Props) {
                     setIsSaving(false);
                 });
         },
-        [onClose, showToast],
+        [onClose, onSaved, showToast],
     );
+
     return (
         <div
             className={`fixed inset-0 z-50 bg-mist-950/90 backdrop-blur-sm flex justify-center items-center p-4 transition-opacity duration-200 ${

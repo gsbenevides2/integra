@@ -1,14 +1,21 @@
 import { PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { IconButton } from "core/ui/components/iconButton";
+import type { Plataform } from "utils/statusPlataform";
 
-export function Card() {
+interface Props {
+    name: string;
+    url: string;
+    type: Plataform;
+}
+
+export function Card({ name, url, type }: Props) {
     return (
         <div className="bg-gray-800 p-2 text-sm rounded-md flex flex-col gap-1">
             <div className="flex justify-between">
                 <div>
-                    <p>Nome: Github</p>
-                    <p>URL: https://status.github.com</p>
-                    <p>Tipo: Atlasian</p>
+                    <p>Nome: {name}</p>
+                    <p>URL: {url}</p>
+                    <p>Tipo: {type}</p>
                 </div>
                 <div className="flex flex-col gap-0.5">
                     <IconButton className="hover:bg-gray-500">
