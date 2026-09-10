@@ -6,7 +6,7 @@ RUN printf '%s\n' "//npm.pkg.github.com/:_authToken=${TOKEN_GITHUB}" "@gsbenevid
     bun install --frozen-lockfile --production && \
     rm -f /root/.npmrc
 COPY . .
-RUN bun build src/index.ts --outdir dist --target bun --sourcemap=external
+RUN bun run build
 
 
 FROM oven/bun:1-slim

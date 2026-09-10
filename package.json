@@ -4,7 +4,7 @@
     "description": "Event-driven daemon connecting external services (HTTP, MQTT, Home Assistant, Redis, PostgreSQL, Email/IMAP, Cron) to user scripts. Every execution is auto-traced to MongoDB.",
     "module": "index.ts",
     "type": "module",
-    "version": "1.0.8",
+    "version": "1.0.9",
     "private": true,
     "repository": {
         "type": "git",
@@ -71,6 +71,7 @@
         "openai": "^6.45.0",
         "react": "^19.2.8",
         "react-dom": "^19.2.8",
+        "recharts": "^3.10.1",
         "ssh2": "^1.17.0",
         "tailwindcss": "^4.3.3",
         "zod": "^4.5.4"

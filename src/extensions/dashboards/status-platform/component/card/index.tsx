@@ -15,6 +15,7 @@ interface Props {
     problemDescription: string | null;
     onDeleted: () => void;
     onEdit: () => void;
+    onOpenHistory: () => void;
 }
 
 export function Card({
@@ -26,6 +27,7 @@ export function Card({
     problemDescription,
     onDeleted,
     onEdit,
+    onOpenHistory,
 }: Props) {
     const [isDeleting, setIsDeleting] = useState(false);
     const { showToast } = useToast();
@@ -62,9 +64,10 @@ export function Card({
 
     return (
         <div
-            className={`bg-gray-800 p-2 text-sm rounded-md flex flex-col gap-1 transition-opacity ${
+            className={`bg-gray-800 p-2 text-sm rounded-md flex flex-col gap-1 transition-opacity cursor-pointer hover:bg-gray-700 ${
                 isDeleting ? "opacity-50 pointer-events-none" : ""
             }`}
+            onClick={onOpenHistory}
         >
             <div className="flex justify-between">
                 <div>
@@ -75,14 +78,20 @@ export function Card({
                 <div className="flex flex-col gap-0.5">
                     <IconButton
                         className="hover:bg-gray-500"
-                        onClick={onEdit}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onEdit();
+                        }}
                         disabled={isDeleting}
                     >
                         <PencilIcon className="size-4.5" />
                     </IconButton>
                     <IconButton
                         className="hover:bg-gray-500"
-                        onClick={deletePlatform}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            deletePlatform();
+                        }}
                         disabled={isDeleting}
                     >
                         <TrashIcon className="size-4.5" />

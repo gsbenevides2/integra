@@ -1,12 +1,15 @@
 import { db } from "core/db";
 import onHttp, { getTraceId } from "core/triggers/http";
 
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, lt } from "drizzle-orm";
 import Elysia from "elysia";
 import { platforms, platformStatusChecks } from "extensions/db/platform-status";
 import { PLATFORMS } from "utils/statusPlatform";
 import z from "zod";
 import { checkPlatformStatus } from "./checkStatus";
+import { buildSegments } from "./history";
+
+const HISTORY_PAGE_SIZE = 100;
 
 function latestChecksSubquery() {
     return db
@@ -49,6 +52,46 @@ export const platformStatusElysiaClient = new Elysia({
         const response = await getPlatformsWithLatestStatus();
         return response;
     })
+    .get(
+        "/:id/history",
+        async ({ params, query }) => {
+            const before = query.before ? new Date(query.before) : new Date();
+            const checks = await db
+                .select({
+                    status: platformStatusChecks.status,
+                    problemDescription: platformStatusChecks.problemDescription,
+                    checkedAt: platformStatusChecks.checkedAt,
+                })
+                .from(platformStatusChecks)
+                .where(
+                    and(
+                        eq(platformStatusChecks.platformId, params.id),
+                        lt(platformStatusChecks.checkedAt, before),
+                    ),
+                )
+                .orderBy(desc(platformStatusChecks.checkedAt))
+                .limit(HISTORY_PAGE_SIZE);
+
+            const ordered = checks.slice().reverse();
+            const segments = buildSegments(ordered);
+            const oldestCheck = checks.at(-1);
+
+            return {
+                checks: ordered,
+                segments,
+                hasMore: checks.length === HISTORY_PAGE_SIZE,
+                nextCursor: oldestCheck ? oldestCheck.checkedAt.toISOString() : null,
+            };
+        },
+        {
+            params: z.object({
+                id: z.string(),
+            }),
+            query: z.object({
+                before: z.string().optional(),
+            }),
+        },
+    )
     .post(
         "/new",
         async ({ body, set }) => {

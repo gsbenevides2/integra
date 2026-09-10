@@ -6,6 +6,7 @@ import { useToast } from "core/ui/components/toast";
 import type { Platform } from "utils/statusPlatform";
 import { Card } from "./component/card";
 import { CardSkeleton } from "./component/cardSkeleton";
+import { HistoryModal } from "./component/historyModal";
 import { PlatformFormModal, type PlatformFormValues } from "./component/platformFormModal";
 import { getPlatformStatusEdenClient } from "extensions/scripts/platform-status/client";
 
@@ -22,6 +23,7 @@ interface PlatformRow {
 function Dashboard() {
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
     const [editingPlatform, setEditingPlatform] = useState<PlatformFormValues>();
+    const [historyPlatform, setHistoryPlatform] = useState<{ id: string; name: string }>();
     const [platforms, setPlatforms] = useState<PlatformRow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const { showToast } = useToast();
@@ -74,6 +76,13 @@ function Dashboard() {
                 platform={editingPlatform}
             />
 
+            <HistoryModal
+                isOpen={Boolean(historyPlatform)}
+                onClose={() => setHistoryPlatform(undefined)}
+                platformId={historyPlatform?.id}
+                platformName={historyPlatform?.name}
+            />
+
             <div className="flex justify-between">
                 <h1 className="text-xl">Status Platform</h1>
                 <Button onClick={openCreateModal}>
@@ -112,6 +121,9 @@ function Dashboard() {
                             problemDescription={platform.problemDescription}
                             onDeleted={() => fetchPlatforms(true)}
                             onEdit={() => openEditModal(platform)}
+                            onOpenHistory={() =>
+                                setHistoryPlatform({ id: platform.id, name: platform.name })
+                            }
                         />
                     ))}
                 </div>
