@@ -8,6 +8,7 @@ import { statusSync } from "extensions/scripts/status-sync";
 import { syncTpLinkData } from "extensions/scripts/tp-link-center";
 import registerSettings from "core";
 import { platformStatusRoutes } from "extensions/scripts/platform-status/routes";
+import { platformStatusCheckCron } from "extensions/scripts/platform-status/cron";
 
 await registerSettings({
     triggers: [
@@ -21,5 +22,6 @@ await registerSettings({
         syncTpLinkData,
         autoClean,
         platformStatusRoutes,
+        platformStatusCheckCron,
     ],
 });

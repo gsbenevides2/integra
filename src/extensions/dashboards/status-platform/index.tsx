@@ -14,6 +14,9 @@ interface PlatformRow {
     name: string;
     url: string;
     type: Platform;
+    status: "OK" | "DOWN" | null;
+    problemDescription: string | null;
+    lastCheckedAt: Date | string | null;
 }
 
 function Dashboard() {
@@ -105,6 +108,8 @@ function Dashboard() {
                             name={platform.name}
                             url={platform.url}
                             type={platform.type}
+                            status={platform.status}
+                            problemDescription={platform.problemDescription}
                             onDeleted={() => fetchPlatforms(true)}
                             onEdit={() => openEditModal(platform)}
                         />

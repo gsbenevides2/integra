@@ -1,23 +1,58 @@
 import { db } from "core/db";
-import onHttp from "core/triggers/http";
+import onHttp, { getTraceId } from "core/triggers/http";
 
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import Elysia from "elysia";
-import { platforms } from "extensions/db/platform-status";
+import { platforms, platformStatusChecks } from "extensions/db/platform-status";
 import { PLATFORMS } from "utils/statusPlatform";
 import z from "zod";
+import { checkPlatformStatus } from "./checkStatus";
+
+function latestChecksSubquery() {
+    return db
+        .selectDistinctOn([platformStatusChecks.platformId], {
+            platformId: platformStatusChecks.platformId,
+            status: platformStatusChecks.status,
+            problemDescription: platformStatusChecks.problemDescription,
+            checkedAt: platformStatusChecks.checkedAt,
+        })
+        .from(platformStatusChecks)
+        .orderBy(platformStatusChecks.platformId, desc(platformStatusChecks.checkedAt))
+        .as("latest_checks");
+}
+
+async function getPlatformsWithLatestStatus(platformId?: string) {
+    const latestChecks = latestChecksSubquery();
+    const query = db
+        .select({
+            id: platforms.id,
+            name: platforms.name,
+            url: platforms.url,
+            type: platforms.type,
+            status: latestChecks.status,
+            problemDescription: latestChecks.problemDescription,
+            lastCheckedAt: latestChecks.checkedAt,
+        })
+        .from(platforms)
+        .leftJoin(latestChecks, eq(platforms.id, latestChecks.platformId));
+
+    if (platformId) {
+        return query.where(eq(platforms.id, platformId));
+    }
+    return query;
+}
 
 export const platformStatusElysiaClient = new Elysia({
     prefix: "/platform-stats",
 })
     .get("/list-platforms", async () => {
-        const response = await db.select().from(platforms);
+        const response = await getPlatformsWithLatestStatus();
         return response;
     })
     .post(
         "/new",
-        async ({ body }) => {
-            const response = await db
+        async ({ body, set }) => {
+            const [created] = await db
                 .insert(platforms)
                 .values([
                     {
@@ -27,7 +62,9 @@ export const platformStatusElysiaClient = new Elysia({
                     },
                 ])
                 .returning();
-            return response;
+            if (!created) return [];
+            await checkPlatformStatus(created, getTraceId(set.headers));
+            return getPlatformsWithLatestStatus(created.id);
         },
         {
             body: z.object({
@@ -54,8 +91,8 @@ export const platformStatusElysiaClient = new Elysia({
     )
     .patch(
         "/:id",
-        async ({ params, body }) => {
-            const response = await db
+        async ({ params, body, set }) => {
+            const [updated] = await db
                 .update(platforms)
                 .set({
                     name: body.name,
@@ -64,7 +101,9 @@ export const platformStatusElysiaClient = new Elysia({
                 })
                 .where(eq(platforms.id, params.id))
                 .returning();
-            return response;
+            if (!updated) return [];
+            await checkPlatformStatus(updated, getTraceId(set.headers));
+            return getPlatformsWithLatestStatus(updated.id);
         },
         {
             params: z.object({

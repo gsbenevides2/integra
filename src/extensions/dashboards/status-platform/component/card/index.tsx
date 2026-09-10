@@ -11,11 +11,22 @@ interface Props {
     name: string;
     url: string;
     type: Platform;
+    status: "OK" | "DOWN" | null;
+    problemDescription: string | null;
     onDeleted: () => void;
     onEdit: () => void;
 }
 
-export function Card({ id, name, url, type, onDeleted, onEdit }: Props) {
+export function Card({
+    id,
+    name,
+    url,
+    type,
+    status,
+    problemDescription,
+    onDeleted,
+    onEdit,
+}: Props) {
     const [isDeleting, setIsDeleting] = useState(false);
     const { showToast } = useToast();
     const confirm = useConfirm();
@@ -80,13 +91,27 @@ export function Card({ id, name, url, type, onDeleted, onEdit }: Props) {
             </div>
             <div>
                 <div className="flex gap-1 items-center">
-                    <div className="bg-green-700 h-2 w-2 rounded-full" />
-                    <p>Status: Operational</p>
+                    <div
+                        className={`h-2 w-2 rounded-full ${
+                            status === "OK"
+                                ? "bg-green-700"
+                                : status === "DOWN"
+                                  ? "bg-red-700"
+                                  : "bg-gray-600"
+                        }`}
+                    />
+                    <p>
+                        Status:{" "}
+                        {status === "OK"
+                            ? "Operational"
+                            : status === "DOWN"
+                              ? "Down"
+                              : "Not checked yet"}
+                    </p>
                 </div>
-                <div className="flex gap-1 items-center">
-                    <div className="h-2 w-2 rounded-full" />
-                    <p>Systems down</p>
-                </div>
+                {status === "DOWN" && problemDescription && (
+                    <p className="text-red-400 text-xs mt-0.5">{problemDescription}</p>
+                )}
             </div>
         </div>
     );
