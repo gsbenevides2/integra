@@ -2,7 +2,8 @@ import { db } from "core/db";
 import onHttp from "core/triggers/http";
 
 import Elysia from "elysia";
-import { PLATAFORMS, plataforms } from "extensions/db/plataform-status";
+import { plataforms } from "extensions/db/plataform-status";
+import { PLATAFORMS } from "utils/statusPlataform";
 import z from "zod";
 
 export const plataformStatusElysiaClient = new Elysia({

@@ -1,16 +1,48 @@
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import { PLATAFORMS } from "extensions/db/plataform-status";
+import { PLATAFORMS, type Plataform } from "utils/statusPlataform";
 import { Button } from "core/ui/components/button";
 import { IconButton } from "core/ui/components/iconButton";
 import { Input } from "core/ui/components/input";
 import { Select } from "core/ui/components/select";
+import { useCallback } from "react";
+import { getPlataformStatusEdenClient } from "extensions/scripts/plataform-status/client";
 
 interface Props {
     onClose: () => void;
     isOpen: boolean;
 }
 
+function isValidPlataform(value: string): value is Plataform {
+    return PLATAFORMS.includes(value as Plataform);
+}
+
 export function AddPlataform({ onClose, isOpen }: Props) {
+    const savePlataform = useCallback((event: React.SubmitEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        const name = formData.get("name")?.toString();
+        const type = formData.get("type")?.toString();
+        const url = formData.get("url")?.toString();
+        if (!name) return alert("Missing name!");
+        if (!type) return alert("Missing type");
+        if (!url) return alert("Missing url");
+        if (!isValidPlataform(type)) return alert("Invalid type");
+
+        const client = getPlataformStatusEdenClient();
+
+        client["plataform-stats"].new
+            .post({
+                name,
+                type,
+                url,
+            })
+            .then(() => {
+                alert("Salvo com sucesso");
+            })
+            .catch(() => {
+                alert("Erro ao salvar");
+            });
+    }, []);
     return (
         <div
             className={`fixed inset-0 z-50 bg-mist-950/90 backdrop-blur-sm flex justify-center items-center p-4 transition-opacity duration-200 ${
@@ -31,7 +63,7 @@ export function AddPlataform({ onClose, isOpen }: Props) {
                         <XMarkIcon className="size-4.5" />
                     </IconButton>
                 </div>
-                <form className="flex flex-col gap-3">
+                <form className="flex flex-col gap-3" onSubmit={savePlataform}>
                     <Input
                         label="Name"
                         type="text"

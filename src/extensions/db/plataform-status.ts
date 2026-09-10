@@ -1,6 +1,5 @@
 import { pgSchema, text } from "drizzle-orm/pg-core";
-
-export const PLATAFORMS = ["incident", "instatus", "atlassian", "generic", "wake"] as const;
+import { PLATAFORMS } from "utils/statusPlataform";
 
 export const statusPlataform = pgSchema("status_platafom");
 

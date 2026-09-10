@@ -14,6 +14,7 @@ export function Input({ label, id, className = "", ...props }: Props) {
             )}
             <input
                 id={id}
+                name={id}
                 className={`border border-mist-600 bg-gray-900 p-2 rounded-md outline-0 focus:border-mist-300 transition-colors ${className}`}
                 {...props}
             />
