@@ -6,6 +6,7 @@ export interface TrainLineData {
     code: number;
     color: string;
     company: TrainCompany;
+    cssColor: string;
 }
 
 export interface ProcessedTrainLine {

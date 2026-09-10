@@ -3,7 +3,7 @@ import { checkPlatformsStatus } from "./checkStatus";
 
 export const platformStatusCheckCron = onCron(
     {
-        cron: "*/2 * * * *",
+        cron: "*/5 * * * *",
         id: "platform-status-check",
         runTriggerOnEnds: "sinal-monitor",
     },

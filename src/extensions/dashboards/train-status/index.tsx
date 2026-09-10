@@ -83,7 +83,6 @@ function Dashboard() {
                         <Card
                             key={line.lineCode}
                             lineCode={line.lineCode}
-                            lineColor={line.lineColor}
                             situation={line.situation}
                             status={line.status}
                             description={line.description}
