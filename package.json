@@ -1,10 +1,10 @@
 {
     "name": "@gsbenevides2/integra",
     "displayName": "Integra",
-    "description": "Event-driven daemon connecting external services (HTTP, MQTT, Home Assistant, Redis, PostgreSQL, Email/IMAP, Cron) to user scripts. Every execution is auto-traced to MongoDB.",
+    "description": "Event-driven daemon connecting external services (HTTP, MQTT, Home Assistant, Redis, PostgreSQL, Email/IMAP, Cron) to user scripts. Every execution is auto-traced to PostgreSQL.",
     "module": "index.ts",
     "type": "module",
-    "version": "1.0.14",
+    "version": "1.0.15",
     "private": true,
     "repository": {
         "type": "git",
@@ -59,7 +59,6 @@
         "@modelcontextprotocol/sdk": "^1.29.0",
         "@tailwindcss/cli": "^4.3.3",
         "@textea/json-viewer": "^4.0.1",
-        "bson": "7.2.0",
         "date-fns": "^4.4.0",
         "date-fns-tz": "^3.2.0",
         "drizzle-orm": "^1.0.0-rc.4",
@@ -68,7 +67,6 @@
         "imap": "^0.8.19",
         "jose": "^6.2.3",
         "mailparser": "^3.9.12",
-        "mongoose": "^9.7.3",
         "mqtt": "^5.15.1",
         "openai": "^6.45.0",
         "react": "^19.2.8",

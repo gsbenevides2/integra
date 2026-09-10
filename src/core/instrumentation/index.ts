@@ -1,5 +1,7 @@
 import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport";
-import { runModel } from "./mongo";
+import { db } from "core/db";
+import { runEvents, runs } from "extensions/db/schema";
+import { eq, lt } from "drizzle-orm";
 import type { CreateEventData, EndTracerParams, StartTracerParams } from "./types";
 import { type ClientOptions } from "openai";
 import type { Treaty } from "@elysia/eden";
@@ -9,7 +11,7 @@ export const DONT_TRACE_ID = "dont-trace";
 
 export async function startTracer(params: StartTracerParams) {
     if (params.traceId === DONT_TRACE_ID) return;
-    await runModel.create({
+    await db.insert(runs).values({
         ...params,
         startTime: new Date(),
     });
@@ -19,20 +21,15 @@ export async function endTracer(params: EndTracerParams, createTracer?: StartTra
     if (params.traceId === DONT_TRACE_ID) return;
     if (createTracer?.traceId === DONT_TRACE_ID) return;
     const endSet = { endTime: new Date(), outputData: params.outputData, status: params.status };
-    const exists = await runModel.findOne({
-        traceId: params.traceId,
-    });
+    const [exists] = await db
+        .select({ id: runs.id })
+        .from(runs)
+        .where(eq(runs.traceId, params.traceId))
+        .limit(1);
     if (exists) {
-        await runModel.updateOne(
-            {
-                traceId: params.traceId,
-            },
-            {
-                $set: endSet,
-            },
-        );
+        await db.update(runs).set(endSet).where(eq(runs.traceId, params.traceId));
     } else if (createTracer) {
-        await runModel.create({
+        await db.insert(runs).values({
             ...createTracer,
             ...endSet,
             startTime: new Date(),
@@ -42,22 +39,19 @@ export async function endTracer(params: EndTracerParams, createTracer?: StartTra
 
 export async function addTracerEvent(params: CreateEventData) {
     if (params.traceId === DONT_TRACE_ID) return;
-    await runModel.updateOne(
-        {
-            traceId: params.traceId,
-        },
-        {
-            $push: {
-                events: {
-                    eventId: crypto.randomUUID(),
-                    eventName: params.eventName,
-                    eventData: params.eventData,
-                    eventType: params.eventType,
-                    dateTime: new Date(),
-                },
-            },
-        },
-    );
+    const [run] = await db
+        .select({ id: runs.id })
+        .from(runs)
+        .where(eq(runs.traceId, params.traceId))
+        .limit(1);
+    if (!run) return;
+    await db.insert(runEvents).values({
+        runId: run.id,
+        eventName: params.eventName,
+        eventData: params.eventData,
+        eventType: params.eventType,
+        dateTime: new Date(),
+    });
 }
 
 export async function createTracerIfNotExtistsAndAppendEvent(
@@ -65,11 +59,13 @@ export async function createTracerIfNotExtistsAndAppendEvent(
     createEventParams: Omit<CreateEventData, "traceId">,
 ) {
     if (params.traceId === DONT_TRACE_ID) return;
-    const exists = await runModel.findOne({
-        traceId: params.traceId,
-    });
+    const [exists] = await db
+        .select({ id: runs.id })
+        .from(runs)
+        .where(eq(runs.traceId, params.traceId))
+        .limit(1);
     if (!exists) {
-        await runModel.create({
+        await db.insert(runs).values({
             ...params,
             startTime: new Date(),
         });
@@ -173,9 +169,7 @@ export function getBunFetchInstrumentableFetchClient(traceId: string): EdenFetch
     return f;
 }
 
-export function clearOldTraces() {
+export async function clearOldTraces() {
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    return runModel.deleteMany({
-        endTime: { $lt: oneDayAgo },
-    });
+    await db.delete(runs).where(lt(runs.endTime, oneDayAgo));
 }

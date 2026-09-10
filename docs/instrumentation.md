@@ -1,6 +1,6 @@
 # Instrumentation
 
-The instrumentation layer automatically traces every trigger execution and stores it in MongoDB.
+The instrumentation layer automatically traces every trigger execution and stores it in PostgreSQL.
 
 ## How It Works
 
@@ -10,29 +10,40 @@ Each trigger execution receives a `traceId` (UUID). The instrumentation system r
 2. **Events**: Named events during execution (errors, custom info)
 3. **End**: When execution finishes (output data, SUCCESS/ERROR status)
 
-## MongoDB Schema
+## PostgreSQL Schema (`execution_logs` schema, `src/extensions/db/execution-logs.ts`)
 
-### `runs` Collection
+### `runs` table
 
 ```ts
 {
-    traceId: string,          // UUID
-    triggerId: string,        // e.g. "authentik:loginFailed"
-    startTime: Date,
-    endTime?: Date,
-    workflowType: string,     // "http", "MQTT", "Redis", etc.
-    inputData: object,
-    outputData?: object,
-    status?: "SUCCESS" | "ERROR",
-    events: [{
-        eventId: string,      // UUID
-        eventName: string,
-        eventData: object,
-        eventType: "INFO" | "ERROR",
-        dateTime: Date,
-    }]
+    id: text,                 // UUID, primary key
+    traceId: text,            // UUID, unique index
+    triggerId: text,          // e.g. "authentik:loginFailed", indexed
+    startTime: timestamptz,   // indexed (dashboard range filter, sort, cursor)
+    endTime?: timestamptz,
+    workflowType: text,       // "http", "MQTT", "Redis", etc., indexed
+    inputData: jsonb,
+    outputData?: jsonb,
+    status?: "SUCCESS" | "ERROR", // indexed
 }
 ```
+
+### `run_events` table
+
+```ts
+{
+    id: text,          // UUID, primary key
+    runId: text,       // FK -> runs.id, indexed, cascades on delete
+    eventName: text,
+    eventData: jsonb,
+    eventType: "INFO" | "ERROR",
+    dateTime: timestamptz,
+}
+```
+
+Events are stored in their own table (rather than embedded, as they were in the previous MongoDB
+document model) since Postgres has no native embedded-array equivalent. Run `bun run db:sync` after
+schema changes to push the schema to Postgres.
 
 ## Functions
 
