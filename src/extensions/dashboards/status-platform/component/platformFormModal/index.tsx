@@ -1,37 +1,37 @@
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import { PLATAFORMS, type Plataform } from "utils/statusPlataform";
+import { PLATFORMS, type Platform } from "utils/statusPlatform";
 import { Button } from "core/ui/components/button";
 import { IconButton } from "core/ui/components/iconButton";
 import { Input } from "core/ui/components/input";
 import { Select } from "core/ui/components/select";
 import { useToast } from "core/ui/components/toast";
 import { useCallback, useState } from "react";
-import { getPlataformStatusEdenClient } from "extensions/scripts/plataform-status/client";
+import { getPlatformStatusEdenClient } from "extensions/scripts/platform-status/client";
 
-export interface PlataformFormValues {
+export interface PlatformFormValues {
     id: string;
     name: string;
     url: string;
-    type: Plataform;
+    type: Platform;
 }
 
 interface Props {
     onClose: () => void;
     onSaved: () => void;
     isOpen: boolean;
-    plataform?: PlataformFormValues;
+    platform?: PlatformFormValues;
 }
 
-function isValidPlataform(value: string): value is Plataform {
-    return PLATAFORMS.includes(value as Plataform);
+function isValidPlatform(value: string): value is Platform {
+    return PLATFORMS.includes(value as Platform);
 }
 
-export function PlataformFormModal({ onClose, onSaved, isOpen, plataform }: Props) {
+export function PlatformFormModal({ onClose, onSaved, isOpen, platform }: Props) {
     const [isSaving, setIsSaving] = useState(false);
     const { showToast } = useToast();
-    const isEditing = Boolean(plataform);
+    const isEditing = Boolean(platform);
 
-    const savePlataform = useCallback(
+    const savePlatform = useCallback(
         (event: React.SubmitEvent<HTMLFormElement>) => {
             event.preventDefault();
             const formData = new FormData(event.currentTarget);
@@ -41,14 +41,14 @@ export function PlataformFormModal({ onClose, onSaved, isOpen, plataform }: Prop
             if (!name) return showToast("Missing name!", "error");
             if (!type) return showToast("Missing type", "error");
             if (!url) return showToast("Missing url", "error");
-            if (!isValidPlataform(type)) return showToast("Invalid type", "error");
+            if (!isValidPlatform(type)) return showToast("Invalid type", "error");
 
-            const client = getPlataformStatusEdenClient();
+            const client = getPlatformStatusEdenClient();
 
             setIsSaving(true);
-            const request = plataform
-                ? client["plataform-stats"]({ id: plataform.id }).patch({ name, type, url })
-                : client["plataform-stats"].new.post({ name, type, url });
+            const request = platform
+                ? client["platform-stats"]({ id: platform.id }).patch({ name, type, url })
+                : client["platform-stats"].new.post({ name, type, url });
 
             request
                 .then(({ error }) => {
@@ -70,7 +70,7 @@ export function PlataformFormModal({ onClose, onSaved, isOpen, plataform }: Prop
                     setIsSaving(false);
                 });
         },
-        [isEditing, onClose, onSaved, plataform, showToast],
+        [isEditing, onClose, onSaved, platform, showToast],
     );
 
     return (
@@ -89,7 +89,7 @@ export function PlataformFormModal({ onClose, onSaved, isOpen, plataform }: Prop
             >
                 <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold">
-                        {isEditing ? "Edit Plataform" : "Add Plataform"}
+                        {isEditing ? "Edit Platform" : "Add Platform"}
                     </h3>
                     <IconButton type="button" onClick={onClose}>
                         <XMarkIcon className="size-4.5" />
@@ -97,29 +97,29 @@ export function PlataformFormModal({ onClose, onSaved, isOpen, plataform }: Prop
                 </div>
                 <form
                     className="flex flex-col gap-3"
-                    onSubmit={savePlataform}
-                    key={plataform?.id ?? "new"}
+                    onSubmit={savePlatform}
+                    key={platform?.id ?? "new"}
                 >
                     <Input
                         label="Name"
                         type="text"
                         id="name"
-                        placeholder="Type the plataform name"
-                        defaultValue={plataform?.name}
+                        placeholder="Type the platform name"
+                        defaultValue={platform?.name}
                     />
                     <Input
                         label="Url"
                         type="text"
                         id="url"
-                        placeholder="Type the plataform url"
-                        defaultValue={plataform?.url}
+                        placeholder="Type the platform url"
+                        defaultValue={platform?.url}
                     />
                     <Select
                         label="Type"
                         id="type"
-                        defaultValue={plataform?.type ?? ""}
-                        placeholder="Select the plataform type"
-                        options={PLATAFORMS.map((option) => ({
+                        defaultValue={platform?.type ?? ""}
+                        placeholder="Select the platform type"
+                        options={PLATFORMS.map((option) => ({
                             label: option,
                             value: option,
                         }))}

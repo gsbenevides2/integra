@@ -1,1 +1,1 @@
-export * from "./plataform-status";
+export * from "./platform-status";

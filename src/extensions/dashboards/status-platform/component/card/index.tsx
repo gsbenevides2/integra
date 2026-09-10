@@ -2,15 +2,15 @@ import { PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { IconButton } from "core/ui/components/iconButton";
 import { useConfirm } from "core/ui/components/confirm";
 import { useToast } from "core/ui/components/toast";
-import { getPlataformStatusEdenClient } from "extensions/scripts/plataform-status/client";
+import { getPlatformStatusEdenClient } from "extensions/scripts/platform-status/client";
 import { useCallback, useState } from "react";
-import type { Plataform } from "utils/statusPlataform";
+import type { Platform } from "utils/statusPlatform";
 
 interface Props {
     id: string;
     name: string;
     url: string;
-    type: Plataform;
+    type: Platform;
     onDeleted: () => void;
     onEdit: () => void;
 }
@@ -20,7 +20,7 @@ export function Card({ id, name, url, type, onDeleted, onEdit }: Props) {
     const { showToast } = useToast();
     const confirm = useConfirm();
 
-    const deletePlataform = useCallback(async () => {
+    const deletePlatform = useCallback(async () => {
         const confirmed = await confirm({
             title: "Delete platform",
             message: `Are you sure you want to delete "${name}"? This action cannot be undone.`,
@@ -28,10 +28,10 @@ export function Card({ id, name, url, type, onDeleted, onEdit }: Props) {
         });
         if (!confirmed) return;
 
-        const client = getPlataformStatusEdenClient();
+        const client = getPlatformStatusEdenClient();
 
         setIsDeleting(true);
-        client["plataform-stats"]({ id })
+        client["platform-stats"]({ id })
             .delete()
             .then(({ error }) => {
                 if (error) {
@@ -71,7 +71,7 @@ export function Card({ id, name, url, type, onDeleted, onEdit }: Props) {
                     </IconButton>
                     <IconButton
                         className="hover:bg-gray-500"
-                        onClick={deletePlataform}
+                        onClick={deletePlatform}
                         disabled={isDeleting}
                     >
                         <TrashIcon className="size-4.5" />

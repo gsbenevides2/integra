@@ -3,22 +3,22 @@ import onHttp from "core/triggers/http";
 
 import { eq } from "drizzle-orm";
 import Elysia from "elysia";
-import { plataforms } from "extensions/db/plataform-status";
-import { PLATAFORMS } from "utils/statusPlataform";
+import { platforms } from "extensions/db/platform-status";
+import { PLATFORMS } from "utils/statusPlatform";
 import z from "zod";
 
-export const plataformStatusElysiaClient = new Elysia({
-    prefix: "/plataform-stats",
+export const platformStatusElysiaClient = new Elysia({
+    prefix: "/platform-stats",
 })
-    .get("/list-plataforms", async () => {
-        const response = await db.select().from(plataforms);
+    .get("/list-platforms", async () => {
+        const response = await db.select().from(platforms);
         return response;
     })
     .post(
         "/new",
         async ({ body }) => {
             const response = await db
-                .insert(plataforms)
+                .insert(platforms)
                 .values([
                     {
                         name: body.name,
@@ -33,7 +33,7 @@ export const plataformStatusElysiaClient = new Elysia({
             body: z.object({
                 name: z.string(),
                 url: z.string(),
-                type: z.enum(PLATAFORMS),
+                type: z.enum(PLATFORMS),
             }),
         },
     )
@@ -41,8 +41,8 @@ export const plataformStatusElysiaClient = new Elysia({
         "/:id",
         async ({ params }) => {
             const response = await db
-                .delete(plataforms)
-                .where(eq(plataforms.id, params.id))
+                .delete(platforms)
+                .where(eq(platforms.id, params.id))
                 .returning();
             return response;
         },
@@ -56,13 +56,13 @@ export const plataformStatusElysiaClient = new Elysia({
         "/:id",
         async ({ params, body }) => {
             const response = await db
-                .update(plataforms)
+                .update(platforms)
                 .set({
                     name: body.name,
                     url: body.url,
                     type: body.type,
                 })
-                .where(eq(plataforms.id, params.id))
+                .where(eq(platforms.id, params.id))
                 .returning();
             return response;
         },
@@ -73,14 +73,14 @@ export const plataformStatusElysiaClient = new Elysia({
             body: z.object({
                 name: z.string(),
                 url: z.string(),
-                type: z.enum(PLATAFORMS),
+                type: z.enum(PLATFORMS),
             }),
         },
     );
 
-export const plataformStatusRoutes = onHttp(
+export const platformStatusRoutes = onHttp(
     {
-        id: "plataform-status-routes",
+        id: "platform-status-routes",
     },
-    plataformStatusElysiaClient,
+    platformStatusElysiaClient,
 );

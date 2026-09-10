@@ -1,4 +1,4 @@
 import type { DashboardData } from "core/ui/createDashboard";
-import { statusPlataformDashboard } from "./status-plataform";
+import { statusPlatformDashboard } from "./status-platform";
 
-export const dashboards: DashboardData[] = [statusPlataformDashboard];
+export const dashboards: DashboardData[] = [statusPlatformDashboard];

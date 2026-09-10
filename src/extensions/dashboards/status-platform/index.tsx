@@ -3,37 +3,37 @@ import { PlusIcon, ServerStackIcon, ShieldCheckIcon } from "@heroicons/react/24/
 import type { DashboardData } from "core/ui/createDashboard";
 import { Button } from "core/ui/components/button";
 import { useToast } from "core/ui/components/toast";
-import type { Plataform } from "utils/statusPlataform";
+import type { Platform } from "utils/statusPlatform";
 import { Card } from "./component/card";
 import { CardSkeleton } from "./component/cardSkeleton";
-import { PlataformFormModal, type PlataformFormValues } from "./component/plataformFormModal";
-import { getPlataformStatusEdenClient } from "extensions/scripts/plataform-status/client";
+import { PlatformFormModal, type PlatformFormValues } from "./component/platformFormModal";
+import { getPlatformStatusEdenClient } from "extensions/scripts/platform-status/client";
 
-interface PlataformRow {
+interface PlatformRow {
     id: string;
     name: string;
     url: string;
-    type: Plataform;
+    type: Platform;
 }
 
 function Dashboard() {
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-    const [editingPlataform, setEditingPlataform] = useState<PlataformFormValues>();
-    const [plataforms, setPlataforms] = useState<PlataformRow[]>([]);
+    const [editingPlatform, setEditingPlatform] = useState<PlatformFormValues>();
+    const [platforms, setPlatforms] = useState<PlatformRow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const { showToast } = useToast();
 
-    const fetchPlataforms = useCallback(
+    const fetchPlatforms = useCallback(
         async (useLoading: boolean) => {
             if (useLoading) {
                 setIsLoading(true);
             }
-            const client = getPlataformStatusEdenClient();
-            const { data, error } = await client["plataform-stats"]["list-plataforms"].get();
+            const client = getPlatformStatusEdenClient();
+            const { data, error } = await client["platform-stats"]["list-platforms"].get();
             if (error) {
                 showToast("Failed to fetch platforms", "error");
             } else {
-                setPlataforms(data ?? []);
+                setPlatforms(data ?? []);
             }
             if (useLoading) {
                 setIsLoading(false);
@@ -43,39 +43,39 @@ function Dashboard() {
     );
 
     useEffect(() => {
-        fetchPlataforms(true);
+        fetchPlatforms(true);
         const interval = setInterval(() => {
-            fetchPlataforms(false);
+            fetchPlatforms(false);
         }, 4000);
         return () => {
             clearInterval(interval);
         };
-    }, [fetchPlataforms]);
+    }, [fetchPlatforms]);
 
     const openCreateModal = useCallback(() => {
-        setEditingPlataform(undefined);
+        setEditingPlatform(undefined);
         setIsFormModalOpen(true);
     }, []);
 
-    const openEditModal = useCallback((plataform: PlataformFormValues) => {
-        setEditingPlataform(plataform);
+    const openEditModal = useCallback((platform: PlatformFormValues) => {
+        setEditingPlatform(platform);
         setIsFormModalOpen(true);
     }, []);
 
     return (
         <div className="p-3 flex flex-col gap-4">
-            <PlataformFormModal
+            <PlatformFormModal
                 onClose={() => setIsFormModalOpen(false)}
-                onSaved={() => fetchPlataforms(true)}
+                onSaved={() => fetchPlatforms(true)}
                 isOpen={isFormModalOpen}
-                plataform={editingPlataform}
+                platform={editingPlatform}
             />
 
             <div className="flex justify-between">
-                <h1 className="text-xl">Status Plataform</h1>
+                <h1 className="text-xl">Status Platform</h1>
                 <Button onClick={openCreateModal}>
                     <PlusIcon className="size-4.5" />
-                    <span>Add Plataform</span>
+                    <span>Add Platform</span>
                 </Button>
             </div>
             {isLoading ? (
@@ -84,7 +84,7 @@ function Dashboard() {
                         <CardSkeleton key={index} />
                     ))}
                 </div>
-            ) : plataforms.length === 0 ? (
+            ) : platforms.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-16 text-center">
                     <ServerStackIcon className="size-10 text-mist-500" />
                     <p className="text-mist-200">No platforms registered yet</p>
@@ -93,20 +93,20 @@ function Dashboard() {
                     </p>
                     <Button className="mt-2" onClick={openCreateModal}>
                         <PlusIcon className="size-4.5" />
-                        <span>Add Plataform</span>
+                        <span>Add Platform</span>
                     </Button>
                 </div>
             ) : (
                 <div className="grid grid-cols-3 gap-2">
-                    {plataforms.map((plataform) => (
+                    {platforms.map((platform) => (
                         <Card
-                            key={plataform.id}
-                            id={plataform.id}
-                            name={plataform.name}
-                            url={plataform.url}
-                            type={plataform.type}
-                            onDeleted={() => fetchPlataforms(true)}
-                            onEdit={() => openEditModal(plataform)}
+                            key={platform.id}
+                            id={platform.id}
+                            name={platform.name}
+                            url={platform.url}
+                            type={platform.type}
+                            onDeleted={() => fetchPlatforms(true)}
+                            onEdit={() => openEditModal(platform)}
                         />
                     ))}
                 </div>
@@ -115,9 +115,9 @@ function Dashboard() {
     );
 }
 
-export const statusPlataformDashboard: DashboardData = {
-    id: "status-plataform",
+export const statusPlatformDashboard: DashboardData = {
+    id: "status-platform",
     content: Dashboard,
     icon: ShieldCheckIcon,
-    name: "Status Plataform",
+    name: "Status Platform",
 };
