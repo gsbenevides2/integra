@@ -5,7 +5,10 @@ import { type ClientOptions } from "openai";
 import type { Treaty } from "@elysia/eden";
 import { fetch } from "bun";
 
+export const DONT_TRACE_ID = "dont-trace";
+
 export async function startTracer(params: StartTracerParams) {
+    if (params.traceId === DONT_TRACE_ID) return;
     await runModel.create({
         ...params,
         startTime: new Date(),
@@ -13,6 +16,8 @@ export async function startTracer(params: StartTracerParams) {
 }
 
 export async function endTracer(params: EndTracerParams, createTracer?: StartTracerParams) {
+    if (params.traceId === DONT_TRACE_ID) return;
+    if (createTracer?.traceId === DONT_TRACE_ID) return;
     const endSet = { endTime: new Date(), outputData: params.outputData, status: params.status };
     const exists = await runModel.findOne({
         traceId: params.traceId,
@@ -36,7 +41,7 @@ export async function endTracer(params: EndTracerParams, createTracer?: StartTra
 }
 
 export async function addTracerEvent(params: CreateEventData) {
-    console.debug("Adding tracer event", params);
+    if (params.traceId === DONT_TRACE_ID) return;
     await runModel.updateOne(
         {
             traceId: params.traceId,
@@ -59,6 +64,7 @@ export async function createTracerIfNotExtistsAndAppendEvent(
     params: StartTracerParams,
     createEventParams: Omit<CreateEventData, "traceId">,
 ) {
+    if (params.traceId === DONT_TRACE_ID) return;
     const exists = await runModel.findOne({
         traceId: params.traceId,
     });

@@ -34,7 +34,7 @@ export const uiFactory = () =>
             headers.set("content-type", "text/html");
             return new Response(
                 await renderToReadableStream(<App />, {
-                    bootstrapScripts: [`assets/client-bundle.js?v=${BUILD_ID}`],
+                    bootstrapModules: [`assets/client-bundle.js?v=${BUILD_ID}`],
                 }),
                 {
                     headers,

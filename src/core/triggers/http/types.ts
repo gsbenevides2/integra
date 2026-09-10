@@ -1,6 +1,8 @@
 import type { TriggerSettings, Trigger } from "core/triggers";
 
-export interface HttpSettings extends TriggerSettings {}
+export interface HttpSettings extends TriggerSettings {
+    dontTrace?: boolean;
+}
 
 export interface HttpTrigger extends Trigger {}
 

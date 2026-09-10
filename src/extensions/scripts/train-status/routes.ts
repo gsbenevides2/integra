@@ -77,6 +77,7 @@ export const trainStatusElysiaClient = new Elysia({
 export const trainStatusRoutes = onHttp(
     {
         id: "train-status-routes",
+        dontTrace: true,
     },
     trainStatusElysiaClient,
 );

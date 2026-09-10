@@ -163,6 +163,7 @@ export const platformStatusElysiaClient = new Elysia({
 export const platformStatusRoutes = onHttp(
     {
         id: "platform-status-routes",
+        dontTrace: true,
     },
     platformStatusElysiaClient,
 );

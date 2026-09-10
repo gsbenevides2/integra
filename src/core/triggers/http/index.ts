@@ -17,14 +17,20 @@ import { uiFactory } from "core/ui";
 declare global {
     var elysiaClient: Elysia | undefined;
     var elysiaRoutesMemory: ElysiaRouteMemory | undefined;
+    var dontTraceRoutes: string[] | undefined;
 }
 
-export function getTraceId(headers: HTTPHeaders) {
+export function getTraceId(headers: HTTPHeaders, hasDontTrace?: boolean) {
+    if (hasDontTrace) return "dont-trace";
     return String(headers[REQUEST_ID_HEADER]) ?? crypto.randomUUID();
 }
 
 export function getTriggerId(method: string, path: string) {
     return globalThis.elysiaRoutesMemory?.get(`${method.toLowerCase()}-${path}`) ?? "unknown";
+}
+
+export function getDontTrace(traceId: string) {
+    return global.dontTraceRoutes?.includes(traceId) ?? false;
 }
 
 function createGlobalElysia() {
@@ -36,9 +42,11 @@ function createGlobalElysia() {
         .use(uiFactory())
         .onBeforeHandle(
             async ({ body, cookie, headers, params, path, query, route, request, set }) => {
-                const traceId = getTraceId(set.headers);
                 const method = request.method;
                 const triggerId = getTriggerId(method, route ?? path);
+                const dontTrace = getDontTrace(triggerId);
+                const traceId = getTraceId(set.headers, dontTrace);
+                set.headers[REQUEST_ID_HEADER] = traceId;
                 const fullUrl = request.url;
                 await startTracer({
                     inputData: {
@@ -73,7 +81,9 @@ function createGlobalElysia() {
             }) => {
                 const method = request.method;
                 const triggerId = getTriggerId(method, route ?? path);
-                const traceId = getTraceId(set.headers);
+                const dontTrace = getDontTrace(triggerId);
+                const traceId = getTraceId(set.headers, dontTrace);
+                set.headers[REQUEST_ID_HEADER] = traceId;
                 const fullUrl = request.url;
                 const status = set.status;
                 let statusNumber = 0;
@@ -118,7 +128,9 @@ function createGlobalElysia() {
             async ({ error, body, cookie, headers, params, path, query, route, request, set }) => {
                 const method = request.method;
                 const triggerId = getTriggerId(method, route ?? path);
-                const traceId = getTraceId(set.headers);
+                const dontTrace = getDontTrace(triggerId);
+                const traceId = getTraceId(set.headers, dontTrace);
+                set.headers[REQUEST_ID_HEADER] = traceId;
                 const fullUrl = request.url;
                 await createTracerIfNotExtistsAndAppendEvent(
                     {
@@ -147,7 +159,7 @@ function createGlobalElysia() {
         ) as unknown as Elysia;
 }
 
-function saveRoutes(elysia: AnyElysia, triggerId: string) {
+function saveRoutes(elysia: AnyElysia, triggerId: string, dontTrace: boolean) {
     const routes = elysia.routes.map<{ key: MemoryRouteKey; triggerId: string }>(
         ({ method, path }) => ({
             key: `${method.toLowerCase()}-${path}`,
@@ -155,6 +167,10 @@ function saveRoutes(elysia: AnyElysia, triggerId: string) {
         }),
     );
     if (!global.elysiaRoutesMemory) global.elysiaRoutesMemory = new Map();
+    if (dontTrace) {
+        if (!global.dontTraceRoutes) global.dontTraceRoutes = [triggerId];
+        else global.dontTraceRoutes.push(triggerId);
+    }
     for (const { key, triggerId } of routes) {
         global.elysiaRoutesMemory.set(key, triggerId);
     }
@@ -164,7 +180,7 @@ export default function onHttp(settings: HttpSettings, elysia: AnyElysia): HttpT
     return {
         id: settings.id,
         register: async () => {
-            await saveRoutes(elysia, settings.id);
+            await saveRoutes(elysia, settings.id, settings.dontTrace ?? false);
             if (!global.elysiaClient) createGlobalElysia();
             global.elysiaClient!.use(elysia);
         },
