@@ -1,5 +1,6 @@
 import { PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { IconButton } from "core/ui/components/iconButton";
+import { useConfirm } from "core/ui/components/confirm";
 import { useToast } from "core/ui/components/toast";
 import { getPlataformStatusEdenClient } from "extensions/scripts/plataform-status/client";
 import { useCallback, useState } from "react";
@@ -16,9 +17,15 @@ interface Props {
 export function Card({ id, name, url, type, onDeleted }: Props) {
     const [isDeleting, setIsDeleting] = useState(false);
     const { showToast } = useToast();
+    const confirm = useConfirm();
 
-    const deletePlataform = useCallback(() => {
-        if (!confirm(`Deseja realmente excluir "${name}"?`)) return;
+    const deletePlataform = useCallback(async () => {
+        const confirmed = await confirm({
+            title: "Excluir plataforma",
+            message: `Deseja realmente excluir "${name}"? Essa ação não pode ser desfeita.`,
+            confirmLabel: "Excluir",
+        });
+        if (!confirmed) return;
 
         const client = getPlataformStatusEdenClient();
 
@@ -39,7 +46,7 @@ export function Card({ id, name, url, type, onDeleted }: Props) {
             .finally(() => {
                 setIsDeleting(false);
             });
-    }, [id, name, onDeleted, showToast]);
+    }, [confirm, id, name, onDeleted, showToast]);
 
     return (
         <div

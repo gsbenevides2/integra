@@ -3,6 +3,7 @@ import { SideBar } from "./components/sidebar";
 import { dashboards } from "extensions/dashboards";
 import { Content } from "./components/content";
 import { ToastProvider, ToastContainer } from "./components/toast";
+import { ConfirmProvider, ConfirmDialog } from "./components/confirm";
 
 export function App() {
     const [selectedDash, setSelectedDash] = useState(dashboards.at(0)?.id);
@@ -21,10 +22,13 @@ export function App() {
             </head>
             <body>
                 <ToastProvider>
-                    <main className="grid grid-cols-[280px_auto]">
-                        <SideBar updateDash={setSelectedDash} />
-                        <Content selectedDash={selectedDash} />
-                    </main>
+                    <ConfirmProvider>
+                        <main className="grid grid-cols-[280px_auto]">
+                            <SideBar updateDash={setSelectedDash} />
+                            <Content selectedDash={selectedDash} />
+                        </main>
+                        <ConfirmDialog />
+                    </ConfirmProvider>
                     <ToastContainer />
                 </ToastProvider>
             </body>
