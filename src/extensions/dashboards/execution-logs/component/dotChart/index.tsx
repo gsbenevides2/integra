@@ -182,6 +182,11 @@ export function DotChart({ runs, onSelectRun }: Props) {
                             tickFormatter={(ts: number) => formatDate(ts)}
                             tick={{ fontSize: 11 }}
                             stroke="#9ca3af"
+                            angle={-35}
+                            textAnchor="end"
+                            height={56}
+                            minTickGap={40}
+                            tickMargin={8}
                         />
                         <YAxis
                             dataKey="durationMs"
