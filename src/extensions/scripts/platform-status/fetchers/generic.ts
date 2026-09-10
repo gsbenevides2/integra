@@ -1,7 +1,7 @@
 import { instrumentableFetch } from "core/instrumentation";
 import type { StatusFetcher } from "./types";
 
-const REQUEST_TIMEOUT_MS = 10000;
+const REQUEST_TIMEOUT_MS = 20000;
 
 /**
  * Fetches the status of a generic HTTP endpoint by testing if it returns a 200 status code.
