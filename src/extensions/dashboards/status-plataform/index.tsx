@@ -31,7 +31,7 @@ function Dashboard() {
             const client = getPlataformStatusEdenClient();
             const { data, error } = await client["plataform-stats"]["list-plataforms"].get();
             if (error) {
-                showToast("Erro ao buscar plataformas", "error");
+                showToast("Failed to fetch platforms", "error");
             } else {
                 setPlataforms(data ?? []);
             }
@@ -87,9 +87,9 @@ function Dashboard() {
             ) : plataforms.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-16 text-center">
                     <ServerStackIcon className="size-10 text-mist-500" />
-                    <p className="text-mist-200">Nenhuma plataforma cadastrada ainda</p>
+                    <p className="text-mist-200">No platforms registered yet</p>
                     <p className="text-sm text-mist-400">
-                        Adicione uma plataforma para começar a acompanhar o status dela por aqui.
+                        Add a platform to start tracking its status here.
                     </p>
                     <Button className="mt-2" onClick={openCreateModal}>
                         <PlusIcon className="size-4.5" />

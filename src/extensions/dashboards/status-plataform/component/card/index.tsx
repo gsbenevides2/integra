@@ -22,9 +22,9 @@ export function Card({ id, name, url, type, onDeleted, onEdit }: Props) {
 
     const deletePlataform = useCallback(async () => {
         const confirmed = await confirm({
-            title: "Excluir plataforma",
-            message: `Deseja realmente excluir "${name}"? Essa ação não pode ser desfeita.`,
-            confirmLabel: "Excluir",
+            title: "Delete platform",
+            message: `Are you sure you want to delete "${name}"? This action cannot be undone.`,
+            confirmLabel: "Delete",
         });
         if (!confirmed) return;
 
@@ -35,14 +35,14 @@ export function Card({ id, name, url, type, onDeleted, onEdit }: Props) {
             .delete()
             .then(({ error }) => {
                 if (error) {
-                    showToast("Erro ao excluir plataforma", "error");
+                    showToast("Failed to delete platform", "error");
                     return;
                 }
-                showToast("Plataforma excluída com sucesso", "success");
+                showToast("Platform deleted successfully", "success");
                 onDeleted();
             })
             .catch(() => {
-                showToast("Erro ao excluir plataforma", "error");
+                showToast("Failed to delete platform", "error");
             })
             .finally(() => {
                 setIsDeleting(false);
@@ -57,9 +57,9 @@ export function Card({ id, name, url, type, onDeleted, onEdit }: Props) {
         >
             <div className="flex justify-between">
                 <div>
-                    <p>Nome: {name}</p>
+                    <p>Name: {name}</p>
                     <p>URL: {url}</p>
-                    <p>Tipo: {type}</p>
+                    <p>Type: {type}</p>
                 </div>
                 <div className="flex flex-col gap-0.5">
                     <IconButton
@@ -81,11 +81,11 @@ export function Card({ id, name, url, type, onDeleted, onEdit }: Props) {
             <div>
                 <div className="flex gap-1 items-center">
                     <div className="bg-green-700 h-2 w-2 rounded-full" />
-                    <p>Status: Operacional</p>
+                    <p>Status: Operational</p>
                 </div>
                 <div className="flex gap-1 items-center">
                     <div className="h-2 w-2 rounded-full" />
-                    <p>Sistemas fora do ar</p>
+                    <p>Systems down</p>
                 </div>
             </div>
         </div>

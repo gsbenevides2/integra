@@ -53,18 +53,18 @@ export function PlataformFormModal({ onClose, onSaved, isOpen, plataform }: Prop
             request
                 .then(({ error }) => {
                     if (error) {
-                        showToast(isEditing ? "Erro ao atualizar" : "Erro ao salvar", "error");
+                        showToast(isEditing ? "Failed to update" : "Failed to save", "error");
                         return;
                     }
                     showToast(
-                        isEditing ? "Plataforma atualizada com sucesso" : "Salvo com sucesso",
+                        isEditing ? "Platform updated successfully" : "Saved successfully",
                         "success",
                     );
                     onSaved();
                     onClose();
                 })
                 .catch(() => {
-                    showToast(isEditing ? "Erro ao atualizar" : "Erro ao salvar", "error");
+                    showToast(isEditing ? "Failed to update" : "Failed to save", "error");
                 })
                 .finally(() => {
                     setIsSaving(false);
