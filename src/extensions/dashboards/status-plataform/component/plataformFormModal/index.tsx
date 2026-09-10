@@ -8,19 +8,28 @@ import { useToast } from "core/ui/components/toast";
 import { useCallback, useState } from "react";
 import { getPlataformStatusEdenClient } from "extensions/scripts/plataform-status/client";
 
+export interface PlataformFormValues {
+    id: string;
+    name: string;
+    url: string;
+    type: Plataform;
+}
+
 interface Props {
     onClose: () => void;
     onSaved: () => void;
     isOpen: boolean;
+    plataform?: PlataformFormValues;
 }
 
 function isValidPlataform(value: string): value is Plataform {
     return PLATAFORMS.includes(value as Plataform);
 }
 
-export function AddPlataform({ onClose, onSaved, isOpen }: Props) {
+export function PlataformFormModal({ onClose, onSaved, isOpen, plataform }: Props) {
     const [isSaving, setIsSaving] = useState(false);
     const { showToast } = useToast();
+    const isEditing = Boolean(plataform);
 
     const savePlataform = useCallback(
         (event: React.SubmitEvent<HTMLFormElement>) => {
@@ -37,25 +46,31 @@ export function AddPlataform({ onClose, onSaved, isOpen }: Props) {
             const client = getPlataformStatusEdenClient();
 
             setIsSaving(true);
-            client["plataform-stats"].new
-                .post({
-                    name,
-                    type,
-                    url,
-                })
-                .then(() => {
-                    showToast("Salvo com sucesso", "success");
+            const request = plataform
+                ? client["plataform-stats"]({ id: plataform.id }).patch({ name, type, url })
+                : client["plataform-stats"].new.post({ name, type, url });
+
+            request
+                .then(({ error }) => {
+                    if (error) {
+                        showToast(isEditing ? "Erro ao atualizar" : "Erro ao salvar", "error");
+                        return;
+                    }
+                    showToast(
+                        isEditing ? "Plataforma atualizada com sucesso" : "Salvo com sucesso",
+                        "success",
+                    );
                     onSaved();
                     onClose();
                 })
                 .catch(() => {
-                    showToast("Erro ao salvar", "error");
+                    showToast(isEditing ? "Erro ao atualizar" : "Erro ao salvar", "error");
                 })
                 .finally(() => {
                     setIsSaving(false);
                 });
         },
-        [onClose, onSaved, showToast],
+        [isEditing, onClose, onSaved, plataform, showToast],
     );
 
     return (
@@ -73,27 +88,40 @@ export function AddPlataform({ onClose, onSaved, isOpen }: Props) {
                 }`}
             >
                 <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold">Add Plataform</h3>
+                    <h3 className="text-lg font-semibold">
+                        {isEditing ? "Edit Plataform" : "Add Plataform"}
+                    </h3>
                     <IconButton type="button" onClick={onClose}>
                         <XMarkIcon className="size-4.5" />
                     </IconButton>
                 </div>
-                <form className="flex flex-col gap-3" onSubmit={savePlataform}>
+                <form
+                    className="flex flex-col gap-3"
+                    onSubmit={savePlataform}
+                    key={plataform?.id ?? "new"}
+                >
                     <Input
                         label="Name"
                         type="text"
                         id="name"
                         placeholder="Type the plataform name"
+                        defaultValue={plataform?.name}
                     />
-                    <Input label="Url" type="text" id="url" placeholder="Type the plataform url" />
+                    <Input
+                        label="Url"
+                        type="text"
+                        id="url"
+                        placeholder="Type the plataform url"
+                        defaultValue={plataform?.url}
+                    />
                     <Select
                         label="Type"
                         id="type"
-                        defaultValue=""
+                        defaultValue={plataform?.type ?? ""}
                         placeholder="Select the plataform type"
-                        options={PLATAFORMS.map((plataform) => ({
-                            label: plataform,
-                            value: plataform,
+                        options={PLATAFORMS.map((option) => ({
+                            label: option,
+                            value: option,
                         }))}
                     />
                     <div className="flex justify-end gap-2 mt-1">

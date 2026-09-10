@@ -51,6 +51,31 @@ export const plataformStatusElysiaClient = new Elysia({
                 id: z.string(),
             }),
         },
+    )
+    .patch(
+        "/:id",
+        async ({ params, body }) => {
+            const response = await db
+                .update(plataforms)
+                .set({
+                    name: body.name,
+                    url: body.url,
+                    type: body.type,
+                })
+                .where(eq(plataforms.id, params.id))
+                .returning();
+            return response;
+        },
+        {
+            params: z.object({
+                id: z.string(),
+            }),
+            body: z.object({
+                name: z.string(),
+                url: z.string(),
+                type: z.enum(PLATAFORMS),
+            }),
+        },
     );
 
 export const plataformStatusRoutes = onHttp(

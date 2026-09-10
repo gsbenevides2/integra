@@ -12,9 +12,10 @@ interface Props {
     url: string;
     type: Plataform;
     onDeleted: () => void;
+    onEdit: () => void;
 }
 
-export function Card({ id, name, url, type, onDeleted }: Props) {
+export function Card({ id, name, url, type, onDeleted, onEdit }: Props) {
     const [isDeleting, setIsDeleting] = useState(false);
     const { showToast } = useToast();
     const confirm = useConfirm();
@@ -61,7 +62,11 @@ export function Card({ id, name, url, type, onDeleted }: Props) {
                     <p>Tipo: {type}</p>
                 </div>
                 <div className="flex flex-col gap-0.5">
-                    <IconButton className="hover:bg-gray-500">
+                    <IconButton
+                        className="hover:bg-gray-500"
+                        onClick={onEdit}
+                        disabled={isDeleting}
+                    >
                         <PencilIcon className="size-4.5" />
                     </IconButton>
                     <IconButton

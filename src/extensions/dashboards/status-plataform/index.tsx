@@ -6,7 +6,7 @@ import { useToast } from "core/ui/components/toast";
 import type { Plataform } from "utils/statusPlataform";
 import { Card } from "./component/card";
 import { CardSkeleton } from "./component/cardSkeleton";
-import { AddPlataform } from "./component/addPlataform";
+import { PlataformFormModal, type PlataformFormValues } from "./component/plataformFormModal";
 import { getPlataformStatusEdenClient } from "extensions/scripts/plataform-status/client";
 
 interface PlataformRow {
@@ -17,7 +17,8 @@ interface PlataformRow {
 }
 
 function Dashboard() {
-    const [isAddPlataformOpen, setIsAddPlataformOpen] = useState(false);
+    const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+    const [editingPlataform, setEditingPlataform] = useState<PlataformFormValues>();
     const [plataforms, setPlataforms] = useState<PlataformRow[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const { showToast } = useToast();
@@ -51,17 +52,28 @@ function Dashboard() {
         };
     }, [fetchPlataforms]);
 
+    const openCreateModal = useCallback(() => {
+        setEditingPlataform(undefined);
+        setIsFormModalOpen(true);
+    }, []);
+
+    const openEditModal = useCallback((plataform: PlataformFormValues) => {
+        setEditingPlataform(plataform);
+        setIsFormModalOpen(true);
+    }, []);
+
     return (
         <div className="p-3 flex flex-col gap-4">
-            <AddPlataform
-                onClose={() => setIsAddPlataformOpen(false)}
+            <PlataformFormModal
+                onClose={() => setIsFormModalOpen(false)}
                 onSaved={() => fetchPlataforms(true)}
-                isOpen={isAddPlataformOpen}
+                isOpen={isFormModalOpen}
+                plataform={editingPlataform}
             />
 
             <div className="flex justify-between">
                 <h1 className="text-xl">Status Plataform</h1>
-                <Button onClick={() => setIsAddPlataformOpen(true)}>
+                <Button onClick={openCreateModal}>
                     <PlusIcon className="size-4.5" />
                     <span>Add Plataform</span>
                 </Button>
@@ -79,7 +91,7 @@ function Dashboard() {
                     <p className="text-sm text-mist-400">
                         Adicione uma plataforma para começar a acompanhar o status dela por aqui.
                     </p>
-                    <Button className="mt-2" onClick={() => setIsAddPlataformOpen(true)}>
+                    <Button className="mt-2" onClick={openCreateModal}>
                         <PlusIcon className="size-4.5" />
                         <span>Add Plataform</span>
                     </Button>
@@ -94,6 +106,7 @@ function Dashboard() {
                             url={plataform.url}
                             type={plataform.type}
                             onDeleted={() => fetchPlataforms(true)}
+                            onEdit={() => openEditModal(plataform)}
                         />
                     ))}
                 </div>
