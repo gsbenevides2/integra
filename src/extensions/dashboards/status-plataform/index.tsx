@@ -89,9 +89,11 @@ function Dashboard() {
                     {plataforms.map((plataform) => (
                         <Card
                             key={plataform.id}
+                            id={plataform.id}
                             name={plataform.name}
                             url={plataform.url}
                             type={plataform.type}
+                            onDeleted={() => fetchPlataforms(true)}
                         />
                     ))}
                 </div>

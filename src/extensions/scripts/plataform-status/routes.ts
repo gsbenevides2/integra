@@ -1,6 +1,7 @@
 import { db } from "core/db";
 import onHttp from "core/triggers/http";
 
+import { eq } from "drizzle-orm";
 import Elysia from "elysia";
 import { plataforms } from "extensions/db/plataform-status";
 import { PLATAFORMS } from "utils/statusPlataform";
@@ -33,6 +34,21 @@ export const plataformStatusElysiaClient = new Elysia({
                 name: z.string(),
                 url: z.string(),
                 type: z.enum(PLATAFORMS),
+            }),
+        },
+    )
+    .delete(
+        "/:id",
+        async ({ params }) => {
+            const response = await db
+                .delete(plataforms)
+                .where(eq(plataforms.id, params.id))
+                .returning();
+            return response;
+        },
+        {
+            params: z.object({
+                id: z.string(),
             }),
         },
     );
