@@ -100,7 +100,41 @@ export async function instrumentableFetch(
     if (body && typeof body === "object" && "toString" in body) {
         processedBody = body.toString();
     }
-    const response = await fetch(input, init);
+
+    let response: Response;
+    try {
+        response = await fetch(input, init);
+    } catch (error) {
+        const end = new Date();
+        let finalInput: object | string = input;
+        if (typeof input === "object" && "headers" in input) {
+            finalInput = {
+                ...input,
+                headers: transformHeadersToObjc(input.headers as unknown as Response["headers"]),
+            };
+        }
+        if (typeof input === "object" && "href" in input) {
+            finalInput = input.href;
+        }
+
+        await addTracerEvent({
+            eventData: {
+                start,
+                end,
+                input: finalInput,
+                init,
+                request: { processedBody },
+                error: {
+                    name: error instanceof Error ? error.name : "UnknownError",
+                    message: error instanceof Error ? error.message : String(error),
+                },
+            },
+            eventName: "Instrumentable Fetch",
+            eventType: "ERROR",
+            traceId,
+        });
+        throw error;
+    }
     const end = new Date();
     const copyResponse = response.clone();
     let finalInput: object | string = input;
@@ -118,7 +152,9 @@ export async function instrumentableFetch(
     if (init?.headers && "append" in init.headers) {
         finalInit = {
             ...finalInit,
-            headers: transformHeadersToObjc(init.headers as unknown as Response["headers"]),
+            headers: transformHeadersToObjc(
+                init.headers as unknown as Response["headers"],
+            ) as unknown as Headers,
         };
     }
 

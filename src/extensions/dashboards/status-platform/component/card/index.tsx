@@ -1,4 +1,4 @@
-import { PencilIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { PencilIcon, TrashIcon, ArrowTopRightOnSquareIcon } from "@heroicons/react/24/outline";
 import { IconButton } from "core/ui/components/iconButton";
 import { useConfirm } from "core/ui/components/confirm";
 import { useToast } from "core/ui/components/toast";
@@ -95,6 +95,16 @@ export function Card({
                         disabled={isDeleting}
                     >
                         <TrashIcon className="size-4.5" />
+                    </IconButton>
+                    <IconButton
+                        className="hover:bg-gray-500"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(url);
+                        }}
+                        disabled={isDeleting}
+                    >
+                        <ArrowTopRightOnSquareIcon className="size-4.5" />
                     </IconButton>
                 </div>
             </div>

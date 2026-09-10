@@ -10,6 +10,7 @@ export function CardSkeleton() {
                 <div className="flex flex-col gap-0.5">
                     <div className="size-6.5 bg-gray-700 rounded-full" />
                     <div className="size-6.5 bg-gray-700 rounded-full" />
+                    <div className="size-6.5 bg-gray-700 rounded-full" />
                 </div>
             </div>
             <div className="flex flex-col gap-1.5 mt-1">
