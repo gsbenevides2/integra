@@ -1,8 +1,18 @@
 import * as macOuiLookup from "mac-oui-lookup";
 
-const getVendor: (mac: string, unknown?: string | null) => string | null =
-    // biome-ignore lint: interop shape differs between dev (tsx) and the prod bundler
-    (macOuiLookup as any).default ?? (macOuiLookup as any).getVendor ?? (macOuiLookup as any);
+function resolveGetVendor(mod: unknown): (mac: string, unknown?: string | null) => string | null {
+    for (const candidate of [
+        (mod as any)?.default,
+        (mod as any)?.getVendor,
+        (mod as any)?.default?.default,
+        mod,
+    ]) {
+        if (typeof candidate === "function") return candidate;
+    }
+    throw new Error("mac-oui-lookup: could not resolve getVendor function from module exports");
+}
+
+const getVendor = resolveGetVendor(macOuiLookup);
 import { eq } from "drizzle-orm";
 import { db } from "core/db";
 import {
