@@ -36,6 +36,7 @@ Configure the following variables in `.env.local` to enable Authentik login and 
 - `GCP_OAUTH_CLIENT_SECRET`
 - `BIRTHDAY_SERVICE_ENDPOINT`
 - `BIRTHDAY_SERVICE_CLIENT_ID`
+- `ROUTER_PASSWORD_SECRET` — secret used to encrypt/decrypt TP-Link router admin passwords stored by the `tp-link-center` extension
 
 ## Code Quality
 

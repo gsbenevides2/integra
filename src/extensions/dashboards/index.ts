@@ -3,6 +3,7 @@ import { executionLogsDashboard } from "./execution-logs";
 import { googleAccountsDashboard } from "./google-accounts";
 import { serverMetricsDashboard } from "./server-metrics";
 import { statusPlatformDashboard } from "./status-platform";
+import { tpLinkCenterDashboard } from "./tp-link-center";
 import { trainStatusDashboard } from "./train-status";
 
 export const dashboards: DashboardData[] = [
@@ -11,4 +12,5 @@ export const dashboards: DashboardData[] = [
     executionLogsDashboard,
     googleAccountsDashboard,
     serverMetricsDashboard,
+    tpLinkCenterDashboard,
 ];

@@ -18,7 +18,7 @@ export function SideBar({ updateDash, isOpen, onClose }: Props) {
                 />
             )}
             <div
-                className={`border-r max-w-70 w-70 border-r-gray-400 h-dvh gap-5 flex flex-col fixed md:static top-0 left-0 z-40 bg-gray-900 transition-transform duration-200 ${
+                className={`border-r max-w-70 w-70 border-r-gray-400 h-dvh gap-5 flex flex-col fixed md:sticky top-0 left-0 z-40 bg-gray-900 transition-transform duration-200 ${
                     isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
                 }`}
             >
