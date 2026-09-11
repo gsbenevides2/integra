@@ -55,9 +55,9 @@ export async function listEventsFromCalendar(
     calendarInfo: Calendar,
     startDate: string,
     endDate: string,
-    _traceId: string,
+    traceId: string,
 ): Promise<Event[]> {
-    const { authClient } = await getClient(calendarInfo.email);
+    const { authClient } = await getClient(calendarInfo.email, traceId);
     const calendar = google.calendar({ version: "v3", auth: authClient });
     const { data } = await calendar.events.list({
         calendarId: calendarInfo.calendarId,

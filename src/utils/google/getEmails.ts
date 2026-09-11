@@ -24,8 +24,8 @@ function formatMessage(message: gmail_v1.Schema$Message): EmailListResponse {
     };
 }
 
-export async function getEmails(params: Params, _traceId: string): Promise<EmailListResponse[]> {
-    const { authClient } = await getClient(params.email);
+export async function getEmails(params: Params, traceId: string): Promise<EmailListResponse[]> {
+    const { authClient } = await getClient(params.email, traceId);
     const gmail = google.gmail({ version: "v1", auth: authClient });
 
     const list = await gmail.users.messages.list({

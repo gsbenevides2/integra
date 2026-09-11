@@ -1,4 +1,4 @@
-import onHttp from "core/triggers/http";
+import onHttp, { getTraceId } from "core/triggers/http";
 import Elysia from "elysia";
 import { deleteAccount, getAuthUrl, listAccounts, processCode } from "utils/google/authService";
 import z from "zod";
@@ -21,7 +21,7 @@ export const googleAccountsElysiaClient = new Elysia({
                 return "";
             }
             try {
-                await processCode(query.code, request.url);
+                await processCode(query.code, request.url, getTraceId(set.headers));
                 set.status = 307;
                 set.headers.location = "/?googleAccountAdded=1";
             } catch (error) {

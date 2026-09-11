@@ -2,8 +2,8 @@ import { google } from "googleapis";
 import { getAllClients } from "./authService";
 import type { Calendar } from "./types";
 
-export async function listCalendarsRequest(_traceId: string): Promise<Calendar[]> {
-    const clients = await getAllClients();
+export async function listCalendarsRequest(traceId: string): Promise<Calendar[]> {
+    const clients = await getAllClients(traceId);
     const calendars = await Promise.all(
         clients.map(async ({ email, authClient }) => {
             const calendar = google.calendar({ version: "v3", auth: authClient });

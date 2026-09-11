@@ -1,8 +1,14 @@
 import { db } from "core/db";
+import { instrumentableFetch } from "core/instrumentation";
 import { eq } from "drizzle-orm";
 import { googleAccounts } from "extensions/db/google-accounts";
 import { google } from "googleapis";
 import safeEnvGet from "utils/safeEnvGet";
+
+function createInstrumentedFetch(traceId: string): typeof fetch {
+    return ((input: RequestInfo | URL, init?: RequestInit) =>
+        instrumentableFetch(traceId, input as string | URL | Request, init)) as typeof fetch;
+}
 
 const GOOGLE_AUTH_SCOPES = [
     "https://www.googleapis.com/auth/userinfo.email",
@@ -24,16 +30,23 @@ function generateRedirectUri(serverURL: string) {
     return redirectUri.toString();
 }
 
-function createOAuth2Client(serverURL: string) {
-    return new google.auth.OAuth2(
-        GOOGLE_OAUTH_CLIENT_ID,
-        GOOGLE_OAUTH_CLIENT_SECRET,
-        generateRedirectUri(serverURL),
-    );
+function createOAuth2Client(serverURL: string, traceId: string) {
+    return new google.auth.OAuth2({
+        clientId: GOOGLE_OAUTH_CLIENT_ID,
+        clientSecret: GOOGLE_OAUTH_CLIENT_SECRET,
+        redirectUri: generateRedirectUri(serverURL),
+        transporterOptions: {
+            fetchImplementation: createInstrumentedFetch(traceId),
+        },
+    });
 }
 
 export function getAuthUrl(serverURL: string) {
-    const oauth2Client = createOAuth2Client(serverURL);
+    const oauth2Client = new google.auth.OAuth2({
+        clientId: GOOGLE_OAUTH_CLIENT_ID,
+        clientSecret: GOOGLE_OAUTH_CLIENT_SECRET,
+        redirectUri: generateRedirectUri(serverURL),
+    });
     return oauth2Client.generateAuthUrl({
         access_type: "offline",
         scope: GOOGLE_AUTH_SCOPES,
@@ -41,8 +54,8 @@ export function getAuthUrl(serverURL: string) {
     });
 }
 
-export async function processCode(code: string, serverURL: string) {
-    const oauth2Client = createOAuth2Client(serverURL);
+export async function processCode(code: string, serverURL: string, traceId: string) {
+    const oauth2Client = createOAuth2Client(serverURL, traceId);
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
 
@@ -87,8 +100,14 @@ export async function deleteAccount(email: string): Promise<boolean> {
     return deleted.length > 0;
 }
 
-function buildClientFromRow(row: AccountRow) {
-    const oauth2Client = new google.auth.OAuth2(GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET);
+function buildClientFromRow(row: AccountRow, traceId: string) {
+    const oauth2Client = new google.auth.OAuth2({
+        clientId: GOOGLE_OAUTH_CLIENT_ID,
+        clientSecret: GOOGLE_OAUTH_CLIENT_SECRET,
+        transporterOptions: {
+            fetchImplementation: createInstrumentedFetch(traceId),
+        },
+    });
     oauth2Client.setCredentials({
         refresh_token: row.refreshToken,
         access_token: row.accessToken,
@@ -113,17 +132,17 @@ function buildClientFromRow(row: AccountRow) {
     return { email: row.email, authClient: oauth2Client };
 }
 
-export async function getClient(email: string) {
+export async function getClient(email: string, traceId: string) {
     const [row] = await db
         .select()
         .from(googleAccounts)
         .where(eq(googleAccounts.email, email))
         .limit(1);
     if (!row) throw new Error(`Google account not found: ${email}`);
-    return buildClientFromRow(row);
+    return buildClientFromRow(row, traceId);
 }
 
-export async function getAllClients() {
+export async function getAllClients(traceId: string) {
     const rows = await db.select().from(googleAccounts);
-    return rows.map(buildClientFromRow);
+    return rows.map((row) => buildClientFromRow(row, traceId));
 }

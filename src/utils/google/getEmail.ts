@@ -5,9 +5,9 @@ import type { EmailResponse } from "./types";
 export async function getEmail(
     email: string,
     messageId: string,
-    _traceId: string,
+    traceId: string,
 ): Promise<EmailResponse> {
-    const { authClient } = await getClient(email);
+    const { authClient } = await getClient(email, traceId);
     const gmail = google.gmail({ version: "v1", auth: authClient });
     const { data } = await gmail.users.messages.get({
         userId: "me",
