@@ -2,7 +2,7 @@ import { SQL } from "bun";
 import type { Trigger, TriggerSettings } from "core/triggers";
 import type { PostgresInstanceKey } from "./types";
 import { postgresInstances } from "./instances";
-import { addTracerEvent, endTracer, startTracer } from "core/instrumentation";
+import { addTracerEvent, endTracer, serializeError, startTracer } from "core/instrumentation";
 import type { TracerStatus } from "core/instrumentation/types";
 
 export interface PostgresSettings extends TriggerSettings {
@@ -91,7 +91,7 @@ export async function startPostgresClients() {
                                 await s.call(rows, traceId);
                             } catch (error: unknown) {
                                 await addTracerEvent({
-                                    eventData: error as object,
+                                    eventData: serializeError(error),
                                     eventName: "Postgres on Error",
                                     eventType: "ERROR",
                                     traceId,

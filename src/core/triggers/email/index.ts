@@ -3,7 +3,7 @@ import type { Trigger, TriggerSettings } from "core/triggers";
 import type { EmailAccountKey } from "./types";
 import { emailAccounts } from "./accounts";
 import { simpleParser } from "mailparser";
-import { addTracerEvent, endTracer, startTracer } from "core/instrumentation";
+import { addTracerEvent, endTracer, serializeError, startTracer } from "core/instrumentation";
 import type { TracerStatus } from "core/instrumentation/types";
 
 export interface EmailSettings extends TriggerSettings {
@@ -152,7 +152,7 @@ export async function startEmailClients() {
                                     } catch (error: unknown) {
                                         status = "ERROR";
                                         await addTracerEvent({
-                                            eventData: error as object,
+                                            eventData: serializeError(error),
                                             eventName: "Email on Error",
                                             eventType: "ERROR",
                                             traceId,

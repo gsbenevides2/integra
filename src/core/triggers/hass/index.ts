@@ -2,7 +2,7 @@ import type { Trigger, TriggerSettings } from "core/triggers";
 import type { InstanceKey, InstancesSettings } from "./types";
 import { instanceSettings } from "./instances";
 import type { TracerStatus } from "core/instrumentation/types";
-import { startTracer, addTracerEvent, endTracer } from "core/instrumentation";
+import { startTracer, addTracerEvent, endTracer, serializeError } from "core/instrumentation";
 
 export interface HassSettings extends TriggerSettings {
     instance: InstanceKey;
@@ -119,7 +119,7 @@ export async function startHaClients() {
                         } catch (error: unknown) {
                             status = "ERROR";
                             await addTracerEvent({
-                                eventData: error as object,
+                                eventData: serializeError(error),
                                 eventName: "Home Assistant on Error",
                                 eventType: "ERROR",
                                 traceId,

@@ -11,6 +11,7 @@ import {
     startTracer,
     endTracer,
     createTracerIfNotExtistsAndAppendEvent,
+    serializeError,
 } from "core/instrumentation";
 import { uiFactory } from "core/ui";
 
@@ -151,7 +152,7 @@ function createGlobalElysia() {
                     },
                     {
                         eventName: "Elysia On Error",
-                        eventData: error,
+                        eventData: serializeError(error),
                         eventType: "ERROR",
                     },
                 );

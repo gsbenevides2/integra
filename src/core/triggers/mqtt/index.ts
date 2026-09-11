@@ -2,7 +2,7 @@ import mqtt from "mqtt";
 import type { Trigger, TriggerSettings } from "core/triggers";
 import type { BrokerKey } from "./types";
 import { brokerSettings } from "./brokers";
-import { startTracer, addTracerEvent, endTracer } from "core/instrumentation";
+import { startTracer, addTracerEvent, endTracer, serializeError } from "core/instrumentation";
 import type { TracerStatus } from "core/instrumentation/types";
 
 export interface MqttSettings extends TriggerSettings {
@@ -110,7 +110,7 @@ export async function startMqttClients() {
                     } catch (error: unknown) {
                         status = "ERROR";
                         await addTracerEvent({
-                            eventData: error as object,
+                            eventData: serializeError(error),
                             eventName: "MQTT on Error",
                             eventType: "ERROR",
                             traceId,

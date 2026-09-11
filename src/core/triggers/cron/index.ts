@@ -1,4 +1,4 @@
-import { addTracerEvent, endTracer, startTracer } from "core/instrumentation";
+import { addTracerEvent, endTracer, serializeError, startTracer } from "core/instrumentation";
 import type { TracerStatus } from "core/instrumentation/types";
 import type { Trigger, TriggerSettings } from "core/triggers";
 
@@ -30,7 +30,7 @@ export default function onCron(settings: CronSettings, func: CronCall): CronTrig
                 } catch (error: unknown) {
                     await addTracerEvent({
                         traceId,
-                        eventData: error as object,
+                        eventData: serializeError(error),
                         eventName: "Cron on Error",
                         eventType: "ERROR",
                     });

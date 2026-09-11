@@ -9,6 +9,20 @@ import { fetch } from "bun";
 
 export const DONT_TRACE_ID = "dont-trace";
 
+export function serializeError(error: unknown): object {
+    if (error instanceof Error) {
+        return {
+            ...error,
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+            ...(error.cause !== undefined ? { cause: serializeError(error.cause) } : {}),
+        };
+    }
+    if (typeof error === "object" && error !== null) return error;
+    return { message: String(error) };
+}
+
 export async function startTracer(params: StartTracerParams) {
     if (params.traceId === DONT_TRACE_ID) return;
     await db.insert(runs).values({

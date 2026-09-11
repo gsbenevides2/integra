@@ -2,7 +2,7 @@ import { RedisClient } from "bun";
 import type { Trigger, TriggerSettings } from "core/triggers";
 import type { RedisInstanceKey } from "./types";
 import { redisInstanceSettings } from "./instances";
-import { startTracer, addTracerEvent, endTracer } from "core/instrumentation";
+import { startTracer, addTracerEvent, endTracer, serializeError } from "core/instrumentation";
 import type { TracerStatus } from "core/instrumentation/types";
 
 export interface RedisSettings extends TriggerSettings {
@@ -94,7 +94,7 @@ export async function startRedisClients() {
                         } catch (error: unknown) {
                             status = "ERROR";
                             await addTracerEvent({
-                                eventData: error as object,
+                                eventData: serializeError(error),
                                 eventName: "Redis on Error",
                                 eventType: "ERROR",
                                 traceId,
