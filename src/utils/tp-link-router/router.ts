@@ -1,4 +1,8 @@
-import getVendor from "mac-oui-lookup";
+import * as macOuiLookup from "mac-oui-lookup";
+
+const getVendor: (mac: string, unknown?: string | null) => string | null =
+    // biome-ignore lint: interop shape differs between dev (tsx) and the prod bundler
+    (macOuiLookup as any).default ?? (macOuiLookup as any).getVendor ?? (macOuiLookup as any);
 import { eq } from "drizzle-orm";
 import { db } from "core/db";
 import {

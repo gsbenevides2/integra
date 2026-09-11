@@ -22,9 +22,7 @@ export async function collectServerMetrics(traceId: string) {
     await db.insert(serverMetricsSnapshots).values({
         memoryTotalMb: Math.round(Number(status.memoria.total_mb)),
         memoryUsedMb: Math.round(Number(status.memoria.usada_mb)),
-        memoryFreeMb: Math.round(
-            Number(status.memoria.total_mb) - Number(status.memoria.usada_mb),
-        ),
+        memoryFreeMb: Math.round(Number(status.memoria.total_mb) - Number(status.memoria.usada_mb)),
         networkRxKbs: Math.round(Number(status.rede.rx_kbs)),
         networkTxKbs: Math.round(Number(status.rede.tx_kbs)),
         disks,

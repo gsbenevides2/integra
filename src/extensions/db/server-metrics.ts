@@ -1,4 +1,4 @@
-import { integer, jsonb, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
+import { doublePrecision, integer, jsonb, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
 
 export const serverMetrics = pgSchema("server_metrics");
 
@@ -21,5 +21,15 @@ export const serverMetricsSnapshots = serverMetrics.table("snapshots", {
     networkRxKbs: integer().notNull(),
     networkTxKbs: integer().notNull(),
     disks: jsonb().$type<DiskSnapshot[]>().notNull(),
+    collectedAt: timestamp({ withTimezone: true }).notNull(),
+});
+
+export const serverMetricsSpeedtestSnapshots = serverMetrics.table("speedtest_snapshots", {
+    id: text()
+        .primaryKey()
+        .$defaultFn(() => crypto.randomUUID()),
+    downloadMbps: doublePrecision().notNull(),
+    uploadMbps: doublePrecision().notNull(),
+    latencyMs: doublePrecision().notNull(),
     collectedAt: timestamp({ withTimezone: true }).notNull(),
 });
