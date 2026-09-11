@@ -2,9 +2,11 @@ import { authentikLoginFailed } from "extensions/scripts/authentik/loginFailed";
 import { autoClean } from "extensions/scripts/auto-clean";
 import sendBirthDayDiscordMessage from "extensions/scripts/birthday";
 import { schedullerCalendarMessages } from "extensions/scripts/calendars";
+import { sendCalendarScheduledMessages } from "extensions/scripts/calendars/sendScheduledMessages";
 import { gmailSuport } from "extensions/scripts/gmail/support";
 import { sinalMonitor } from "extensions/scripts/sinal";
-import { statusSync } from "extensions/scripts/status-sync";
+import { serverMetricsCollectCron } from "extensions/scripts/server-metrics/cron";
+import { serverMetricsRoutes } from "extensions/scripts/server-metrics/routes";
 import { syncTpLinkData } from "extensions/scripts/tp-link-center";
 import registerSettings from "core";
 import { platformStatusRoutes } from "extensions/scripts/platform-status/routes";
@@ -19,8 +21,10 @@ await registerSettings({
         authentikLoginFailed,
         sendBirthDayDiscordMessage,
         schedullerCalendarMessages,
+        sendCalendarScheduledMessages,
         gmailSuport,
-        statusSync,
+        serverMetricsCollectCron,
+        serverMetricsRoutes,
         sinalMonitor,
         syncTpLinkData,
         autoClean,

@@ -1,10 +1,9 @@
 import { parseISO, differenceInMilliseconds, subMinutes } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
-import type { CalendarEvents, EventWithCalendar } from "./types";
+import type { CalendarEvents, EventWithCalendar, PendingMessage } from "./types";
 import { DISCORD_CHANNEL_ID, DISCORD_PUBLIC_KEY } from "utils/discord/sendMessage";
-import type { AddSchedulledRequest } from "utils/httpScheduller/types";
 
-export function prepareMessageAndSchedule(events: CalendarEvents[]): AddSchedulledRequest[] {
+export function prepareMessageAndSchedule(events: CalendarEvents[]): PendingMessage[] {
     function formatEventMessage(data: EventWithCalendar) {
         const email = data.calendar.email;
         const dateTime = parseISO(data.start_date);
@@ -47,8 +46,7 @@ export function prepareMessageAndSchedule(events: CalendarEvents[]): AddSchedull
 
     const getTriggerValue = (event: EventWithCalendar) => {
         const date = parseISO(event.start_date);
-        const triggerValue = subMinutes(date, 1).toISOString().split("-").slice(0, 3).join("-");
-        return triggerValue;
+        return subMinutes(date, 1).toISOString();
     };
 
     const allEvents = events.flatMap(({ events, calendar }) =>
@@ -77,16 +75,12 @@ export function prepareMessageAndSchedule(events: CalendarEvents[]): AddSchedull
         .filter((event) => checkIfEventIsInTheFuture(event)) // Filtra eventos que ainda não aconteceram
         .filter((event) => checkIfEventHasNoConfirmation(event)); // Filtra eventos do calendario da econverse que foram recusados
 
-    const schedulledRequests = eventsToSchedule.map<AddSchedulledRequest>((event) => {
+    const pendingMessages = eventsToSchedule.map<PendingMessage>((event) => {
         const { message } = formatEventMessage(event);
         const triggerValue = getTriggerValue(event);
-        const externalId = crypto.randomUUID();
         const name = `calendar-scheduller-${event.id}`;
         return {
-            externalId,
             name,
-            triggerType: "date",
-            excludeBeforeExecution: true,
             triggerValue,
             url: `https://discord.com/api/v10/channels/${DISCORD_CHANNEL_ID}/messages`,
             method: "POST",
@@ -97,8 +91,7 @@ export function prepareMessageAndSchedule(events: CalendarEvents[]): AddSchedull
             body: JSON.stringify({
                 content: message,
             }),
-            useAuthentikServiceAccount: false,
         };
     });
-    return schedulledRequests;
+    return pendingMessages;
 }

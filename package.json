@@ -4,7 +4,7 @@
     "description": "Event-driven daemon connecting external services (HTTP, MQTT, Home Assistant, Redis, PostgreSQL, Email/IMAP, Cron) to user scripts. Every execution is auto-traced to PostgreSQL.",
     "module": "index.ts",
     "type": "module",
-    "version": "1.0.19",
+    "version": "1.0.20",
     "private": true,
     "repository": {
         "type": "git",
@@ -53,7 +53,6 @@
     "dependencies": {
         "@elysia/eden": "^1.4.10",
         "@elysia/openapi": "^1.4.15",
-        "@gsbenevides2/http-scheduller": "^1.0.17",
         "@gsbenevides2/tp-link-center": "^0.0.26",
         "@heroicons/react": "^2.2.0",
         "@modelcontextprotocol/sdk": "^1.29.0",

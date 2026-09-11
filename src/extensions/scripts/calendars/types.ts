@@ -12,5 +12,13 @@ export interface MakedDates {
     startDate: string;
     endDate: string;
     nonDuplicatedCalendars: Calendar[];
-    schedullersIdsToDelete: string[];
+}
+
+export interface PendingMessage {
+    name: string;
+    triggerValue: string;
+    url: string;
+    method: string;
+    headers: Record<string, string>;
+    body: string;
 }

@@ -1,12 +1,10 @@
 import onCron from "core/triggers/cron";
 
-import { listSchedullersRequest } from "utils/httpScheduller/listSchedullersRequest";
 import { makeDatesAndFilterCalendars } from "./makeDatesAndFilterCalendars";
-import { deleteManySchedullerRequests } from "utils/httpScheduller/deleteManySchedullerRequests";
 
 import type { CalendarEvents } from "./types";
 import { prepareMessageAndSchedule } from "./prepareMessageAndSchedule";
-import { schedulleRequests } from "utils/httpScheduller/schedulleRequests";
+import { setPendingMessages } from "./pendingMessagesCache";
 import { listCalendarsRequest } from "utils/google/listCalendarsRequest";
 import { listEventsFromCalendar } from "utils/google/listEventsFromCalendar";
 
@@ -16,15 +14,10 @@ export const schedullerCalendarMessages = onCron(
         id: "calendars:scheduleMessage",
     },
     async (_, traceId) => {
-        const [calendars, schedullers] = await Promise.all([
-            listCalendarsRequest(traceId),
-            listSchedullersRequest(traceId),
-        ]);
+        const calendars = await listCalendarsRequest(traceId);
 
-        const { startDate, endDate, nonDuplicatedCalendars, schedullersIdsToDelete } =
-            await makeDatesAndFilterCalendars(calendars, schedullers);
-        if (schedullersIdsToDelete.length)
-            await deleteManySchedullerRequests(schedullersIdsToDelete, traceId);
+        const { startDate, endDate, nonDuplicatedCalendars } =
+            await makeDatesAndFilterCalendars(calendars);
         const events = await Promise.all(
             nonDuplicatedCalendars.map<Promise<CalendarEvents>>(async (calendar) => ({
                 events: await listEventsFromCalendar(calendar, startDate, endDate, traceId),
@@ -32,7 +25,7 @@ export const schedullerCalendarMessages = onCron(
             })),
         );
 
-        const requestsToSchedule = await prepareMessageAndSchedule(events);
-        if (requestsToSchedule.length) await schedulleRequests(requestsToSchedule, traceId);
+        const pendingMessages = prepareMessageAndSchedule(events);
+        await setPendingMessages(pendingMessages);
     },
 );
