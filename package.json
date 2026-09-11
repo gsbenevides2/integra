@@ -4,7 +4,7 @@
     "description": "Event-driven daemon connecting external services (HTTP, MQTT, Home Assistant, Redis, PostgreSQL, Email/IMAP, Cron) to user scripts. Every execution is auto-traced to PostgreSQL.",
     "module": "index.ts",
     "type": "module",
-    "version": "1.0.17",
+    "version": "1.0.18",
     "private": true,
     "repository": {
         "type": "git",
@@ -19,7 +19,7 @@
     "scripts": {
         "dev": "concurrently \"bun run dev:css\" \"bun run dev:server\" \"bun run dev:client\"",
         "dev:css": "bunx @tailwindcss/cli -i ./src/input.css -o ./assets/output.css --watch",
-        "dev:server": "bun run --watch src/index.ts",
+        "dev:server": "bun run --watch src/index.ts --disableCrons",
         "dev:client": "bun build --watch src/core/ui/client-bundle.tsx --outdir assets --minify --sourceap=inline",
         "build": "bun run build:css && bun run build:server && bun run build:client",
         "build:css": "bunx @tailwindcss/cli -i ./src/input.css -o ./assets/output.css  --minify",
@@ -63,6 +63,7 @@
         "date-fns-tz": "^3.2.0",
         "drizzle-orm": "^1.0.0-rc.4",
         "elysia": "^1.4.29",
+        "googleapis": "^178.1.1",
         "happy-dom": "^20.14.3",
         "imap": "^0.8.19",
         "jose": "^6.2.3",

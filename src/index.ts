@@ -12,6 +12,7 @@ import { platformStatusCheckCron } from "extensions/scripts/platform-status/cron
 import { trainStatusRoutes } from "extensions/scripts/train-status/routes";
 import { trainStatusCheckCron } from "extensions/scripts/train-status/cron";
 import { executionLogsRoutes } from "extensions/scripts/execution-logs/routes";
+import { googleAccountsRoutes } from "extensions/scripts/google-accounts/routes";
 
 await registerSettings({
     triggers: [
@@ -28,5 +29,6 @@ await registerSettings({
         trainStatusRoutes,
         trainStatusCheckCron,
         executionLogsRoutes,
+        googleAccountsRoutes,
     ],
 });
