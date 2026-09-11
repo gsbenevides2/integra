@@ -166,7 +166,7 @@ export function DotChart({ runs, onSelectRun }: Props) {
                     </button>
                 )}
             </div>
-            <div className="w-full h-[280px] sm:h-[360px]">
+            <div className="w-full h-70 sm:h-90">
                 <ResponsiveContainer width="100%" height="100%">
                     <ScatterChart
                         onMouseDown={handleMouseDown}

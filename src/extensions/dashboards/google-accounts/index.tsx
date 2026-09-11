@@ -64,7 +64,7 @@ function Dashboard() {
             </div>
 
             {isLoading && accounts.length === 0 ? (
-                <div className="h-[200px] flex items-center justify-center text-mist-400 text-sm">
+                <div className="h-50 flex items-center justify-center text-mist-400 text-sm">
                     Loading accounts...
                 </div>
             ) : accounts.length === 0 ? (

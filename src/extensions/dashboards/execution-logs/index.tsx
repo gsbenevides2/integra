@@ -100,7 +100,7 @@ function Dashboard() {
             <FilterBar onFilterChange={setFilters} />
 
             {isLoading && runs.length === 0 ? (
-                <div className="h-[360px] flex items-center justify-center text-mist-400 text-sm">
+                <div className="h-90 flex items-center justify-center text-mist-400 text-sm">
                     Loading executions...
                 </div>
             ) : runs.length === 0 ? (

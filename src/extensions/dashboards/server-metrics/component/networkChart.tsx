@@ -27,7 +27,7 @@ export function NetworkChart({ data }: { data: Point[] }) {
     return (
         <div className="bg-gray-800 rounded-md p-3 flex flex-col gap-2">
             <h3 className="text-sm font-semibold">Rede (kB/s)</h3>
-            <div className="w-full h-[260px]">
+            <div className="w-full h-65">
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={data}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.4} />

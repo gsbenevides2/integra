@@ -13,15 +13,18 @@ interface Props {
     onSelectRun: (traceId: string) => void;
 }
 
-const COLUMNS: { field: SortField | "triggerId" | "workflowType" | "status"; label: string; sortable: boolean }[] =
-    [
-        { field: "triggerId", label: "Trigger ID", sortable: false },
-        { field: "workflowType", label: "Type", sortable: false },
-        { field: "startTime", label: "Start Time", sortable: true },
-        { field: "endTime", label: "End Time", sortable: true },
-        { field: "status", label: "Status", sortable: false },
-        { field: "durationMs", label: "Duration", sortable: true },
-    ];
+const COLUMNS: {
+    field: SortField | "triggerId" | "workflowType" | "status";
+    label: string;
+    sortable: boolean;
+}[] = [
+    { field: "triggerId", label: "Trigger ID", sortable: false },
+    { field: "workflowType", label: "Type", sortable: false },
+    { field: "startTime", label: "Start Time", sortable: true },
+    { field: "endTime", label: "End Time", sortable: true },
+    { field: "status", label: "Status", sortable: false },
+    { field: "durationMs", label: "Duration", sortable: true },
+];
 
 export function RunsTable({ filters, onSelectRun }: Props) {
     const [rows, setRows] = useState<RunDocument[]>([]);
@@ -100,7 +103,7 @@ export function RunsTable({ filters, onSelectRun }: Props) {
 
     return (
         <div className="bg-gray-800 rounded-md overflow-hidden">
-            <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
+            <div className="overflow-x-auto max-h-105 overflow-y-auto">
                 <table className="w-full text-sm">
                     <thead className="sticky top-0 bg-gray-900">
                         <tr>
@@ -108,13 +111,19 @@ export function RunsTable({ filters, onSelectRun }: Props) {
                                 <th
                                     key={col.field}
                                     className={`text-left px-3 py-2 font-semibold text-mist-300 ${
-                                        col.sortable ? "cursor-pointer select-none hover:text-white" : ""
+                                        col.sortable
+                                            ? "cursor-pointer select-none hover:text-white"
+                                            : ""
                                     }`}
-                                    onClick={() => col.sortable && toggleSort(col.field as SortField)}
+                                    onClick={() =>
+                                        col.sortable && toggleSort(col.field as SortField)
+                                    }
                                 >
                                     {col.label}
                                     {col.sortable && sortField === col.field && (
-                                        <span className="ml-1">{sortOrder === "asc" ? "▲" : "▼"}</span>
+                                        <span className="ml-1">
+                                            {sortOrder === "asc" ? "▲" : "▼"}
+                                        </span>
                                     )}
                                 </th>
                             ))}
@@ -133,7 +142,9 @@ export function RunsTable({ filters, onSelectRun }: Props) {
                                         {run.workflowType}
                                     </span>
                                 </td>
-                                <td className="px-3 py-1.5">{formatDateTime(new Date(run.startTime))}</td>
+                                <td className="px-3 py-1.5">
+                                    {formatDateTime(new Date(run.startTime))}
+                                </td>
                                 <td className="px-3 py-1.5">
                                     {run.endTime ? formatDateTime(new Date(run.endTime)) : "-"}
                                 </td>
@@ -160,7 +171,10 @@ export function RunsTable({ filters, onSelectRun }: Props) {
                 {isLoading && (
                     <div className="flex flex-col gap-1 p-2">
                         {Array.from({ length: 5 }).map((_, index) => (
-                            <div key={index} className="h-6 w-full bg-gray-700 rounded-sm animate-pulse" />
+                            <div
+                                key={index}
+                                className="h-6 w-full bg-gray-700 rounded-sm animate-pulse"
+                            />
                         ))}
                     </div>
                 )}
