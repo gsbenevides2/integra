@@ -1,5 +1,6 @@
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { dashboards } from "extensions/dashboards";
+import { APP_VERSION } from "core/ui/version";
 
 interface Props {
     updateDash: (dashId: string) => void;
@@ -41,7 +42,7 @@ export function SideBar({ updateDash, isOpen, onClose }: Props) {
                         <XMarkIcon className="size-5" />
                     </button>
                 </div>
-                <div className="px-1 flex flex-col gap-0.5 overflow-y-auto">
+                <div className="px-1 flex flex-col gap-0.5 overflow-y-auto flex-1">
                     {dashboards.map((dash) => (
                         <button
                             onClick={() => updateDash(dash.id)}
@@ -52,6 +53,9 @@ export function SideBar({ updateDash, isOpen, onClose }: Props) {
                             <span className="truncate">{dash.name}</span>
                         </button>
                     ))}
+                </div>
+                <div className="px-3 py-2 text-xs text-gray-500 border-t border-gray-800 text-center">
+                    v{APP_VERSION}
                 </div>
             </div>
         </>
