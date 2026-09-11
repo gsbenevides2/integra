@@ -1,6 +1,8 @@
-import { inArray, sql } from "drizzle-orm";
+import { desc, inArray, lt, sql } from "drizzle-orm";
 import { db } from "core/db";
-import { tpLinkCenterSettings } from "core/db/schema";
+import { tpLinkCenterRouterStatusHistory, tpLinkCenterSettings } from "core/db/schema";
+
+const STATUS_HISTORY_PAGE_SIZE = 200;
 
 export interface RouterStatus {
     wanIp: string;
@@ -62,5 +64,35 @@ export async function getLatestRouterStatus(): Promise<RouterStatus> {
         memoryUsage: map.has("memoryUsage") ? Number(map.get("memoryUsage")) : null,
         totalDownload: map.get("totalDownload") ?? null,
         totalUpload: map.get("totalUpload") ?? null,
+    };
+}
+
+export async function saveRouterStatusHistory(
+    status: Pick<RouterStatus, "cpuUsage" | "memoryUsage" | "connectionStatus">,
+): Promise<void> {
+    await db.insert(tpLinkCenterRouterStatusHistory).values({
+        cpuUsage: status.cpuUsage,
+        memoryUsage: status.memoryUsage,
+        connectionStatus: status.connectionStatus,
+    });
+}
+
+export async function getRouterStatusHistory(before?: Date) {
+    const snapshots = await db
+        .select()
+        .from(tpLinkCenterRouterStatusHistory)
+        .where(
+            before ? lt(tpLinkCenterRouterStatusHistory.collectedAt, before) : undefined,
+        )
+        .orderBy(desc(tpLinkCenterRouterStatusHistory.collectedAt))
+        .limit(STATUS_HISTORY_PAGE_SIZE);
+
+    const ordered = snapshots.slice().reverse();
+    const oldest = snapshots.at(-1);
+
+    return {
+        snapshots: ordered,
+        hasMore: snapshots.length === STATUS_HISTORY_PAGE_SIZE,
+        nextCursor: oldest ? oldest.collectedAt.toISOString() : null,
     };
 }

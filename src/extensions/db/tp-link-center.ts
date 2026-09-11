@@ -1,4 +1,4 @@
-import { boolean, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
 
 export const tpLinkCenter = pgSchema("tp_link_center");
 
@@ -37,6 +37,16 @@ export const tpLinkCenterOnlineChecks = tpLinkCenter.table("online_checks", {
         .primaryKey()
         .$defaultFn(() => crypto.randomUUID()),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+});
+
+export const tpLinkCenterRouterStatusHistory = tpLinkCenter.table("router_status_history", {
+    id: text()
+        .primaryKey()
+        .$defaultFn(() => crypto.randomUUID()),
+    cpuUsage: integer(),
+    memoryUsage: integer(),
+    connectionStatus: text().notNull(),
+    collectedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
 
 export const tpLinkCenterOnlineDeviceChecks = tpLinkCenter.table("online_device_checks", {

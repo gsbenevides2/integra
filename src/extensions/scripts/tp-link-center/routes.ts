@@ -12,7 +12,7 @@ import {
     updateInterface,
 } from "utils/tp-link-router/devices";
 import { restartNetwork, syncSettings } from "utils/tp-link-router/router";
-import { getLatestRouterStatus } from "utils/tp-link-router/settings";
+import { getLatestRouterStatus, getRouterStatusHistory } from "utils/tp-link-router/settings";
 
 const deviceBody = z.object({
     name: z.string(),
@@ -63,7 +63,13 @@ export const tpLinkCenterElysiaClient = new Elysia({ prefix: "/tp-link-center" }
         return { ok: true };
     })
     .get("/checks/latest", async () => getLatestCheck())
-    .get("/settings/latest-router-status", async () => getLatestRouterStatus());
+    .get("/settings/latest-router-status", async () => getLatestRouterStatus())
+    .get(
+        "/settings/router-status-history",
+        async ({ query }) =>
+            getRouterStatusHistory(query.before ? new Date(query.before) : undefined),
+        { query: z.object({ before: z.string().optional() }) },
+    );
 
 export const tpLinkCenterRoutes = onHttp(
     {

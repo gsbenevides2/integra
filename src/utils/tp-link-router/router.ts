@@ -24,7 +24,7 @@ import {
 import { TpLinkClient } from "./client";
 import { getAllRouters, getControllerRouter, getDeviceNameOfMac } from "./devices";
 import { normalizeMac } from "./normalizeMac";
-import { saveRouterStatus } from "./settings";
+import { saveRouterStatus, saveRouterStatusHistory } from "./settings";
 import type {
     ConnectedDevices,
     DEV2_ADT_WAN,
@@ -493,6 +493,11 @@ async function syncConnectedDevices(client: TpLinkClient): Promise<void> {
 async function syncRouterStatus(client: TpLinkClient): Promise<void> {
     const status = await getStatus(client);
     await saveRouterStatus(status);
+    await saveRouterStatusHistory({
+        cpuUsage: status.cpuUsage,
+        memoryUsage: status.memoryUsage,
+        connectionStatus: status.connectionStatus,
+    });
 }
 
 export async function syncSettings(): Promise<void> {

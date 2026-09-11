@@ -16,6 +16,7 @@ import { useToast } from "core/ui/components/toast";
 import { getTpLinkCenterEdenClient } from "extensions/scripts/tp-link-center/client";
 import { DeviceDrawerContent } from "./component/deviceDrawerContent";
 import { Modal } from "./component/modal";
+import { RouterStatusChart } from "./component/routerStatusChart";
 import { RouterStatusPanel } from "./component/routerStatusPanel";
 import { UnregisteredDevices } from "./component/unregisteredDevices";
 
@@ -49,6 +50,14 @@ interface RouterStatus {
     memoryUsage: number | null;
     totalDownload: string | null;
     totalUpload: string | null;
+}
+
+interface RouterStatusHistoryPoint {
+    id: string;
+    cpuUsage: number | null;
+    memoryUsage: number | null;
+    connectionStatus: string;
+    collectedAt: string;
 }
 
 interface OnlineDevice {
@@ -161,6 +170,7 @@ function Dashboard() {
     const [devices, setDevices] = useState<Device[]>([]);
     const [onlineDevices, setOnlineDevices] = useState<OnlineDevice[]>([]);
     const [routerStatus, setRouterStatus] = useState<RouterStatus | null>(null);
+    const [routerStatusHistory, setRouterStatusHistory] = useState<RouterStatusHistoryPoint[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSyncing, setIsSyncing] = useState(false);
     const [showNewDeviceForm, setShowNewDeviceForm] = useState(false);
@@ -169,15 +179,21 @@ function Dashboard() {
     const fetchAll = useCallback(async (useLoading: boolean) => {
         if (useLoading) setIsLoading(true);
         const client = getTpLinkCenterEdenClient();
-        const [devicesRes, statusRes, checkRes] = await Promise.all([
+        const [devicesRes, statusRes, checkRes, statusHistoryRes] = await Promise.all([
             client["tp-link-center"].devices.get(),
             client["tp-link-center"].settings["latest-router-status"].get(),
             client["tp-link-center"].checks.latest.get(),
+            client["tp-link-center"].settings["router-status-history"].get({ query: {} }),
         ]);
         if (devicesRes.data) setDevices(devicesRes.data as unknown as Device[]);
         if (statusRes.data) setRouterStatus(statusRes.data as unknown as RouterStatus);
         if (checkRes.data)
             setOnlineDevices((checkRes.data as { devices: OnlineDevice[] }).devices ?? []);
+        if (statusHistoryRes.data)
+            setRouterStatusHistory(
+                (statusHistoryRes.data as unknown as { snapshots: RouterStatusHistoryPoint[] })
+                    .snapshots ?? [],
+            );
         if (useLoading) setIsLoading(false);
     }, []);
 
@@ -258,6 +274,10 @@ function Dashboard() {
             ) : (
                 <>
                     <RouterStatusPanel status={routerStatus} />
+
+                    {routerStatusHistory.length > 0 && (
+                        <RouterStatusChart data={routerStatusHistory} />
+                    )}
 
                     <div className="flex flex-col gap-2">
                         <div className="flex items-center justify-between">
