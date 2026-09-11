@@ -83,7 +83,7 @@ function Dashboard() {
                 platformName={historyPlatform?.name}
             />
 
-            <div className="flex justify-between">
+            <div className="flex flex-wrap gap-3 justify-between">
                 <h1 className="text-xl">Status Platform</h1>
                 <Button onClick={openCreateModal}>
                     <PlusIcon className="size-4.5" />
@@ -91,7 +91,7 @@ function Dashboard() {
                 </Button>
             </div>
             {isLoading ? (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                     {Array.from({ length: 6 }).map((_, index) => (
                         <CardSkeleton key={index} />
                     ))}
@@ -109,7 +109,7 @@ function Dashboard() {
                     </Button>
                 </div>
             ) : (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                     {platforms.map((platform) => (
                         <Card
                             key={platform.id}

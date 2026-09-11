@@ -60,11 +60,11 @@ function Dashboard() {
                 lineCode={historyLineCode}
             />
 
-            <div className="flex justify-between">
+            <div className="flex flex-wrap gap-3 justify-between">
                 <h1 className="text-xl">Train Status</h1>
             </div>
             {isLoading ? (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                     {Array.from({ length: 6 }).map((_, index) => (
                         <CardSkeleton key={index} />
                     ))}
@@ -78,7 +78,7 @@ function Dashboard() {
                     </p>
                 </div>
             ) : (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                     {lines.map((line) => (
                         <Card
                             key={line.lineCode}

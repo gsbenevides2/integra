@@ -49,9 +49,9 @@ function Dashboard() {
 
     return (
         <div className="p-3 flex flex-col gap-4">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-wrap gap-3 justify-between items-center">
                 <h1 className="text-xl">Google Accounts</h1>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                     <Button variant="secondary" isLoading={isLoading} onClick={fetchAccounts}>
                         <ArrowPathIcon className="size-4" />
                         Refresh
@@ -76,7 +76,7 @@ function Dashboard() {
                     </p>
                 </div>
             ) : (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                     {accounts.map((email) => (
                         <Card key={email} email={email} onDeleted={fetchAccounts} />
                     ))}

@@ -82,9 +82,9 @@ function Dashboard() {
                 traceId={selectedTraceId}
             />
 
-            <div className="flex justify-between items-center">
+            <div className="flex flex-wrap gap-3 justify-between items-center">
                 <h1 className="text-xl">Execution History</h1>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                     <span className="text-sm text-mist-400">{runs.length} executions</span>
                     <Button variant="secondary" isLoading={isLoading} onClick={handleRefresh}>
                         <ArrowPathIcon className="size-4" />
