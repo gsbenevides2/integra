@@ -1,6 +1,7 @@
 import { BoltIcon, CloudIcon, LightBulbIcon } from "@heroicons/react/24/outline";
 import { Slider } from "core/ui/components/slider";
 import { Switch } from "core/ui/components/switch";
+import { brightnessCommand, currentHex, effectiveBrightness, isColourMode } from "../lampColor";
 import type { Device, DeviceCommand } from "../types";
 
 interface Props {
@@ -17,6 +18,8 @@ export function DeviceCard({ device, isBusy, onCommand, onOpen }: Props) {
     const channelKeys = Object.keys(channels).sort((a, b) => Number(a) - Number(b));
     const anyChannelOn = channelKeys.some((key) => channels[key]);
     const isSwitch = device.kind === "switch";
+    const tint = currentHex(state);
+    const brightness = effectiveBrightness(state);
 
     return (
         <div
@@ -38,9 +41,8 @@ export function DeviceCard({ device, isBusy, onCommand, onOpen }: Props) {
                         />
                     ) : (
                         <LightBulbIcon
-                            className={`size-5 shrink-0 ${
-                                isOn ? "text-amber-300" : "text-mist-500"
-                            }`}
+                            className={`size-5 shrink-0 ${isOn ? "" : "text-mist-500"}`}
+                            style={isOn ? { color: tint } : undefined}
                         />
                     )}
                     <span className="truncate">{device.name}</span>
@@ -102,14 +104,15 @@ export function DeviceCard({ device, isBusy, onCommand, onOpen }: Props) {
                 />
             )}
 
-            {!isSwitch && state.brightness !== null && (
+            {!isSwitch && brightness !== null && (
                 <Slider
                     label="Brilho"
                     min={1}
                     max={100}
-                    value={state.brightness}
+                    value={brightness}
                     disabled={isBusy || !state.online}
-                    onCommit={(brightness) => onCommand({ brightness })}
+                    track={`linear-gradient(to right, #000, ${tint})`}
+                    onCommit={(value) => onCommand(brightnessCommand(state, value))}
                 />
             )}
 
@@ -117,12 +120,10 @@ export function DeviceCard({ device, isBusy, onCommand, onOpen }: Props) {
                 <div className="flex items-center gap-2">
                     <span
                         className="size-4 rounded-full border border-gray-600 shrink-0"
-                        style={{
-                            backgroundColor: state.workMode === "colour" ? state.colorHex : "#fff",
-                        }}
+                        style={{ backgroundColor: tint }}
                     />
                     <span className="text-xs text-mist-400">
-                        {state.workMode === "colour" ? state.colorHex : "Modo branco"}
+                        {isColourMode(state) ? tint : "Modo branco"}
                     </span>
                 </div>
             )}

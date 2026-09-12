@@ -3,16 +3,13 @@ import { SignalIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { Button } from "core/ui/components/button";
 import { useConfirm } from "core/ui/components/confirm/context";
 import { Input } from "core/ui/components/input";
-import { Slider } from "core/ui/components/slider";
 import { Switch } from "core/ui/components/switch";
 import { useToast } from "core/ui/components/toast";
 import { getTuyaEdenClient } from "extensions/scripts/tuya/client";
 import type { HistoryPoint, Device, DeviceCommand } from "../types";
 import { DeviceHistoryChart } from "./deviceHistoryChart";
-
-// 0% is the warmest reading the lamp reports and 100% the coolest, so the track
-// runs from orange to blue.
-const COLOR_TEMP_TRACK = "linear-gradient(to right, #ffb46b, #f6f1ea 50%, #8ec2ff)";
+import { LampControls } from "./lampControls";
+import { SwitchControls } from "./switchControls";
 
 interface Props {
     device: Device;
@@ -106,56 +103,13 @@ export function DeviceDrawerContent({ device, isBusy, onCommand, onChanged, onDe
         onDeleted();
     }, [confirm, device.id, device.name, showToast, onDeleted]);
 
-    const { state } = device;
-    const controlsDisabled = isBusy || !state.online;
-
     return (
         <div className="flex flex-col gap-4">
             <section className="flex flex-col gap-3">
-                <h3 className="text-sm font-semibold text-mist-300">Controle</h3>
-
-                <Switch
-                    checked={state.power === true}
-                    disabled={controlsDisabled}
-                    onChange={(checked) => onCommand({ power: checked })}
-                    label={state.power ? "Ligada" : "Desligada"}
-                />
-
-                {state.brightness !== null && (
-                    <Slider
-                        label="Brilho"
-                        min={1}
-                        max={100}
-                        value={state.brightness}
-                        disabled={controlsDisabled}
-                        onCommit={(brightness) => onCommand({ brightness })}
-                    />
-                )}
-
-                {state.colorTemp !== null && (
-                    <Slider
-                        label="Temperatura de cor"
-                        min={0}
-                        max={100}
-                        value={state.colorTemp}
-                        disabled={controlsDisabled}
-                        onCommit={(colorTemp) => onCommand({ colorTemp })}
-                        track={COLOR_TEMP_TRACK}
-                    />
-                )}
-
-                {state.colorHex !== null && (
-                    <label className="flex items-center gap-2">
-                        <span className="text-xs text-mist-400">Cor</span>
-                        <input
-                            type="color"
-                            value={state.colorHex}
-                            disabled={controlsDisabled}
-                            onChange={(e) => onCommand({ colorHex: e.target.value })}
-                            className="h-7 w-12 bg-transparent cursor-pointer disabled:cursor-not-allowed"
-                        />
-                        <span className="text-xs text-mist-400">{state.colorHex}</span>
-                    </label>
+                {device.kind === "switch" ? (
+                    <SwitchControls device={device} isBusy={isBusy} onCommand={onCommand} />
+                ) : (
+                    <LampControls device={device} isBusy={isBusy} onCommand={onCommand} />
                 )}
             </section>
 
