@@ -265,7 +265,7 @@ All routes are under `/tuya`, registered as `onHttp({ id: "tuya-routes", dontTra
 | ---------------------- | ------------ | --------------------------------------------------------------------- |
 | `tuya-catalogue`       | every 6 h    | Re-reads the account: new devices, renamed ones, refreshed local keys |
 | `tuya-sensor-readings` | every minute | Pulls sensor changes from the cloud                                   |
-| `tuya-sync`            | every minute | Reconnects dropped LAN sockets and reconciles device state            |
+| `tuya-sync`            | every minute | Reconnects dropped LAN sockets and reconciles state, LAN then cloud   |
 | `tuya-discovery`       | every 5 min  | UDP sweep for device IPs and protocol versions; prunes old readings   |
 
 `bun run dev` starts with `--disableCrons`, so none of these run in development. Connections
@@ -353,9 +353,11 @@ every pass would re-announce it to every automation each time.
 **A bulb stops responding after being re-paired.** Its `localKey` changed. The catalogue sync
 picks the new one up within 6 hours; to fix it immediately, hit **Sincronizar**.
 
-**A device shows as offline but works in the Smart Life app.** The status shadow keeps its
-last known values while a device is unplugged, so reachability comes from the device record
-rather than the payload. Check the LAN: `--test=tuya-discovery` reports what is broadcasting.
+**A device shows as offline but works in the Smart Life app.** The per-minute sweep asks the
+cloud about everything the LAN could not reach, so this means the cloud reports it offline
+too — its status shadow keeps the last known values while a device is unplugged, which is why
+reachability comes from the account listing rather than from the payload. If the app really
+does control it, check the LAN: `--test=tuya-discovery` reports what is broadcasting.
 
 **A sensor shows no readings at all.** Check whether the device reports anything in the Smart
 Life app. Some vendors ship a product profile with no data points registered, in which case

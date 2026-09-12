@@ -1,5 +1,7 @@
 import { addTracerEvent, serializeError } from "core/instrumentation";
-import { listEnabledDevices, markDeviceSeen } from "utils/tuya/devices";
+import { type DeviceState, OFFLINE_STATE } from "utils/tuya/capabilities";
+import { readStatesFromCloud } from "utils/tuya/deviceAccess";
+import { type Device, listEnabledDevices, markDeviceSeen } from "utils/tuya/devices";
 import { refreshDiscovery } from "utils/tuya/discoveryCache";
 import { readStateSafe } from "utils/tuya/registry";
 import { pruneStateHistory, saveStateIfChanged } from "utils/tuya/state";
@@ -40,21 +42,35 @@ export async function runDiscovery(traceId: string): Promise<void> {
  * or a dropped connection.
  */
 export async function reconcileDevices(traceId: string): Promise<void> {
-    const lamps = await listEnabledDevices();
+    const devices = await listEnabledDevices();
+
+    const states = new Map<string, DeviceState>();
+    const unreachable: Device[] = [];
+
+    for (const device of devices) {
+        const state = await readStateSafe(device);
+        // A local read that succeeded is by definition online; anything else is a device
+        // the LAN could not reach, which says nothing about whether it is actually down.
+        if (state.online) states.set(device.id, state);
+        else unreachable.push(device);
+    }
+
+    const viaCloud = await fillFromCloud(states, unreachable, traceId);
+
     let changed = 0;
     let offline = 0;
 
-    for (const lamp of lamps) {
+    for (const device of devices) {
+        const state = states.get(device.id) ?? OFFLINE_STATE;
+        if (!state.online) offline++;
         try {
-            const state = await readStateSafe(lamp);
-            if (!state.online) offline++;
-            if (await saveStateIfChanged(lamp.id, state)) changed++;
+            if (await saveStateIfChanged(device.id, state)) changed++;
         } catch (error) {
             await addTracerEvent({
                 traceId,
                 eventName: "Tuya lamp reconcile failed",
                 eventType: "ERROR",
-                eventData: { lampId: lamp.id, name: lamp.name, error: serializeError(error) },
+                eventData: { lampId: device.id, name: device.name, error: serializeError(error) },
             });
         }
     }
@@ -63,6 +79,40 @@ export async function reconcileDevices(traceId: string): Promise<void> {
         traceId,
         eventName: "Tuya reconcile finished",
         eventType: "INFO",
-        eventData: { lamps: lamps.length, offline, changed },
+        eventData: { lamps: devices.length, offline, viaCloud, changed },
     });
+}
+
+/**
+ * Asks the cloud about whatever the LAN could not answer for, so the dashboard stops
+ * reporting a device as offline while the Smart Life app controls it happily — which is
+ * exactly what a device on another network, or one this host cannot discover, looks like.
+ * A cloud outage is not worth failing the sweep over: those devices simply stay unknown.
+ */
+async function fillFromCloud(
+    states: Map<string, DeviceState>,
+    unreachable: Device[],
+    traceId: string,
+): Promise<number> {
+    if (unreachable.length === 0) return 0;
+
+    try {
+        let online = 0;
+        for (const [deviceId, state] of await readStatesFromCloud(unreachable, traceId)) {
+            states.set(deviceId, state);
+            if (state.online) online++;
+        }
+        return online;
+    } catch (error) {
+        await addTracerEvent({
+            traceId,
+            eventName: "Tuya cloud fallback failed",
+            eventType: "ERROR",
+            eventData: {
+                devices: unreachable.map((device) => device.name),
+                error: serializeError(error),
+            },
+        });
+        return 0;
+    }
 }

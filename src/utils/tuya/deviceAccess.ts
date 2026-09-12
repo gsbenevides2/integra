@@ -1,6 +1,13 @@
 import { DONT_TRACE_ID } from "core/instrumentation";
 import type { DeviceState } from "utils/tuya/capabilities";
-import { getDeviceDetail, getDeviceStatus, sendDeviceCommands } from "utils/tuya/cloud/client";
+import {
+    type TuyaStatusEntry,
+    getDeviceDetail,
+    getDeviceStatus,
+    getDevicesStatus,
+    listAccountDevices,
+    sendDeviceCommands,
+} from "utils/tuya/cloud/client";
 import {
     cloudStatusToDeviceState,
     cloudStatusToSwitchState,
@@ -31,7 +38,7 @@ export async function readDeviceState(
         return { state: await readState(device), transport: "local" };
     } catch {
         dropConnection(device.id);
-        return { state: await readLampStateFromCloud(device, traceId), transport: "cloud" };
+        return { state: await readStateFromCloud(device, traceId), transport: "cloud" };
     }
 }
 
@@ -57,12 +64,53 @@ export async function commandDevice(
     }
 }
 
-async function readLampStateFromCloud(device: Device, traceId: string): Promise<DeviceState> {
+async function readStateFromCloud(device: Device, traceId: string): Promise<DeviceState> {
     const [status, detail] = await Promise.all([
         getDeviceStatus(device.tuyaDeviceId, traceId),
         getDeviceDetail(device.tuyaDeviceId, traceId),
     ]);
-    return cloudStatusToDeviceState(status, detail.online);
+    return stateFromCloud(device, status, detail.online);
+}
+
+/**
+ * Reads a whole set of devices from the cloud in two calls, however many there are. Reading
+ * them one by one costs two requests each, which a sweep running every minute would turn
+ * into thousands of calls a day for no extra information.
+ */
+export async function readStatesFromCloud(
+    devices: Device[],
+    traceId: string,
+): Promise<Map<string, DeviceState>> {
+    if (devices.length === 0) return new Map();
+
+    const [statuses, account] = await Promise.all([
+        getDevicesStatus(
+            devices.map((device) => device.tuyaDeviceId),
+            traceId,
+        ),
+        listAccountDevices(traceId),
+    ]);
+    const online = new Map(account.map((entry) => [entry.id, entry.online]));
+
+    const states = new Map<string, DeviceState>();
+    for (const device of devices) {
+        states.set(
+            device.id,
+            stateFromCloud(
+                device,
+                statuses.get(device.tuyaDeviceId) ?? [],
+                online.get(device.tuyaDeviceId) ?? false,
+            ),
+        );
+    }
+    return states;
+}
+
+/** The cloud reports a relay's channels and a bulb's colour under entirely different codes. */
+function stateFromCloud(device: Device, status: TuyaStatusEntry[], online: boolean): DeviceState {
+    return device.kind === "switch"
+        ? cloudStatusToSwitchState(status, online)
+        : cloudStatusToDeviceState(status, online);
 }
 
 async function commandLampViaCloud(
