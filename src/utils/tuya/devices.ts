@@ -128,6 +128,14 @@ export async function markDeviceSeen(id: string, ip?: string): Promise<void> {
         .where(eq(tuyaDevices.id, id));
 }
 
+/**
+ * Forgets a stored address that has stopped answering, so the next discovery sweep can
+ * supply a fresh one instead of every connection starting at a dead lease.
+ */
+export async function clearDeviceIp(id: string): Promise<void> {
+    await db.update(tuyaDevices).set({ ip: null }).where(eq(tuyaDevices.id, id));
+}
+
 export async function saveDetectedProfile(
     id: string,
     protocolVersion: TuyaProtocolVersion,

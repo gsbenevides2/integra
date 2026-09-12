@@ -299,6 +299,26 @@ Two details that are easy to get wrong:
 - A pushed `STATUS` frame carries **only the data points that changed**, so it has to be
   merged onto the last full reading rather than interpreted alone.
 
+### Addressing
+
+A device is reached at the first address that answers, freshest lead first: the address it
+was last heard broadcasting, then the one stored on the record. A broadcast is seconds old
+while a stored address can be a lease the router moved on from days ago, so discovery leads —
+but the stored address stays as a fallback, since the broadcast never reaches a host that
+cannot see it.
+
+Whatever finally answers is written back to the record, which is what makes a device that
+changed address heal itself. When a socket opens but the device never answers — a firmware
+upgrade moving it onto another protocol version looks exactly like this — the profile is
+re-probed once and the read retried. Probing walks up to four protocol versions per address
+with a five-second timeout each, so it is not repeated more than once every five minutes for
+the same device.
+
+A stored address that has failed three times running is forgotten, so the record stops
+pinning the device to an address nothing answers at. That is only done while discovery is
+demonstrably working on this host: when nothing at all is broadcasting, the stored address is
+the only lead there is and dropping it would strand the device for good.
+
 ### Cloud requests
 
 Signed with HMAC-SHA256. Query parameters must be sorted alphabetically in the signed string
@@ -342,7 +362,9 @@ Life app. Some vendors ship a product profile with no data points registered, in
 there is nothing to read on any API.
 
 **Discovery finds nothing in Docker.** UDP broadcast does not cross the bridge network. Run
-the container with `network_mode: host`, or set each device's IP by hand — a configured IP
-skips discovery entirely.
+the container with `network_mode: host`, or set each device's IP by hand. Without discovery a
+hand-set address is the only lead there is, so a device that changes address is reachable
+through the cloud but not over the LAN until the record is corrected — a DHCP reservation on
+the router avoids the whole problem.
 
 **Ports.** UDP 6666, 6667 and 7000 for discovery, TCP 6668 for control.
