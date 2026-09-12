@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { db } from "core/db";
 import { tuyaDevices } from "core/db/schema";
 import type { BulbType } from "utils/tuya/capabilities";
@@ -44,7 +44,7 @@ function toPublic(device: Device): PublicDevice {
 }
 
 export async function listDevices(): Promise<PublicDevice[]> {
-    const devices = await db.select().from(tuyaDevices);
+    const devices = await db.select().from(tuyaDevices).orderBy(asc(tuyaDevices.id));
     return devices.map(toPublic);
 }
 

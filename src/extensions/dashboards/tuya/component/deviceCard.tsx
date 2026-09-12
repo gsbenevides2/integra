@@ -1,4 +1,5 @@
 import { BoltIcon, CloudIcon, LightBulbIcon } from "@heroicons/react/24/outline";
+import { Slider } from "core/ui/components/slider";
 import { Switch } from "core/ui/components/switch";
 import type { Device, DeviceCommand } from "../types";
 
@@ -102,25 +103,23 @@ export function DeviceCard({ device, isBusy, onCommand, onOpen }: Props) {
             )}
 
             {!isSwitch && state.brightness !== null && (
-                <label className="flex flex-col gap-1">
-                    <span className="text-xs text-mist-400">Brilho · {state.brightness}%</span>
-                    <input
-                        type="range"
-                        min={1}
-                        max={100}
-                        value={state.brightness}
-                        disabled={isBusy || !state.online}
-                        onChange={(e) => onCommand({ brightness: Number(e.target.value) })}
-                        className="w-full accent-mist-400 cursor-pointer disabled:cursor-not-allowed"
-                    />
-                </label>
+                <Slider
+                    label="Brilho"
+                    min={1}
+                    max={100}
+                    value={state.brightness}
+                    disabled={isBusy || !state.online}
+                    onCommit={(brightness) => onCommand({ brightness })}
+                />
             )}
 
             {!isSwitch && state.colorHex && (
                 <div className="flex items-center gap-2">
                     <span
                         className="size-4 rounded-full border border-gray-600 shrink-0"
-                        style={{ backgroundColor: state.colorHex }}
+                        style={{
+                            backgroundColor: state.workMode === "colour" ? state.colorHex : "#fff",
+                        }}
                     />
                     <span className="text-xs text-mist-400">
                         {state.workMode === "colour" ? state.colorHex : "Modo branco"}

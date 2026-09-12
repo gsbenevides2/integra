@@ -3,11 +3,16 @@ import { SignalIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { Button } from "core/ui/components/button";
 import { useConfirm } from "core/ui/components/confirm/context";
 import { Input } from "core/ui/components/input";
+import { Slider } from "core/ui/components/slider";
 import { Switch } from "core/ui/components/switch";
 import { useToast } from "core/ui/components/toast";
 import { getTuyaEdenClient } from "extensions/scripts/tuya/client";
 import type { HistoryPoint, Device, DeviceCommand } from "../types";
 import { DeviceHistoryChart } from "./deviceHistoryChart";
+
+// 0% is the warmest reading the lamp reports and 100% the coolest, so the track
+// runs from orange to blue.
+const COLOR_TEMP_TRACK = "linear-gradient(to right, #ffb46b, #f6f1ea 50%, #8ec2ff)";
 
 interface Props {
     device: Device;
@@ -117,35 +122,26 @@ export function DeviceDrawerContent({ device, isBusy, onCommand, onChanged, onDe
                 />
 
                 {state.brightness !== null && (
-                    <label className="flex flex-col gap-1">
-                        <span className="text-xs text-mist-400">Brilho · {state.brightness}%</span>
-                        <input
-                            type="range"
-                            min={1}
-                            max={100}
-                            value={state.brightness}
-                            disabled={controlsDisabled}
-                            onChange={(e) => onCommand({ brightness: Number(e.target.value) })}
-                            className="w-full accent-mist-400 cursor-pointer disabled:cursor-not-allowed"
-                        />
-                    </label>
+                    <Slider
+                        label="Brilho"
+                        min={1}
+                        max={100}
+                        value={state.brightness}
+                        disabled={controlsDisabled}
+                        onCommit={(brightness) => onCommand({ brightness })}
+                    />
                 )}
 
                 {state.colorTemp !== null && (
-                    <label className="flex flex-col gap-1">
-                        <span className="text-xs text-mist-400">
-                            Temperatura de cor · {state.colorTemp}%
-                        </span>
-                        <input
-                            type="range"
-                            min={0}
-                            max={100}
-                            value={state.colorTemp}
-                            disabled={controlsDisabled}
-                            onChange={(e) => onCommand({ colorTemp: Number(e.target.value) })}
-                            className="w-full accent-mist-400 cursor-pointer disabled:cursor-not-allowed"
-                        />
-                    </label>
+                    <Slider
+                        label="Temperatura de cor"
+                        min={0}
+                        max={100}
+                        value={state.colorTemp}
+                        disabled={controlsDisabled}
+                        onCommit={(colorTemp) => onCommand({ colorTemp })}
+                        track={COLOR_TEMP_TRACK}
+                    />
                 )}
 
                 {state.colorHex !== null && (
