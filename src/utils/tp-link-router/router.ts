@@ -32,6 +32,7 @@ import type {
     DEV2_DHCPV4_POOL_STATICADDR,
     DEV2_FW_CHAIN,
     DEV2_FW_CHAIN_RULE,
+    DEV2_HOST_ENTRY,
     DEV2_MEM_STATUS,
     DEV2_PROC_STATUS,
     DEV2_WIFI_APDEV,
@@ -142,13 +143,90 @@ async function getConnectedWiredDevices(client: TpLinkClient): Promise<Connected
     );
 }
 
+interface KnownHost {
+    ip: string;
+    hostName: string;
+}
+
+/**
+ * The router's own host table, which is the only place an IP can be found for a device that
+ * is associated but whose Wi-Fi entry carries no address.
+ */
+async function listKnownHosts(client: TpLinkClient): Promise<Map<string, KnownHost>> {
+    // Enrichment only: a firmware that does not serve this table must not take the whole
+    // sync down with it.
+    const result = await client
+        .getList<{ data: DEV2_HOST_ENTRY[] }>("DEV2_HOST_ENTRY", {
+            stack: "0,0,0,0,0,0",
+            pstack: "0,0,0,0,0,0",
+        })
+        .catch((error: unknown) => {
+            console.error(
+                `Failed to read the router host table: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            return { data: [] as DEV2_HOST_ENTRY[] };
+        });
+
+    const byMac = new Map<string, KnownHost>();
+    for (const host of result.data ?? []) {
+        if (!host.IPAddress) continue;
+        byMac.set(normalizeMac(host.physAddress), {
+            ip: host.IPAddress,
+            hostName: host.hostName,
+        });
+    }
+    return byMac;
+}
+
+function preferKnown(current: string, fallback: string): string {
+    return current && current !== "Unknown" ? current : fallback;
+}
+
+/**
+ * A device can surface in more than one of the router's tables — a mesh agent is both an AP
+ * and a wired client — so entries are merged by MAC instead of being listed twice.
+ *
+ * The Wi-Fi table also reports no IP for anything that has not taken a DHCP lease from this
+ * router, which is the normal state for IoT gear with a fixed address. Those used to be
+ * dropped, and the device then never appeared in the panel at all; now the IP is filled in
+ * from the host table when the router knows one, and the device is listed either way.
+ */
+function mergeConnectedDevices(
+    devices: ConnectedDevices,
+    hosts: Map<string, KnownHost>,
+): ConnectedDevices {
+    const byMac = new Map<string, ConnectedDevices[number]>();
+
+    for (const device of devices) {
+        const key = normalizeMac(device.mac);
+        const host = hosts.get(key);
+        const current = byMac.get(key);
+
+        byMac.set(key, {
+            mac: current?.mac ?? device.mac,
+            ip: current?.ip || device.ip || host?.ip || "",
+            name: preferKnown(
+                current?.name ?? "",
+                preferKnown(device.name, host?.hostName || "Unknown"),
+            ),
+            vendor: preferKnown(current?.vendor ?? "", device.vendor),
+            routerInterface: preferKnown(current?.routerInterface ?? "", device.routerInterface),
+        });
+    }
+
+    return Array.from(byMac.values());
+}
+
 async function getConnectedDevices(client: TpLinkClient): Promise<ConnectedDevices> {
-    const result = await Promise.all([
-        getConnectedEasyMeshDevices(client),
-        getConnectedWifiDevices(client),
-        getConnectedWiredDevices(client),
+    const [result, hosts] = await Promise.all([
+        Promise.all([
+            getConnectedEasyMeshDevices(client),
+            getConnectedWifiDevices(client),
+            getConnectedWiredDevices(client),
+        ]),
+        listKnownHosts(client),
     ]);
-    return result.flat().filter((r) => r.ip !== "");
+    return mergeConnectedDevices(result.flat(), hosts);
 }
 
 async function listDHCPEntry(client: TpLinkClient): Promise<DhcpEntries> {

@@ -36,6 +36,7 @@ export function UnregisteredDevices({ onlineDevices, devices, onChanged }: Props
     const [selectedDeviceId, setSelectedDeviceId] = useState("");
     const [deviceName, setDeviceName] = useState("");
     const [deviceBrand, setDeviceBrand] = useState("");
+    const [ip, setIp] = useState("");
     const [isSaving, setIsSaving] = useState(false);
 
     const registeredMacs = useMemo(() => {
@@ -57,6 +58,7 @@ export function UnregisteredDevices({ onlineDevices, devices, onChanged }: Props
         setLinkTarget(device);
         setSelectedDeviceId("");
         setInterfaceName("");
+        setIp(device.ip);
     }, []);
 
     const openCreate = useCallback((device: OnlineDevice) => {
@@ -64,11 +66,12 @@ export function UnregisteredDevices({ onlineDevices, devices, onChanged }: Props
         setDeviceName(device.name !== "Unknown" ? device.name : "");
         setDeviceBrand(device.vendor !== "Unknown" ? device.vendor : "");
         setInterfaceName("");
+        setIp(device.ip);
     }, []);
 
     const submitLink = useCallback(async () => {
-        if (!linkTarget || !selectedDeviceId || !interfaceName) {
-            showToast("Selecione o dispositivo e informe o nome da interface", "error");
+        if (!linkTarget || !selectedDeviceId || !interfaceName || !ip) {
+            showToast("Selecione o dispositivo e informe nome da interface e IP", "error");
             return;
         }
         setIsSaving(true);
@@ -78,7 +81,7 @@ export function UnregisteredDevices({ onlineDevices, devices, onChanged }: Props
             .interface.post({
                 name: interfaceName,
                 mac: linkTarget.mac,
-                ip: linkTarget.ip,
+                ip,
             });
         setIsSaving(false);
         if (error) {
@@ -88,11 +91,11 @@ export function UnregisteredDevices({ onlineDevices, devices, onChanged }: Props
         showToast("Interface vinculada", "success");
         setLinkTarget(null);
         onChanged();
-    }, [linkTarget, selectedDeviceId, interfaceName, onChanged, showToast]);
+    }, [linkTarget, selectedDeviceId, interfaceName, ip, onChanged, showToast]);
 
     const submitCreate = useCallback(async () => {
-        if (!createTarget || !deviceName || !deviceBrand || !interfaceName) {
-            showToast("Preencha nome, marca e nome da interface", "error");
+        if (!createTarget || !deviceName || !deviceBrand || !interfaceName || !ip) {
+            showToast("Preencha nome, marca, nome da interface e IP", "error");
             return;
         }
         setIsSaving(true);
@@ -109,7 +112,7 @@ export function UnregisteredDevices({ onlineDevices, devices, onChanged }: Props
         }
         const { error: interfaceError } = await client["tp-link-center"]
             .devices({ id: (data as { id: string }).id })
-            .interface.post({ name: interfaceName, mac: createTarget.mac, ip: createTarget.ip });
+            .interface.post({ name: interfaceName, mac: createTarget.mac, ip });
         setIsSaving(false);
         if (interfaceError) {
             showToast("Dispositivo criado, mas falhou ao adicionar a interface", "error");
@@ -118,7 +121,7 @@ export function UnregisteredDevices({ onlineDevices, devices, onChanged }: Props
         showToast("Dispositivo criado e vinculado", "success");
         setCreateTarget(null);
         onChanged();
-    }, [createTarget, deviceName, deviceBrand, interfaceName, onChanged, showToast]);
+    }, [createTarget, deviceName, deviceBrand, interfaceName, ip, onChanged, showToast]);
 
     if (unregistered.length === 0) return null;
 
@@ -145,7 +148,7 @@ export function UnregisteredDevices({ onlineDevices, devices, onChanged }: Props
                                 <td className="py-2 px-3">{device.name}</td>
                                 <td className="py-2 px-3 text-mist-300">{device.vendor}</td>
                                 <td className="py-2 px-3 font-mono text-xs">{device.mac}</td>
-                                <td className="py-2 px-3 font-mono text-xs">{device.ip}</td>
+                                <td className="py-2 px-3 font-mono text-xs">{device.ip || "-"}</td>
                                 <td className="py-2 px-3 text-xs text-mist-400">
                                     {device.routerInterface || "-"}
                                 </td>
@@ -178,8 +181,7 @@ export function UnregisteredDevices({ onlineDevices, devices, onChanged }: Props
             >
                 <div className="flex flex-col gap-2 text-sm">
                     <p className="text-xs text-mist-400">
-                        MAC <span className="font-mono">{linkTarget?.mac}</span> · IP{" "}
-                        <span className="font-mono">{linkTarget?.ip}</span>
+                        MAC <span className="font-mono">{linkTarget?.mac}</span>
                     </p>
                     <Select
                         label="Dispositivo"
@@ -196,6 +198,12 @@ export function UnregisteredDevices({ onlineDevices, devices, onChanged }: Props
                         placeholder="Ex: Wi-Fi, Ethernet..."
                         value={interfaceName}
                         onChange={(e) => setInterfaceName(e.target.value)}
+                    />
+                    <Input
+                        label="IP"
+                        placeholder="Ex: 192.168.0.10"
+                        value={ip}
+                        onChange={(e) => setIp(e.target.value)}
                     />
                 </div>
                 <div className="flex justify-end gap-2">
@@ -215,8 +223,7 @@ export function UnregisteredDevices({ onlineDevices, devices, onChanged }: Props
             >
                 <div className="flex flex-col gap-2 text-sm">
                     <p className="text-xs text-mist-400">
-                        MAC <span className="font-mono">{createTarget?.mac}</span> · IP{" "}
-                        <span className="font-mono">{createTarget?.ip}</span>
+                        MAC <span className="font-mono">{createTarget?.mac}</span>
                     </p>
                     <Input
                         label="Nome"
@@ -233,6 +240,12 @@ export function UnregisteredDevices({ onlineDevices, devices, onChanged }: Props
                         placeholder="Ex: Wi-Fi, Ethernet..."
                         value={interfaceName}
                         onChange={(e) => setInterfaceName(e.target.value)}
+                    />
+                    <Input
+                        label="IP"
+                        placeholder="Ex: 192.168.0.10"
+                        value={ip}
+                        onChange={(e) => setIp(e.target.value)}
                     />
                 </div>
                 <div className="flex justify-end gap-2">

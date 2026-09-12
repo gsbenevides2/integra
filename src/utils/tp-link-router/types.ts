@@ -54,6 +54,14 @@ export interface DEV2_WIFI_APDEV_ETHASSOCDEV {
     active: string;
 }
 
+export interface DEV2_HOST_ENTRY {
+    physAddress: string;
+    IPAddress: string;
+    hostName: string;
+    addressSource: string;
+    active: string;
+}
+
 export interface DEV2_DHCPV4_POOL_STATICADDR {
     yiaddr: string;
     chaddr: string;
