@@ -8,5 +8,6 @@
     "android-chrome-512x512.png",
     "safari-pinned-tab.svg",
     "site.webmanifest",
-    "client-bundle.js"
+    "client-bundle.js",
+    "maskable-icon-512x512.png"
 ]

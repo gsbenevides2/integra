@@ -29,6 +29,17 @@ export const uiFactory = () =>
             }
             return Bun.file(`${ASSETS_PATH}/${path}`);
         })
+        // The worker has to be served from the root for its default scope to cover the whole
+        // app — from "/assets/sw.js" it would only ever control "/assets/*". "no-cache" keeps
+        // the browser from sitting on an old worker for up to a day after a deploy.
+        .get("/sw.js", () => {
+            return new Response(Bun.file(`${ASSETS_PATH}/sw.js`), {
+                headers: {
+                    "content-type": "text/javascript;charset=utf-8",
+                    "cache-control": "no-cache",
+                },
+            });
+        })
         .get("/", async () => {
             const headers = new Headers();
             headers.set("content-type", "text/html");

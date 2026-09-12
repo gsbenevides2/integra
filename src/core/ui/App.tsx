@@ -15,6 +15,15 @@ export function App() {
             <head>
                 <meta charSet="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                {/* Paints the status bar to match the page background once installed. */}
+                <meta name="theme-color" content="#030712" />
+                <meta name="application-name" content="Integra" />
+                {/* iOS reads the manifest only partially, so standalone mode and the home
+                    screen label still have to be spelled out with these legacy meta tags. */}
+                <meta name="mobile-web-app-capable" content="yes" />
+                <meta name="apple-mobile-web-app-capable" content="yes" />
+                <meta name="apple-mobile-web-app-title" content="Integra" />
+                <meta name="apple-mobile-web-app-status-bar-style" content="black" />
                 <title>Integra</title>
                 <link rel="stylesheet" href={`/assets/output.css?v=${BUILD_ID}`} />
                 <link rel="icon" type="image/x-icon" href="/assets/favicon.ico" />
