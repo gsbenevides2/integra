@@ -26,7 +26,7 @@ import {
     tuyaSyncCron,
 } from "extensions/scripts/tuya/cron";
 import { tuyaRoutes } from "extensions/scripts/tuya/routes";
-import { deviceStateLog, doorOpenAlert, motionLightsUp } from "extensions/scripts/tuya-automations";
+//import { deviceStateLog, doorOpenAlert, motionLightsUp } from "extensions/scripts/tuya-automations";
 
 await registerSettings({
     triggers: [
@@ -53,8 +53,10 @@ await registerSettings({
         tuyaCatalogueCron,
         tuyaSensorReadingsCron,
         tuyaRoutes,
+        /*
         motionLightsUp,
         doorOpenAlert,
         deviceStateLog,
+        */
     ],
 });
