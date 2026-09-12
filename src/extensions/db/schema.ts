@@ -4,3 +4,4 @@ export * from "./platform-status";
 export * from "./server-metrics";
 export * from "./tp-link-center";
 export * from "./train-status";
+export * from "./tuya";
