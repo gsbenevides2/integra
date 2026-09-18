@@ -66,3 +66,7 @@ Triggers live in `src/extensions/scripts/<service>/<name>/`. Each exports a `Tri
 ## Skills
 
 ElysiaJS skill installed at `.agents/skills/elysiajs/`. Run `bunx skills` to list.
+
+## Adding a feature or fixing a bug
+
+Read [`docs/development.md`](docs/development.md) first — it's a domain-agnostic playbook (DB, routes, dashboard UI, naming, verification, versioning/commits, and safety around real hardware + the shared database) for extending this codebase, distilled from how existing features here are actually built.
