@@ -1,0 +1,32 @@
+services:
+  # ── OpenTelemetry Collector ─────────────────────────────────────
+  # Receives traces from the Integra server (OTLP HTTP on 4318)
+  # and forwards them to Jaeger for storage + UI.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: integra-otel-collector
+    command:
+      - "--config=/etc/otelcol/config.yaml"
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol/config.yaml
+    ports:
+      - "4318:4318"   # OTLP HTTP (Integra sends traces here)
+    depends_on:
+      - jaeger
+
+  # ── Jaeger (trace storage + UI) ─────────────────────────────────
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: integra-jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686" # Jaeger UI (http://localhost:16686)
+
+  # ── Alternative: SigNoz (store + UI, replaces Jaeger) ───────────
+  # Uncomment to use SigNoz instead of Jaeger + Collector.
+  # signoz:
+  #   image: signoz/query-service:latest
+  #   container_name: integra-signoz
+  #   ports:
+  #     - "3301:3301"   # SigNoz frontend

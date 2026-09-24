@@ -9,5 +9,6 @@
     "safari-pinned-tab.svg",
     "site.webmanifest",
     "client-bundle.js",
-    "maskable-icon-512x512.png"
+    "maskable-icon-512x512.png",
+    "opentelemetry/frontend.js"
 ]

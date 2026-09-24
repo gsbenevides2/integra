@@ -31,6 +31,8 @@ export function App() {
                 <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16.png" />
                 <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
                 <link rel="manifest" href="/assets/site.webmanifest" />
+                {/* OpenTelemetry frontend tracing — safe to load; no-ops when collector is unreachable */}
+                <script src={`/assets/opentelemetry/frontend.js?v=${BUILD_ID}`} defer />
             </head>
             <body>
                 <ToastProvider>

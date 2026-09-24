@@ -15,6 +15,7 @@ import {
 } from "core/instrumentation";
 import { uiFactory } from "core/ui";
 import { registerClient, unregisterClient } from "core/websocket";
+import { setupOpenTelemetry } from "core/opentelemetry";
 
 declare global {
     var elysiaClient: Elysia | undefined;
@@ -36,7 +37,8 @@ export function getDontTrace(traceId: string) {
 }
 
 function createGlobalElysia() {
-    global.elysiaClient = new Elysia()
+    global.elysiaClient = setupOpenTelemetry(
+        new Elysia()
         .on("request", ({ set }) => {
             set.headers[REQUEST_ID_HEADER] = crypto.randomUUID();
         })
@@ -167,7 +169,8 @@ function createGlobalElysia() {
             close(ws) {
                 unregisterClient(ws.raw);
             },
-        }) as unknown as Elysia;
+        }) as unknown as Elysia,
+    );
 }
 
 function saveRoutes(elysia: AnyElysia, triggerId: string, dontTrace: boolean) {

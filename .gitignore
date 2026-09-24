@@ -35,3 +35,8 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 assets/output.css
 assets/client-bundle.js
+assets/opentelemetry/
+assets/ui/
+
+# npm artifacts when developing with bun
+package-lock.json

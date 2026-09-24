@@ -5,6 +5,8 @@ import { startEmailClients } from "core/triggers/email";
 import { startPostgresClients } from "core/triggers/postgres";
 import { startTuyaPulsar } from "utils/tuya/pulsar";
 import type { Trigger } from "core/triggers";
+import { setupOpenTelemetry, shutdownOpenTelemetry } from "core/opentelemetry";
+import { otelConfig } from "core/opentelemetry/config";
 
 export interface RegisterConfig {
     triggers: Trigger[];
