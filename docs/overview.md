@@ -1,263 +1,151 @@
 # Integra — Complete Overview
 
-**Integra** is an event-driven integration daemon built with **Bun** and **Elysia**. It connects external services and executes custom scripts in response to events, with full execution tracing to PostgreSQL.
+**Integra** is a personal home-automation and monitoring server built with **Bun** and **Elysia**. It talks to real hardware and external APIs (a Tuya smart-home account, a TP-Link router, Google accounts, SSH-reachable servers, status pages, train APIs, Discord, Authentik) and exposes a React dashboard over all of it. Every HTTP request, outgoing `fetch`, database query and cron run is traced end-to-end with OpenTelemetry.
+
+It is a from-scratch rewrite of an older project (`integra`) that used a heavier custom trigger/tracing framework (MQTT, Redis pub/sub, PostgreSQL polling, IMAP email triggers, a bespoke Postgres-backed tracer). None of that framework survived the rewrite — see [`instrumentation.md`](./instrumentation.md) and [`triggers.md`](./triggers.md) for what replaced it.
 
 ## Project Summary
 
 | Property | Value |
 |----------|-------|
-| **Name** | @gsbenevides2/integra |
-| **Type** | Event-driven daemon |
-| **Runtime** | Bun >= 1.3.13 |
-| **HTTP Framework** | Elysia 1.4+ |
-| **Database** | PostgreSQL (Drizzle ORM) |
+| **Name** | `@gsbenevides2/integra` (`displayName`: Integra) |
+| **Runtime** | Bun |
+| **HTTP Framework** | Elysia |
+| **Database** | PostgreSQL (Drizzle ORM, schema-push, no migrations) |
 | **Validation** | Zod v4 |
-| **Version** | 1.0.37 |
-
-## Core Services
-
-Integra manages **6 trigger types** connecting to external services:
-
-1. **HTTP** — Elysia server accepting webhook events
-2. **MQTT** — Real-time message broker subscriptions
-3. **Redis Pub/Sub** — Channel-based event streaming
-4. **PostgreSQL Polling** — Scheduled database queries
-5. **Email (IMAP)** — Real-time email listening via IMAP IDLE
-6. **Cron** — Scheduled jobs using Bun's built-in cron
+| **Frontend** | React 19 + Tailwind CSS 4, served as one SPA |
+| **Tracing** | OpenTelemetry (OTLP), exported to an external collector |
 
 ## Directory Structure
 
-```
-src/
-├── index.ts                          # Entry point (registers all triggers)
-├── core/
-│   ├── index.ts                      # registerSettings() function
-│   ├── triggers/                     # Trigger service clients
-│   │   ├── index.ts                  # Trigger interface & CliSettings
-│   │   ├── http/                     # Elysia HTTP server
-│   │   │   ├── index.ts
-│   │   │   └── types.ts              # TypedElysia helper
-│   │   ├── mqtt/                     # MQTT broker clients
-│   │   │   ├── index.ts
-│   │   │   └── brokers.ts            # Broker instances config
-│   │   ├── redis/                    # Redis Pub/Sub clients
-│   │   │   ├── index.ts
-│   │   │   └── instances.ts          # Redis instances config
-│   │   ├── postgres/                 # PostgreSQL polling
-│   │   │   ├── index.ts
-│   │   │   └── instances.ts          # Database instances config
-│   │   ├── email/                    # IMAP email listening
-│   │   │   ├── index.ts
-│   │   │   └── accounts.ts           # Email accounts config
-│   │   ├── cron/                     # Bun cron jobs
-│   │   ├── manual/                   # Manual test triggers
-│   │   └── tuya/                     # Tuya smart home integration
-│   ├── ui/                           # React UI dashboard
-│   │   ├── client-bundle.tsx         # Client entry point
-│   │   ├── sw.ts                     # Service worker
-│   │   ├── registerServiceWorker.ts
-│   │   └── components/               # React components
-│   │       ├── sidebar, drawer, input, toast, confirm, etc.
-│   ├── instrumentation/              # Execution tracing
-│   │   ├── index.ts                  # Tracer functions
-│   │   └── types.ts                  # Tracer types
-│   └── db/                           # Database
-│       ├── drizzle.config.ts         # Drizzle ORM config
-│       ├── index.ts
-│       └── schema.ts                 # Drizzle schema
-├── extensions/
-│   ├── scripts/                      # User-defined scripts (business logic)
-│   │   ├── authentik/                # Authentik SSO integration
-│   │   ├── auto-clean/               # Auto-cleanup jobs
-│   │   ├── birthday/                 # Birthday notifications
-│   │   ├── calendars/                # Calendar integrations
-│   │   ├── execution-logs/           # Log UI & API
-│   │   ├── gmail/                    # Gmail integrations
-│   │   ├── google-accounts/          # Google account management
-│   │   ├── platform-status/          # Platform health checks
-│   │   ├── server-metrics/           # Server monitoring & speedtest
-│   │   ├── sinal/                    # Signal/SMS monitoring
-│   │   ├── tp-link-center/           # TP-Link router management
-│   │   ├── train-status/             # Train status monitoring
-│   │   ├── tuya/                     # Tuya smart home devices
-│   │   └── tuya-automations/         # Tuya automation scripts
-│   └── db/                           # Extension database schemas
-├── utils/                            # Shared utilities
-│   ├── safeEnvGet.ts                 # Safe environment variable access
-│   ├── discord/                      # Discord integration
-│   ├── google/                       # Google APIs (Gmail, etc.)
-│   └── ...                           # Other utilities
-└── input.css                         # Tailwind CSS input
+```text
+server/
+├── index.ts                     # Entry point: builds the Elysia app, mounts every module,
+│                                 # starts Tuya Pulsar, calls registerCrons()
+├── cron.ts                      # Every scheduled job, registered in one place via Bun.cron
+├── openapi.ts                   # OpenAPI/Scalar docs config (title/description from package.json)
+├── safeEnvGet.ts                # Throws at call time if an env var is missing
+├── instrumentation/
+│   ├── instrumentHttpServer.ts  # elysiaOtel plugin + frontend trace proxy (/v1/traces)
+│   ├── instrumentFetch.ts       # Monkey-patches global fetch to trace every outgoing call
+│   └── instrumentDb.ts          # Wraps Bun's SQL client to trace every query
+├── shared/                      # Cross-module services (not tied to one domain)
+│   ├── ssh.ts                   # runSshCommand() via node-ssh
+│   ├── discord.ts               # sendDiscordMessage()
+│   ├── cache.ts                 # redisGet/redisSet via Bun.redis
+│   └── authentik.ts             # loginInAuthentik() — Authentik OAuth client-credentials login
+├── db/
+│   ├── index.ts                 # drizzle() instance over Bun's SQL client
+│   ├── schema.ts                # Barrel: `export * from "./<domain>"` per module
+│   ├── drizzle.config.ts        # drizzle-kit config (schema-push target)
+│   └── <domain>.ts              # One pgSchema(<domain>) per module (google, tuya, tplink, ...)
+├── modules/
+│   ├── google/                  # Google account linking, Calendar reminders, Gmail watchers
+│   ├── tuya/                    # Tuya cloud devices/sensors, real-time via Pulsar
+│   ├── tplink/                  # TP-Link router device sync, DHCP/firewall reconciliation
+│   ├── server-metrics/          # SSH-collected system stats + Cloudflare speedtest
+│   ├── status-platform/         # Uptime checks against status pages (Atlassian, Instatus, ...)
+│   ├── train-status/            # São Paulo train/metro line status scrapers
+│   ├── birthday/                # Daily Discord birthday announcement (cron-only, no routes/UI)
+│   └── authentik/                # Authentik login-failed webhook → Discord
+└── utils/getProjectInfo.ts      # Re-exports name/description/version/... from package.json
 
-dist/                                 # Built output
-assets/                               # Compiled CSS and client bundles
+public/
+├── index.tsx                    # App entry: Toast/Confirm/GlobalDrawer providers
+├── instrumentFrontend.ts         # OpenObserve RUM + logs, OTEL web instrumentation
+├── components/                   # Shared UI primitives (Button, Modal, Drawer, Select, ...)
+│   └── GlobalDrawerContext/      # DASHBOARD_LIST — the one place a dashboard gets registered
+└── dashboards/<domain>/         # One folder per module with a UI: client.ts, index.tsx, component/*
 ```
+
+Every module under `server/modules/<domain>/` follows the same internal shape:
+
+```text
+<domain>/
+├── model.ts        # Zod schemas + shared types/consts — no logic
+├── service/*.ts     # `export abstract class XService { static async foo() {...} }`
+├── jobs/*.ts        # Plain async functions, wired up only from server/cron.ts
+└── index.ts         # Elysia instance, prefix "/api/<domain>", talks only to services
+```
+
+See [`development.md`](./development.md) for the full checklist to follow when adding a new one.
 
 ## Execution Flow
 
-```
-┌─ External Event
-│  (HTTP, MQTT, Redis, Postgres, Email, Cron)
-│
-├─ Trigger receives event
-├─ Generate traceId (UUID)
-├─ Start instrumentation (startTracer)
-│
-├─ Execute trigger handler
-│  ├─ Validate request/data (Zod)
-│  ├─ Execute business logic
-│  ├─ Log events (addTracerEvent)
-│  └─ Handle errors
-│
-├─ End instrumentation (endTracer)
-└─ Store trace to PostgreSQL
+```text
+Browser / external caller
+   │
+   ▼
+Bun.serve (server/index.ts)
+   │
+   ├─ elysiaOtel plugin — opens a span per request, records headers/body, exports via OTLP
+   ├─ static plugin — serves public/ (the SPA, its assets, the service worker)
+   └─ one Elysia instance per module, mounted with .use()
+        │
+        ├─ route calls into a Service (server/modules/<domain>/service/*)
+        │    ├─ every outgoing fetch() is auto-traced (instrumentFetch)
+        │    └─ every DB query is auto-traced (instrumentDb)
+        └─ response returned; a span attribute records it too
 
-PostgreSQL tables:
-  - runs (execution records)
-  - run_events (execution events)
+Independently, on a timer:
+   Bun.cron (server/cron.ts) → tracedCronJob(name, fn) → same module's jobs/*.ts
+   (disabled by default outside production — see "Cron safety" below)
+
+Independently, always-on:
+   Tuya Pulsar websocket (server/modules/tuya/service/pulsar) → handlePulsarMessage
+   → updates device/sensor state in real time, no polling involved
 ```
 
 ## Key Concepts
 
-### Trigger
-A unit of business logic responding to an external event. Each trigger has:
-- `id: string` — unique identifier (e.g., `"authentik:loginFailed"`)
-- `type?: string` — trigger type (e.g., `"http"`, `"cron"`, `"mqtt"`)
-- `register(): Promise<void>` — called during startup to register the trigger
-- `test?(): Promise<void>` — optional test function
+### Module
+A self-contained feature under `server/modules/<domain>/`: its own DB tables (`server/db/<domain>.ts`), its own Zod schemas, its own service classes, its own Elysia routes, and — if it needs one — its own dashboard under `public/dashboards/<domain>/`. There is no shared "trigger registry" gluing modules together; each one is mounted or scheduled explicitly.
 
-### Service Client
-Persistent connection to an external service (MQTT broker, Redis, PostgreSQL, etc.), managed globally by `src/core/triggers/`. Each service has a `start*Clients()` function called unconditionally at startup.
+### Service
+A domain's business logic, as `static` methods on an `abstract class` (e.g. `DeviceService`, `TrainStatusService`). Routes call services; services talk to the DB and to external APIs. Never the other way around.
+
+### Job
+A plain exported `async function` under a module's `jobs/` folder, with zero self-scheduling inside it. `server/cron.ts` is the only place that decides when a job runs.
+
+### Cron safety
+`registerCrons()` (`server/cron.ts`) no-ops unless `NODE_ENV=production` or `ENABLE_CRONS=true` is set, so running `bun run dev` locally never hits a real router, SSH box, Discord channel or external API on a schedule. Set `ENABLE_CRONS=true` to test one deliberately.
 
 ### Instrumentation
-Tracing and logging layer recording every trigger execution:
-- **startTracer** — records execution start (input, trigger ID, type)
-- **addTracerEvent** — logs named events during execution
-- **endTracer** — marks execution complete (output, status)
-- **instrumentableFetch** — wraps `fetch()` to log HTTP calls
+Everything is traced with OpenTelemetry, not a custom tracer — see [`instrumentation.md`](./instrumentation.md).
 
-### Trace ID
-A `crypto.randomUUID()` assigned per execution, propagated through all events and logs for end-to-end tracing.
+## CLI / Runtime Flags
 
-## Script Organization
+There is no custom CLI argument parser (no `--only-run`, `--debug`, `--disableCrons` like the old repo). Behavior is controlled entirely through environment variables:
 
-Scripts live in `src/extensions/scripts/<service>/<name>/` and typically include:
-- `index.ts` — trigger definition
-- `types.ts` — Zod validation schemas
-- `utils.ts` or `handlers.ts` — business logic
-- `routes.ts` — Elysia route(s) (for HTTP triggers)
-- `cron.ts` — cron job definition
-
-Example: `src/extensions/scripts/authentik/loginFailed/`
-1. Authentik sends POST to `/authentik-login-failed`
-2. Zod validates the request body
-3. `generateMessage()` formats a Discord message
-4. `sendDiscordMessage()` sends it via Discord webhook
-5. Events are logged to PostgreSQL
-
-## CLI Flags
-
-```bash
-bun run src/index.ts [flags]
-```
-
-| Flag | Description |
-|------|-------------|
-| `--only-run=<id>` | Register only triggers matching this ID (repeatable) |
-| `--debug` | Enable `console.debug` output |
-| `--test=<id>` | Test a specific trigger's test function |
-| `--disableCrons` | Skip cron triggers during startup |
-
-## Environment Variables
-
-Core configuration (see `docs/configuration.md` for full list):
-
-| Variable | Purpose | Default |
-|----------|---------|---------|
-| `PORT` | HTTP server port | `3000` |
-| `MONGO_LOGS` | **DEPRECATED** — MongoDB connection (now PostgreSQL) | — |
-| `POSTGRES_DEFAULT_URL` | PostgreSQL connection string | `none` |
-| `MQTT_DEFAULT_BROKER_URL` | MQTT broker URL | `mqtt://192.168.0.3:1883` |
-| `REDIS_URL` | Redis connection | `none` |
-| `EMAIL_DEFAULT_HOST` | IMAP server host | `none` |
-| `DISCORD_DEFAULT_PUBLIC_KEY` | Discord bot token | — |
+| Variable | Purpose |
+|----------|---------|
+| `NODE_ENV` | `production` enables crons and disables Bun's dev/HMR mode |
+| `ENABLE_CRONS` | `true` runs crons even when `NODE_ENV !== "production"` |
 
 ## Development Commands
 
 | Command | Action |
 |---------|--------|
-| `bun run dev` | Start with Tailwind watch, Elysia HMR, and React build watch |
-| `bun run start` | Start production daemon |
+| `bun run dev` | Start with `--watch` (HMR); crons disabled unless `ENABLE_CRONS=true` |
 | `bun run lint` | ESLint check |
-| `bun run lint:fix` | ESLint fix + format |
-| `bun run format` | Prettier check |
-| `bun run format:fix` | Prettier write |
-| `bun run db:sync` | Push Drizzle schema to PostgreSQL |
-| `bun run db:studio` | Open Drizzle Studio UI |
-
-## Architecture Highlights
-
-1. **Modular Triggers** — Each trigger type is isolated in `src/core/triggers/`
-2. **Service Clients** — HTTP, MQTT, Redis, Postgres, Email clients start unconditionally
-3. **Instrumentation** — Every execution traced to PostgreSQL with start, events, and end records
-4. **CLI Filtering** — `--only-run` and `--debug` for development and testing
-5. **React UI** — Dashboard for viewing execution logs and managing extensions
-6. **Extensions** — Business logic organized by service in `src/extensions/scripts/`
+| `bun run lint:fix` | ESLint fix |
+| `bun run db:sync` | Push Drizzle schema to PostgreSQL (`drizzle-kit push`, no migration files) |
+| `bun run db:studio` | Open Drizzle Studio |
 
 ## Conventions
 
-- **Imports**: Bare specifiers with `baseUrl: "src"` in tsconfig
-- **HTTP Triggers**: Must use `TypedElysia()` from `triggers/http/types` (adds `traceId` and `triggerId` decorators)
-- **Validation**: Zod v4 for all request bodies
-- **Formatting**: tabWidth 4, singleQuote false, trailingComma all, printWidth 100
-- **Logging**: `addTracerEvent()` for structured logging (never `console.log` for data)
-- **Environment**: `safeEnvGet()` throws at import if variable missing (fail-fast)
+- **Imports**: path aliases `@server/*` and `@public/*` (see `tsconfig.json`), no bare `baseUrl: "src"` specifiers like the old repo.
+- **HTTP routes**: a plain `new Elysia({ prefix, detail: { tags } })` — no `TypedElysia()` wrapper needed; OTEL instrumentation is automatic for every mounted route.
+- **Validation**: Zod v4, schemas live in each module's `model.ts` with `.meta({ title, description, example })` so they double as OpenAPI documentation.
+- **UI copy**: Portuguese (pt-BR); code identifiers: English.
+- **Environment**: `safeEnvGet()` throws when called if the variable is missing (fail-fast, not fail-at-import).
 
 ## Database Schema
 
-PostgreSQL (via Drizzle ORM) stores execution traces:
-
-### `runs` table
-```ts
-{
-    id: text,                    // UUID PK
-    traceId: text,               // UUID unique index
-    triggerId: text,             // Indexed
-    startTime: timestamptz,      // Indexed
-    endTime?: timestamptz,
-    workflowType: text,          // "http", "mqtt", "redis", etc.
-    inputData: jsonb,
-    outputData?: jsonb,
-    status?: "SUCCESS" | "ERROR",
-}
-```
-
-### `run_events` table
-```ts
-{
-    id: text,                    // UUID PK
-    runId: text,                 // FK -> runs.id
-    eventName: text,
-    eventData: jsonb,
-    eventType: "INFO" | "ERROR",
-    dateTime: timestamptz,
-}
-```
+Every module owns its own Postgres schema (namespace), not shared tables. See each module's `server/db/<domain>.ts` for the exact tables — there is no generic "runs"/"run_events" tracing schema anymore (that lived in the old repo; tracing now goes straight to an external OTEL collector, not this app's own database).
 
 ## Security & Secrets
 
-- `.env` is gitignored; use `.env.local` locally
-- `safeEnvGet()` throws at module import if a variable is missing
-- Secrets stored in environment variables only (never hardcoded)
-- PostgreSQL connection string should use SSL/TLS in production
-
-## Features
-
-✅ **5 trigger types** — HTTP, MQTT, Redis, PostgreSQL, Email  
-✅ **Cron jobs** — Bun's built-in cron for scheduled tasks  
-✅ **Full instrumentation** — Every execution traced to PostgreSQL  
-✅ **React dashboard** — View logs, manage settings  
-✅ **Modular scripts** — Business logic separated from infrastructure  
-✅ **Type-safe** — TypeScript + Zod validation  
-✅ **Discord integration** — Built-in Discord webhook support  
-✅ **Dev tools** — HMR, file watching, debug logging
+- `.env.local` is gitignored; see [`configuration.md`](./configuration.md) for the full variable reference.
+- `safeEnvGet()` throws the first time a missing variable is actually read.
+- The TP-Link module encrypts the router's admin password at rest (`ROUTER_PASSWORD_SECRET`) — see [`configuration.md`](./configuration.md).

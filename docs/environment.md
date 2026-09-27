@@ -2,8 +2,9 @@
 
 ## Requirements
 
-- **Bun** >= 1.3.13
-- **PostgreSQL** (for instrumentation/tracing)
+- **Bun** (see `bunfig.toml`/`package.json` for the toolchain; no Node.js involved anywhere)
+- **PostgreSQL** — application data, one schema per module
+- **Redis** — caching (`server/shared/cache.ts`), read via Bun's built-in client
 
 ## Quick Start
 
@@ -11,62 +12,34 @@
 # Install dependencies
 bun install
 
-# Copy and configure environment
+# Configure
 cp .env .env.local
-# Edit .env.local with your settings
+# Edit .env.local — see docs/configuration.md for the full variable reference
 
-# Run in development mode (with file watching)
+# Run in development (HMR via --watch; cron jobs disabled by default)
 bun run dev
 
-# Run in production
-bun run start
+# Run in production (cron jobs enabled)
+NODE_ENV=production bun run dev
 
-# Run with specific triggers and debug
-bun run start --only-run=authentik:loginFailed --debug
+# Test one cron job locally without enabling all of them
+ENABLE_CRONS=true bun run dev
 ```
-
-## Environment Variables
-
-Configure the following variables in `.env.local` to enable Authentik login and the downstream services:
-
-- `AUTHENTIK_URL`
-- `AUTHENTIK_USERNAME`
-- `AUTHENTIK_PASSWORD`
-- `GCP_OAUTH_CLIENT_ID`
-- `GCP_OAUTH_CLIENT_SECRET`
-- `BIRTHDAY_SERVICE_ENDPOINT`
-- `BIRTHDAY_SERVICE_CLIENT_ID`
-- `ROUTER_PASSWORD_SECRET` — secret used to encrypt/decrypt TP-Link router admin passwords stored by the `tp-link-center` extension
-- `TUYA_LOCAL_KEY_SECRET` — secret used to encrypt/decrypt the Tuya `localKey` of each lamp stored by the `tuya` extension
-- `TUYA_ACCESS_ID` — Access ID of the Tuya IoT Platform cloud project, used to read the battery sensors
-- `TUYA_ACCESS_SECRET` — Access Secret of the same project
-- `TUYA_DATA_CENTER` — Tuya data centre the project lives in: `us`, `eu`, `cn` or `in` (defaults to `us`)
 
 ## Code Quality
 
 ```bash
-# Lint
-bun run lint
-
-# Lint and fix
-bun run lint:fix
-
-# Format check
-bun run format
-
-# Format and write
-bun run format:fix
+bun run lint       # ESLint check
+bun run lint:fix    # ESLint fix
 ```
+
+There is no `format`/`format:fix` script and no automated test suite — see [`development.md`](./development.md) for how changes are verified instead (typecheck + actually running the app).
 
 ## Project Conventions
 
-- **Runtime**: Bun (never Node.js)
-- **HTTP Framework**: Elysia (never Express)
-- **Validation**: Zod
-- **Database ORM**: Mongoose (MongoDB)
-- **Database Client**: Bun's built-in `SQL` for PostgreSQL, Bun's `RedisClient` for Redis
-- **Testing**: `bun test`
-- **Linting**: ESLint with typescript-eslint
-- **Formatting**: Prettier
-- **Module System**: ESM (`"type": "module"`)
-- **Import Style**: Bare specifier with `baseUrl: "src"` in tsconfig
+- **Runtime**: Bun only — no Node.js APIs assumed to work the same way, prefer Bun built-ins (`Bun.serve`, `Bun.cron`, `Bun.redis`, `Bun.s3`) over npm packages that reimplement them.
+- **HTTP Framework**: Elysia.
+- **Validation**: Zod v4.
+- **Database**: PostgreSQL via Drizzle ORM, schema-push only (`bun run db:sync`) — no `migrations/` folder.
+- **Module System**: ESM (`"type": "module"`).
+- **Import Style**: path aliases `@server/*` and `@public/*` (see `tsconfig.json`), not bare `baseUrl` specifiers.

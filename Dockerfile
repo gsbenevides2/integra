@@ -1,18 +1,17 @@
-FROM oven/bun:1 AS build
-ARG TOKEN_GITHUB
+# syntax=docker/dockerfile:1
+FROM oven/bun:1
 WORKDIR /app
-COPY package.json bun.lock ./
-RUN printf '%s\n' "//npm.pkg.github.com/:_authToken=${TOKEN_GITHUB}" "@gsbenevides2:registry=https://npm.pkg.github.com" > /root/.npmrc && \
-    bun install --frozen-lockfile --production && \
-    rm -f /root/.npmrc
+ENV NODE_ENV=production
+
+COPY package.json bun.lock bunfig.toml ./
+COPY patches ./patches
+RUN bun install --frozen-lockfile
+
 COPY . .
-RUN bun run build
 
-
-FROM oven/bun:1-slim
-WORKDIR /app
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/assets ./assets
-USER bun
-CMD ["bun", "run", "dist/index.js"]
+# ponytail: bun build --compile fails ahead-of-time bundling the frontend's
+# @opentelemetry browser packages (resolves Node builtins instead of browser
+# exports). Running from source works today; revisit --compile if startup
+# memory becomes a problem.
+EXPOSE 3000
+CMD ["bun", "run", "server/index.ts"]

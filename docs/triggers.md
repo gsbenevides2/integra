@@ -1,122 +1,64 @@
 # Triggers
 
-Triggers are the core abstraction in Integra. A **Trigger** is an object with:
-- `id: string` — unique identifier
-- `type?: string` — trigger type (e.g., `"http"`, `"cron"`, `"mqtt"`)
-- `register(): Promise<void>` — called during startup to wire the trigger to its service
-- `test?(): Promise<void>` — optional test function
+The old repo had a generic `Trigger` abstraction (`id`, `type`, `register()`, `test()`) with six factory functions — `onHttp`, `onMqtt`, `onRedis`, `onPostgres`, `onEmail`, `onCron` — registered through a central `registerSettings({ triggers: [...] })` call. **None of that survived the rewrite.** This repo has exactly two ways code starts running, plus one always-on connection, wired directly instead of through a shared registry:
 
-## Creating a Trigger
+## 1. HTTP routes
 
-Each trigger type has a factory function:
+A module's `index.ts` is a plain Elysia instance, mounted directly in `server/index.ts`:
 
 ```ts
-import onHttp from "core/triggers/http";
-import { TypedElysia } from "core/triggers/http/types";
+// server/modules/<domain>/index.ts
+export const xRoutes = new Elysia({ prefix: "/api/<domain>", detail: { tags: ["X"] } })
+    .get("/thing", async () => { ... }, { detail: { summary: "...", description: "..." } });
 
-const trigger = onHttp(
-    { id: "my:httpTrigger" },
-    TypedElysia().get("/hello", () => "Hello!"),
-);
+// server/index.ts
+.use(xRoutes)
 ```
 
-## Available Trigger Types
+No factory function, no registration array — the `elysiaOtel` plugin wrapping the whole app instruments every mounted route automatically (see [`instrumentation.md`](./instrumentation.md)).
 
-### HTTP (Elysia)
+## 2. Cron jobs
 
-File: `src/core/triggers/http/index.ts`
-
-Creates an Elysia route. Supports full Elysia API (params, query, body validation via Zod, etc.).
+`server/cron.ts` is the single place every scheduled job is registered, using Bun's native `Bun.cron` directly:
 
 ```ts
-onHttp({ id: "my:endpoint" }, elysiaApp);
+// server/cron.ts, inside registerCrons()
+Bun.cron("*/2 * * * *", tracedCronJob("trainStatus.check", checkTrainLinesStatus));
 ```
 
-Triggers are registered into a global Elysia server that starts on configurable `PORT` (default 3000).
+`tracedCronJob` opens a span and swallows the job's own errors so one failing job can't take the process down or block the next `Bun.cron(...)` line from registering. `registerCrons()` itself no-ops unless `NODE_ENV=production` or `ENABLE_CRONS=true` — see [`configuration.md`](./configuration.md).
 
-### MQTT
+There is no `test()`/`--test=<id>` equivalent — to exercise a job once, call its exported function directly (e.g. from a scratch script or the REPL) or set `ENABLE_CRONS=true` and wait for its schedule.
 
-File: `src/core/triggers/mqtt/index.ts`
+## 3. Tuya Pulsar (the one always-on connection)
 
-Subscribes to a topic on an MQTT broker.
+`startTuyaPulsar()` (`server/modules/tuya/service/pulsar/index.ts`), called once from `server/index.ts`, opens a websocket to Tuya's Pulsar message queue for the lifetime of the process and pushes every incoming device/sensor event through `handlePulsarMessage`. This is not a generic "trigger type" — it's the one module that genuinely needs a persistent connection, so it's started directly rather than through any shared abstraction.
+
+### Reacting to a device/sensor change from other code
+
+The old repo's `onTuyaSensorChange`/`onTuyaDeviceChange` trigger factories are gone. In their place, `server/modules/tuya/events.ts` exposes a plain in-process `EventEmitter`-based bus:
 
 ```ts
-onMqtt({ id: "my:mqtt", broker: "default", topic: "home/temp" }, async (message, topic, traceId) => {
-    console.log(message.toString());
+import { tuyaEvents } from "@server/modules/tuya/events";
+
+const unsubscribe = tuyaEvents.onDeviceChange((event) => {
+  // event: { device, previous, current, changed, at }
+});
+
+tuyaEvents.onSensorChange((event) => {
+  // event: { sensor, code, value, previousValue, at }
 });
 ```
 
-- `qos`: 0, 1, or 2 (default 0)
-- Instances defined in `src/core/triggers/mqtt/brokers.ts`
+Both fire from `StateService.saveStateIfChanged` and the Pulsar handler's sensor-report path respectively — i.e. for changes coming from Tuya's cloud, however they originated (the Smart Life app, a physical switch, this app's own dashboard). There's no separate "automations" folder yet; a script watching this bus would live as a new listener registered near where `tuyaEvents` is imported, not as a registered trigger.
 
-### Redis (Pub/Sub)
+## What's gone, and why
 
-File: `src/core/triggers/redis/index.ts`
-
-Subscribes to a Redis channel.
-
-```ts
-onRedis({ id: "my:redis", instance: "default", channel: "notifications" }, async (message, channel, traceId) => { ... });
-```
-
-- Uses Bun's built-in `RedisClient`
-- Instances defined in `src/core/triggers/redis/instances.ts`
-
-### PostgreSQL (Polling)
-
-File: `src/core/triggers/postgres/index.ts`
-
-Polls a PostgreSQL database at a fixed interval.
-
-```ts
-onPostgres(
-    { id: "my:pg", instance: "default", query: "SELECT * FROM events WHERE processed = false", intervalMs: 5000 },
-    async (rows, traceId) => { ... },
-);
-```
-
-- `intervalMs`: polling interval in milliseconds
-- Uses Bun's built-in `SQL` client
-- Instances defined in `src/core/triggers/postgres/instances.ts`
-
-### Email (IMAP)
-
-File: `src/core/triggers/email/index.ts`
-
-Listens for new emails via IMAP IDLE.
-
-```ts
-onEmail(
-    { id: "my:email", account: "default", mailbox: "INBOX", searchCriteria: ["UNSEEN"], markSeen: true },
-    async (email, traceId) => { ... },
-);
-```
-
-- Uses `imap` and `mailparser` packages
-- Accounts defined in `src/core/triggers/email/accounts.ts`
-
-### Cron
-
-File: `src/core/triggers/cron/index.ts`
-
-Runs on a schedule using Bun's built-in cron.
-
-```ts
-onCron(
-    { id: "my:cron", cron: "*/5 * * * *" },
-    async (cronJob, traceId) => { ... },
-);
-```
-
-## Trigger Registry (CLI)
-
-`src/core/index.ts` handles registration and CLI arguments via `registerSettings()`
-
-| Flag | Description |
-|------|-------------|
-| `--only-run=id` | Only register triggers matching this id (repeatable) |
-| `--debug` | Enable debug logging |
-
-```bash
-bun run src/index.ts --only-run=authentik:loginFailed --debug
-```
+| Old trigger type | Status | Replaced by |
+|---|---|---|
+| MQTT | Removed | Nothing needed it after the Tuya rewrite dropped the local LAN protocol — see [`tuya.md`](./tuya.md) |
+| Redis Pub/Sub | Removed | Not used by any current module (Redis is still used, just for caching — `server/shared/cache.ts`) |
+| PostgreSQL polling | Removed | Scheduled jobs (`Bun.cron`) read/write the DB directly when they run, instead of a separate poller |
+| Email (IMAP) | Removed | Gmail integration goes through the Gmail API (`server/modules/google/service/gmail.ts`), not IMAP IDLE |
+| HTTP | Kept, simplified | Plain Elysia instances, no `TypedElysia()` wrapper needed |
+| Cron | Kept, simplified | `Bun.cron` directly, wrapped once by `tracedCronJob` |

@@ -1,61 +1,56 @@
 # Instrumentation
 
-The instrumentation layer automatically traces every trigger execution and stores it in PostgreSQL.
+Every HTTP request, outgoing `fetch`, database query and cron run is traced with **OpenTelemetry** and exported via OTLP to an external collector. There is no custom tracer and no app-owned "runs"/"run_events" table like the old repo had — tracing data lives entirely outside this app's own database.
 
-## How It Works
+## Backend
 
-Each trigger execution receives a `traceId` (UUID). The instrumentation system records:
+### HTTP requests — `server/instrumentation/instrumentHttpServer.ts`
 
-1. **Start**: When execution begins (input data, trigger ID, workflow type)
-2. **Events**: Named events during execution (errors, custom info)
-3. **End**: When execution finishes (output data, SUCCESS/ERROR status)
+The `elysiaOtel` plugin (built on `@elysia/opentelemetry`) wraps the whole app:
 
-## PostgreSQL Schema (Drizzle ORM, `src/core/db/schema.ts`)
+- Opens a span per request, records request headers/body as span attributes (`headersToSpanAttributes`, `recordBody: true`).
+- `onAfterHandle` records the response's headers/body/size onto the same span.
+- `onError` marks the span as errored with the caught message.
+- Exports spans via `OTLPTraceExporter` + `BatchSpanProcessor` to `OTEL_EXPORTER_OTLP_ENDPOINT`.
+- Also exposes `POST /v1/traces`, which **proxies the frontend's own spans** to the real collector, attaching `OTEL_EXPORTER_OTLP_HEADERS` server-side — so the collector's auth header never has to reach the browser bundle.
 
-### `runs` table
+Because this plugin wraps every mounted route automatically, a module's `index.ts` needs no manual `traceId`/`triggerId` decorators (unlike the old repo's `TypedElysia()`).
 
-```ts
-{
-    id: text,                    // UUID PK
-    traceId: text,               // UUID unique index
-    triggerId: text,             // e.g. "authentik:loginFailed", indexed
-    startTime: timestamptz,      // indexed (dashboard range filter, sort)
-    endTime?: timestamptz,
-    workflowType: text,          // "http", "mqtt", "redis", "postgres", "email", "cron", indexed
-    inputData: jsonb,
-    outputData?: jsonb,
-    status?: "SUCCESS" | "ERROR", // indexed
-}
-```
+### Outgoing HTTP calls — `server/instrumentation/instrumentFetch.ts`
 
-### `run_events` table
+`instrumentFetch()` (called once, at the top of `server/index.ts`) monkey-patches `globalThis.fetch`:
 
-```ts
-{
-    id: text,                    // UUID PK
-    runId: text,                 // FK -> runs.id, indexed, cascades on delete
-    eventName: text,
-    eventData: jsonb,
-    eventType: "INFO" | "ERROR",
-    dateTime: timestamptz,
-}
-```
+- Every call gets its own span (`"<METHOD> <hostname>"`, `SpanKind.CLIENT`), recording request/response headers, bodies, sizes and status code.
+- Injects W3C trace-context headers into the outgoing request (`propagation.inject`), so a call from this app to another service you also instrument continues the same trace.
+- Skips tracing calls to the OTLP endpoint itself, to avoid feedback loops.
 
-Events are stored in their own table (rather than embedded) for normalization and query efficiency. Run `bun run db:sync` after schema changes to push the schema to PostgreSQL.
+Because this patches the global `fetch`, **no module needs to reach for a special "traced fetch" helper** — a plain `fetch(url)` anywhere in the codebase is already traced.
 
-## Functions
+### Database queries — `server/instrumentation/instrumentDb.ts`
 
-### `startTracer(params)`
-Records the beginning of a trace.
+`instrumentDb(client, connectionUrl)` wraps Bun's `SQL` client (used by `server/db/index.ts`) in a `Proxy` that intercepts every query's `.then()`, opening a `db.query` span with the executed statement, its parameters, and the row count/body of the result. Drizzle's chained `.values()`/`.raw()` calls are unaffected since the same query instance is returned.
 
-### `endTracer(params, createTracer?)`
-Marks a trace as complete. If the trace doesn't exist and `createTracer` is provided, it creates one (for edge cases like HTTP error handlers).
+### Cron jobs — `server/cron.ts`
 
-### `addTracerEvent(params)`
-Appends an event to an existing trace.
+Every scheduled job is wrapped by a local `tracedCronJob(name, fn)` helper: opens a span named `cron.<name>`, and — critically — **catches and records the job's error instead of letting it propagate**, so one failing job (a router that's down, an SSH box unreachable) never crashes the process or blocks the next job from registering.
 
-### `createTracerIfNotExtistsAndAppendEvent(params, event)`
-Creates a trace if it doesn't exist, then appends an event. Used in HTTP error handlers.
+### Manual spans
 
-### `instumentableFetch(traceId, input, init?)`
-A wrapper around `fetch()` that logs the request and response as a trace event. Automatically handles `Headers` objects and `Request` objects.
+Reach for `trace.getTracer("<name>").startActiveSpan(...)` directly only when neither of the above covers the call — e.g. `server/shared/ssh.ts` wraps `node-ssh`'s `execCommand` in its own span, since that's neither an HTTP call nor a DB query. Look at that file for the pattern (`SpanKind.CLIENT`, record the exception, set the status, always `span.end()` in `finally`).
+
+## Frontend — `public/instrumentFrontend.ts`
+
+Wires up:
+
+- **OpenTelemetry web SDK** (`WebTracerProvider` + `FetchInstrumentation`, `DocumentLoadInstrumentation`, `UserInteractionInstrumentation`), exporting to `/v1/traces` on this app's own origin — which the backend then proxies to the real collector (see above).
+- **OpenObserve RUM + logs** (`@openobserve/browser-rum`/`browser-logs`) — session replay, resource/long-task tracking, forwarded console errors. Configured via `PUBLIC_RUM_TOKEN`, `PUBLIC_RUM_SITE`, `PUBLIC_OTEL_ORGANIZATION`.
+- Session persistence is deliberately `"memory"` (not cookie/localStorage) — a page reload always starts a fresh RUM session.
+
+## What replaced the old repo's tracer
+
+| Old repo | This repo |
+|----------|-----------|
+| `addTracerEvent()` / `startTracer()` / `endTracer()` | Automatic OTEL spans (HTTP, fetch, DB) + manual `startActiveSpan()` where needed |
+| `instrumentableFetch(traceId, ...)` | Plain `fetch()` — already traced globally |
+| Postgres `runs`/`run_events` tables + a React "Execution Logs" dashboard | An external OTEL/OpenObserve collector — nothing queryable from inside this app |
+| `traceId` threaded manually through every function call | OTEL's active-span context, propagated automatically (including across an outgoing `fetch`) |

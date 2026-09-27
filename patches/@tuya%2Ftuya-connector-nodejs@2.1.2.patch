@@ -1,0 +1,25 @@
+diff --git a/node_modules/@tuya/tuya-connector-nodejs/.bun-tag-18d4cd9bb9e0c047 b/.bun-tag-18d4cd9bb9e0c047
+new file mode 100644
+index 0000000000000000000000000000000000000000..e69de29bb2d1d6434b8b29ae775ad8c2e48c5391
+diff --git a/lib/core/client.js b/lib/core/client.js
+index ca8965b21e80d70d47991b25da8830913514b721..6df5dd1dc7185174fefd4a5010e66610f7db6863 100644
+--- a/lib/core/client.js
++++ b/lib/core/client.js
+@@ -170,7 +170,7 @@ var TuyaOpenApiClient = /** @class */ (function () {
+      * @param retry   失败是否重试一次，默认true
+      */
+     TuyaOpenApiClient.prototype.request = function (_a) {
+-        var path = _a.path, method = _a.method, _b = _a.body, body = _b === void 0 ? {} : _b, _c = _a.query, query = _c === void 0 ? {} : _c, _d = _a.headers, headers = _d === void 0 ? {} : _d, _e = _a.retry, retry = _e === void 0 ? true : _e;
++        var path = _a.path, method = _a.method, _b = _a.body, body = _b === void 0 ? "" : _b, _c = _a.query, query = _c === void 0 ? {} : _c, _d = _a.headers, headers = _d === void 0 ? {} : _d, _e = _a.retry, retry = _e === void 0 ? true : _e;
+         return __awaiter(this, void 0, void 0, function () {
+             var t, reqHeaders, _f, url, _g, encodePath, signHeaders, param, res;
+             return __generator(this, function (_h) {
+@@ -249,7 +249,7 @@ var TuyaOpenApiClient = /** @class */ (function () {
+                         accessToken = (_b.sent()) || '';
+                         _b.label = 4;
+                     case 4:
+-                        contentHash = crypto.createHash('sha256').update(JSON.stringify(body)).digest('hex');
++                        contentHash = crypto.createHash('sha256').update(typeof body === 'string' ? body : JSON.stringify(body)).digest('hex');
+                         stringToSign = [method, contentHash, '', decodeURIComponent(url)].join('\n');
+                         signStr = this.accessKey + accessToken + t + stringToSign;
+                         return [2 /*return*/, {

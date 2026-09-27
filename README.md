@@ -1,18 +1,17 @@
 # Integra
 
-Modular event-driven integration daemon built with **Bun** and **Elysia**. Connects external services (HTTP, MQTT, Redis, PostgreSQL, Email/IMAP, Cron) and executes custom scripts in response to events — with full execution tracing to PostgreSQL.
+Personal home-automation and monitoring server built with **Bun** and **Elysia**. Integrates a Tuya smart-home account, a TP-Link router, Google accounts, an SSH-reachable server, status pages, São Paulo train/metro lines, and Discord/Authentik notifications — with a React dashboard and end-to-end OpenTelemetry tracing.
 
 ## Features
 
-- **6 trigger types**: HTTP (Elysia), MQTT, Redis (Pub/Sub), PostgreSQL (Polling), Email (IMAP IDLE), and Cron
-- **Automatic instrumentation**: Every execution is traced and logged to PostgreSQL
-- **Modular scripts**: Business logic lives in `src/extensions/scripts/`, cleanly separated from infrastructure
-- **React dashboard**: Web UI for viewing execution logs and managing integrations
-- **Tuya smart home**: Built-in support for Tuya IoT devices
-- **Discord & Gmail**: Built-in utilities for Discord messages and Gmail integration
-- **Zod validation**: Request bodies validated at runtime
-- **Debug & filter**: CLI flags for debug logging and trigger filtering
-- **Full TypeScript**: Type-safe end-to-end with Zod validation
+- **Tuya smart home** — lamps, switches, and sensors, updated in real time via Tuya's Pulsar push connection (no polling)
+- **TP-Link router** — device inventory, DHCP/firewall reconciliation, connection history
+- **Google accounts** — Calendar reminders, Gmail-based support-ticket and payslip watchers
+- **Monitoring** — SSH-collected server stats + Cloudflare speedtest, status-page uptime checks, train/metro line status
+- **Notifications** — Discord messages for an Authentik login-failed webhook and a daily birthday announcement
+- **Full OpenTelemetry tracing** — every HTTP request, outgoing `fetch`, DB query and cron run, backend and frontend
+- **React dashboard** — one screen per integration, reachable from a single drawer menu
+- **Zod validation** end to end, documented automatically via OpenAPI/Scalar
 
 ## Quick Start
 
@@ -22,54 +21,50 @@ bun install
 
 # Configure
 cp .env .env.local
-# Edit .env.local with your credentials
+# Edit .env.local — see docs/configuration.md
 
-# Run (development)
+# Run (development — cron jobs disabled by default)
 bun run dev
 
-# Run (production)
-bun run start
-
-# Run with only specific triggers
-bun run start --only-run=authentik:loginFailed --debug
+# Run (production — cron jobs enabled)
+NODE_ENV=production bun run server/index.ts
 ```
+
+Open http://localhost:3000/ to see the dashboard, or http://localhost:3000/openapi for the API docs.
 
 ## Documentation
 
 See the [`docs/`](./docs/) folder for detailed documentation:
 
-- **[Overview](./docs/overview.md)** — Complete project structure and concepts
-- **[Architecture](./docs/architecture.md)** — System design and data flow
-- **[Triggers](./docs/triggers.md)** — Trigger types and factory functions
-- **[Scripts](./docs/scripts.md)** — Creating business logic scripts
-- **[Instrumentation](./docs/instrumentation.md)** — Execution tracing and PostgreSQL schema
-- **[Configuration](./docs/configuration.md)** — Environment variables and CLI arguments
-- **[Environment](./docs/environment.md)** — Setup and code quality tools
-- **[Utilities](./docs/utils.md)** — Helper functions
+- **[Overview](./docs/overview.md)** — project structure and concepts
+- **[Architecture](./docs/architecture.md)** — system design and data flow
+- **[Modules](./docs/scripts.md)** — the module convention, and how to add a new one
+- **[Triggers](./docs/triggers.md)** — HTTP routes, cron jobs, Tuya Pulsar
+- **[Instrumentation](./docs/instrumentation.md)** — OpenTelemetry tracing, backend and frontend
+- **[Configuration](./docs/configuration.md)** — environment variable reference
+- **[Environment](./docs/environment.md)** — setup and code quality tools
+- **[Development](./docs/development.md)** — the checklist for adding or changing a feature
+- **[Tuya](./docs/tuya.md)** — the Tuya integration in depth
+- **[Shared Utilities](./docs/utils.md)** — cross-module helpers
 
 ## Scripts
 
 | Command | Description |
 |---------|-------------|
-| `bun run start` | Start in production mode |
-| `bun run dev` | Start with file watching (HMR) |
-| `bun run lint` | Lint code with ESLint |
+| `bun run dev` | Start with file watching (HMR); cron jobs disabled unless `ENABLE_CRONS=true` |
+| `bun run lint` | Lint with ESLint |
 | `bun run lint:fix` | Lint and auto-fix |
-| `bun run format` | Check formatting with Prettier |
-| `bun run format:fix` | Format and write |
+| `bun run db:sync` | Push the Drizzle schema to PostgreSQL (no migration files) |
+| `bun run db:studio` | Open Drizzle Studio |
 
 ## Tech Stack
 
-- **Runtime**: [Bun](https://bun.sh) >= 1.3.13
-- **HTTP**: [Elysia](https://elysiajs.com) 1.4+
+- **Runtime**: [Bun](https://bun.sh)
+- **HTTP**: [Elysia](https://elysiajs.com)
 - **Validation**: [Zod](https://zod.dev) v4
-- **Database ORM**: [Drizzle ORM](https://orm.drizzle.team) with PostgreSQL
-- **UI Framework**: [React](https://react.dev) 19 + [Tailwind CSS](https://tailwindcss.com) 4
-- **Database**: PostgreSQL (via Drizzle), Redis (Bun RedisClient), MQTT broker
-- **Messaging**: MQTT.js, Discord webhooks, Gmail API
-- **Email**: node-imap + mailparser
-- **Code Quality**: ESLint + TypeScript ESLint, Prettier
-- **Build**: Bun build tool
+- **Database**: PostgreSQL via [Drizzle ORM](https://orm.drizzle.team), Redis (Bun's built-in client)
+- **UI**: [React](https://react.dev) 19 + [Tailwind CSS](https://tailwindcss.com) 4
+- **Tracing**: [OpenTelemetry](https://opentelemetry.io) (OTLP) + OpenObserve RUM/logs on the frontend
 
 ## License
 

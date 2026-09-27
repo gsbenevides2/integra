@@ -1,90 +1,72 @@
 # Architecture
 
-Integra is a modular event-driven integration platform built with **Bun** and **Elysia**. It connects various external services (MQTT, Redis, PostgreSQL, Email/IMAP, HTTP) and executes user-defined scripts (triggers) in response to events from those services.
+Integra is a single Bun process: one Elysia HTTP server, a set of `Bun.cron` scheduled jobs, and one always-on websocket connection (Tuya Pulsar). There is no separate trigger-registry abstraction, no message broker client, no polling loop against the database — each module wires itself into exactly the mechanism it needs.
 
 ## High-Level Flow
 
+```text
+External callers / browser
+   │
+   ▼
+┌───────────────────────────────────────────┐
+│  Bun.serve (server/index.ts)               │
+│                                             │
+│  elysiaOtel → openapi → static(public/) →  │
+│  one Elysia instance per module, .use()'d  │
+└───────────────┬─────────────────────────────┘
+                │
+                ▼
+┌───────────────────────────────────────────┐
+│  Module (server/modules/<domain>)          │
+│                                             │
+│  index.ts (routes) → service/*.ts          │
+│  (business logic + DB access via Drizzle)  │
+└───────────────┬─────────────────────────────┘
+                │
+   ┌────────────┼───────────────┐
+   ▼            ▼               ▼
+ Postgres    External API    Discord / SSH / etc.
+ (Drizzle,   (fetch, auto-   (server/shared/*)
+ own schema)  traced)
+
+In parallel:
+  Bun.cron (server/cron.ts) ──▶ tracedCronJob(name, job) ──▶ same module's jobs/*.ts
+  Tuya Pulsar (websocket)   ──▶ handlePulsarMessage       ──▶ updates device/sensor state
 ```
-External Services
-  ├─ HTTP (Elysia server)
-  ├─ MQTT Broker
-  ├─ Redis (Pub/Sub)
-  ├─ PostgreSQL (Polling)
-  └─ Email (IMAP IDLE)
-       │
-       ▼
-  ┌─────────────────────────────┐
-  │      Trigger Registry       │
-  │  (src/triggers/index.ts)    │
-  │                             │
-  │  - Registers user scripts   │
-  │  - Starts service clients   │
-  └──────────┬──────────────────┘
-             │
-             ▼
-  ┌─────────────────────────────┐
-  │     Instrumentation         │
-  │  (src/instrumentation/)     │
-  │                             │
-  │  - Traces every execution   │
-  │  - Logs to MongoDB          │
-  │  - Wraps fetch() calls      │
-  └─────────────────────────────┘
-             │
-             ▼
-  ┌─────────────────────────────┐
-  │    User Scripts (Triggers)  │
-  │  (src/scripts/)             │
-  │                             │
-  │  - Business logic           │
-  │  - Can call utils           │
-  │  - Can send Discord msgs    │
-  └─────────────────────────────┘
-```
+
+Every hop in the request path — the HTTP request itself, any outgoing `fetch`, any DB query — opens its own OpenTelemetry span and exports it via OTLP. See [`instrumentation.md`](./instrumentation.md).
 
 ## Key Concepts
 
-- **Trigger**: A unit of business logic (a script) that responds to an event from an external service.
-- **Service Client**: A persistent connection to an external service (MQTT broker, Redis, etc.), managed globally.
-- **Instrumentation**: A tracing/logging layer that records every trigger execution into PostgreSQL for audit/debug.
-- **Trace ID**: A `crypto.randomUUID()` assigned per execution, propagated through all events and logs.
+- **Module**: a self-contained feature (`server/modules/<domain>/`) — its own DB schema, service classes, routes, and optionally a dashboard. Nothing generic connects modules together; `server/index.ts` and `server/cron.ts` wire each one in explicitly.
+- **Service**: a domain's logic as `static` methods on an `abstract class`. Routes and jobs call services; services are the only thing that touches the database or an external API for that domain.
+- **Job**: a plain `async function` a module exports for `server/cron.ts` to schedule — it has no idea when or how often it runs.
+- **Shared service** (`server/shared/*`): a service used by more than one module (SSH, Discord, Redis cache, Authentik login) — lives outside any single module so nothing has to import across module boundaries.
 
 ## Directory Structure
 
+```text
+server/
+├── index.ts                 # Builds the app, mounts every module, starts Pulsar, registers crons
+├── cron.ts                   # registerCrons() — every Bun.cron(...) call, one per line
+├── openapi.ts                 # OpenAPI/Scalar docs metadata
+├── db/                        # One pgSchema per module + the schema.ts barrel
+├── instrumentation/            # OTEL wiring for HTTP, fetch, and DB
+├── shared/                     # Cross-module services (ssh, discord, cache, authentik)
+└── modules/
+    ├── google/                # Account linking, Calendar reminders, Gmail watchers, payslips
+    ├── tuya/                  # Cloud devices/sensors + Pulsar real-time push
+    ├── tplink/                # Router device sync, DHCP/firewall reconciliation
+    ├── server-metrics/         # SSH-collected system stats + Cloudflare speedtest
+    ├── status-platform/        # Uptime checks against status pages
+    ├── train-status/           # São Paulo train/metro line status
+    ├── birthday/               # Cron-only Discord announcement
+    └── authentik/               # Login-failed webhook → Discord
+
+public/
+├── index.tsx                 # App shell (Toast/Confirm/GlobalDrawer providers)
+├── components/                # Shared UI primitives + GlobalDrawerContext (dashboard registry)
+└── dashboards/<domain>/       # client.ts (Eden Treaty) + index.tsx + component/*
 ```
-src/
-├── index.ts                    # Entry point (registers all triggers)
-├── core/
-│   ├── index.ts                # registerSettings() & CLI parser
-│   ├── triggers/
-│   │   ├── index.ts            # Trigger interface & CliSettings
-│   │   ├── http/               # Elysia HTTP server
-│   │   ├── mqtt/               # MQTT client(s)
-│   │   ├── redis/              # Redis Pub/Sub client(s)
-│   │   ├── postgres/           # PostgreSQL polling
-│   │   ├── email/              # IMAP email listening
-│   │   ├── cron/               # Bun cron jobs
-│   │   ├── manual/             # Manual test triggers
-│   │   └── tuya/               # Tuya smart home integration
-│   ├── ui/                     # React dashboard
-│   ├── instrumentation/        # Execution tracing
-│   │   ├── index.ts            # Tracer functions
-│   │   └── types.ts            # Tracer types
-│   └── db/                     # Drizzle ORM
-│       ├── drizzle.config.ts   # ORM config
-│       └── schema.ts           # Database schema
-├── extensions/
-│   ├── scripts/                # User-defined trigger scripts
-│   │   ├── authentik/          # Authentik SSO integration
-│   │   ├── calendars/          # Calendar integrations
-│   │   ├── gmail/              # Gmail integration
-│   │   ├── tuya/               # Tuya smart home
-│   │   └── ...                 # Other integrations
-│   └── db/                     # Extension database schemas
-├── utils/
-│   ├── safeEnvGet.ts           # Safe env var access
-│   ├── discord/                # Discord utilities
-│   ├── google/                 # Google API utilities
-│   └── ...                     # Other utilities
-└── input.css                   # Tailwind CSS input
-```
+
+See [`overview.md`](./overview.md) for the per-module internal file convention and [`development.md`](./development.md) for how to add a new one.

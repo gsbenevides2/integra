@@ -1,2 +1,3 @@
-[install.scopes]
-"@gsbenevides2" = { token = "$GITHUB_TOKEN", url = "https://npm.pkg.github.com" }
+[serve.static]
+plugins = ["bun-plugin-tailwind"]
+env = "PUBLIC_*"

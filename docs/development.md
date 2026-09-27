@@ -1,84 +1,80 @@
 # Development Workflow
 
-A playbook for adding a feature or fixing a bug in this repo, whatever service or domain it touches (Tuya, TP-Link, calendars, Google accounts, ...). It is not about any specific integration — it is about how this codebase wants to be extended.
+A playbook for adding a feature or fixing a bug in this repo, whatever module it touches (Tuya, TP-Link, Google, train status, ...). It is not about any specific integration — it is about how this codebase wants to be extended.
 
 ## Checklist
 
-1. Find the closest existing example and mirror it — don't invent new structure.
-2. Extend the domain's existing schema/route/dashboard file instead of creating new ones, unless the domain doesn't have one yet.
+1. Find the closest existing module and mirror its shape — don't invent new structure.
+2. Extend a module's existing `model.ts`/`service/`/`index.ts` instead of starting new ones, unless the feature genuinely doesn't fit any existing module.
 3. Keep code identifiers in English, UI copy in Portuguese (pt-BR) — matches every existing screen.
-4. Reuse `core/ui/components/*` and existing `utils/*` helpers before writing new ones.
-5. Run `bun run lint`, `bun run format`, and a `tsc --noEmit` pass. No test suite exists — actually run the app and drive the change (curl the route, click through the UI) instead of trusting types alone.
-6. Bump `package.json`'s patch version and commit with a `feat:`/`fix:` message, following the existing log.
-7. Never touch a live device or the shared Postgres instance without telling the user first — see [Safety](#safety-real-hardware--a-shared-database).
+4. Reuse `public/components/*` and `server/shared/*` before writing new helpers.
+5. Run `bun run lint` and a `bunx tsc --noEmit` pass. No test suite exists — actually run the app and drive the change (curl the route, click through the UI) instead of trusting types alone.
+6. Never let a cron you're testing run unattended in dev — see [Safety](#safety-real-hardware-a-shared-database-and-crons) below.
+7. Only commit when the user asks for it.
 
 ## 1. Explore before you build
 
-This repo already has a full CRUD example for almost any shape of feature you'll need: a registerable entity with cloud-backed state (`tuyaDevices`), a lighter read-mostly entity (`tuyaSensors`), a time-series log (`tuyaDeviceStateHistory`), a scheduled job (`onCron` triggers), a webhook consumer (`authentik/loginFailed`). Before writing anything:
+This repo already has a full example for almost any shape of feature: a cloud-backed CRUD entity with real-time push (`tuya` devices/sensors via Pulsar), a scheduled poll-and-store job (`train-status`, `status-platform`, `server-metrics`), a stateful sync engine talking to real hardware (`tplink`), a stateless webhook (`authentik`), a cron-only job with no routes or UI at all (`birthday`).
 
-- Grep for the closest analog by shape, not by domain. A new "preset"/"profile"/"saved config" entity looks like `tuyaDevices`, not like `tuyaSensors`, even though sensors live in the same folder.
-- Read that example end to end: schema → access layer → routes → dashboard. Note exactly which files it touches and copy that shape.
-- Prefer the smaller/leaner analog when the new entity is simpler (e.g. `tuyaSensors`' rename/enable/hide pattern) — don't drag in machinery (history tables, live polling) the new feature doesn't need.
+- Grep for the closest analog by shape, not by domain. A new scheduled external-API poller looks like `train-status` or `status-platform`, not like `tplink`, even if it happens to also be about networking.
+- Read that example end to end: `server/db/<domain>.ts` → `service/*.ts` → `index.ts` → `public/dashboards/<domain>/`. Note exactly which files it touches and copy that shape.
+- Prefer the smaller/leaner analog when the new feature is simpler — don't drag in machinery (a circuit breaker, a sync engine, a websocket) the new feature doesn't need.
 
 If nothing in the repo is close, that's a signal to ask the user how they want it structured before committing to a design.
 
 ## 2. Database changes
 
-- ORM is Drizzle over PostgreSQL, **schema-push, no migration files**. Edit `src/extensions/db/<domain>.ts` and run `bun run db:sync` (wraps `drizzle-kit push`) — there is nothing to write in a `migrations/` folder.
-- Add a new table to the domain's existing schema file (e.g. everything Tuya-related lives in `src/extensions/db/tuya.ts` under one `pgSchema("tuya")`) rather than creating a one-table file. Only start a new file for a genuinely new domain.
-- `src/extensions/db/schema.ts` re-exports every domain file with `export * from "./<domain>"` — a new table needs no wiring beyond being exported from its domain file.
-- Match the column conventions already in use: `id: text().primaryKey().$defaultFn(() => crypto.randomUUID())`, `createdAt: timestamp({ withTimezone: true }).notNull().defaultNow()`. Only add `updatedAt`/soft-delete flags (`hidden`) if the feature actually needs them — most entities here don't.
+- ORM is Drizzle over PostgreSQL, **schema-push, no migration files**. Edit `server/db/<domain>.ts` and run `bun run db:sync` (wraps `drizzle-kit push`) — there is nothing to write in a `migrations/` folder.
+- One `pgSchema("<domain>")` per module, in its own file. `server/db/schema.ts` re-exports every domain file with `export * from "./<domain>"` — a new table needs no wiring beyond being exported from its domain file.
+- Match the column conventions already in use: `id: text().primaryKey().$defaultFn(() => crypto.randomUUID())`, `createdAt: timestamp({ withTimezone: true }).notNull().defaultNow()`. Only add `updatedAt`/soft-delete flags (`hidden`) if the feature actually needs them.
+- **If the tables already exist in the live database** (a schema shared with another app, or one you're deliberately not altering), match the existing column names/types exactly and skip `db:sync` entirely — pushing against a schema that already matches is a needless risk, not a needless no-op.
 
-## 3. Service / access layer
+## 3. Service layer
 
-Lives in `src/utils/<domain>/<entity>.ts`, one file per entity, plain async functions (no classes, no repository interfaces):
+Lives in `server/modules/<domain>/service/*.ts`, one file per concern, as `static` methods on an `abstract class` (no instantiation, no repository interfaces):
 
-- `list<Entity>s()`, `get<Entity>(id)`, `get<Entity>OrThrow(id)`, `create<Entity>(input)`, `update<Entity>(id, partialInput)`, `delete<Entity>(id)`.
+- `list()`, `get(id)`, `getOrThrow(id)`, `create(input)`, `update(id, partialInput)`, `delete(id)`.
 - `update` uses a diff pattern: build a `changes` object from only the fields present on the partial input, skip the DB call entirely if nothing changed.
-- Business actions (e.g. "apply this saved config to a live device") are separate functions in the same file that compose the CRUD primitives with whatever the domain's action primitive already is (e.g. `commandDevice()` for Tuya) — never reimplement the action primitive itself.
+- Business actions (e.g. "apply this saved preset to a live device") are separate methods that compose the CRUD primitives with whatever the domain's action primitive already is (e.g. `DeviceService.command()` for Tuya) — never reimplement the action primitive itself.
+- Wrap anything worth tracing individually (an SSH call, a call to an external API without a descriptive URL) in an OpenTelemetry span — see `server/shared/ssh.ts` for the pattern. Plain outgoing `fetch()` calls and DB queries are already auto-traced; don't add a manual span around those.
 
 ## 4. HTTP routes
 
-- The HTTP framework is Elysia, and every route must go through `TypedElysia()` (`core/triggers/http/types`) — never a raw `new Elysia()` — for the `traceId`/`triggerId` decorators.
-- Each domain keeps **one** Elysia instance and **one** Eden Treaty client (e.g. `tuyaElysiaClient` / `getTuyaEdenClient()` in `src/extensions/scripts/<domain>/routes.ts` + `client.ts`). Add new endpoints to that instance instead of starting a second route file/client for the same domain — the frontend gets the new routes for free through the existing typed client.
-- Validate bodies with Zod (v4), colocated above the route chain. Match the normalized value ranges the domain already established (e.g. this app always represents brightness/saturation as 0-100 percent and colour as `#rrggbb`, never the device's raw 0-255/0-1000 range) — conversion to raw device units belongs in the domain's existing conversion layer, not in a new one.
-- Mirror the existing error handling: 404 when a referenced row doesn't exist, try/catch around any call to an external service returning a 503 with the caught message.
+- One `new Elysia({ prefix: "/api/<domain>", detail: { tags: [...] } })` instance per module (`server/modules/<domain>/index.ts`) — no wrapper needed, OTEL instrumentation is automatic for every mounted route.
+- Every route gets `detail: { summary, description }` — this is what shows up in the OpenAPI/Scalar docs, there's no separate documentation step.
+- Validate bodies/queries with Zod (v4) schemas from `model.ts`, with `.meta({ title, description, example })` so the OpenAPI docs stay useful.
+- Mirror the existing error handling: 404 (`status(404, {...})`) when a referenced row doesn't exist, 503 with the caught message around a call to an external service that might fail.
+- One Eden Treaty client per module (`public/dashboards/<domain>/client.ts`, `treaty<typeof xRoutes>("", { keepDomain: true })`) — the frontend gets new endpoints for free through the existing typed client, no manual fetch/URL building.
 
 ## 5. Dashboard UI
 
-- The UI is a server-rendered React 19 + Tailwind SPA (`src/core/ui`), one entry per domain in `src/extensions/dashboards/<domain>/`, registered in `src/extensions/dashboards/index.ts`.
-- A new entity in an existing domain is a new **section** inside that domain's dashboard (see how "Sensores" sits next to "Iluminação" in the Tuya dashboard), not a new sidebar item — only add a new `DashboardData` entry for a genuinely new domain.
-- Reuse `core/ui/components/*` as-is: `Modal`, `Drawer`, `Input`, `Select`, `Slider`, `RingPicker`, `Switch`, `Button`, `useToast`, `useConfirm`. Don't write new primitives for something these already cover.
-- Follow the create/list/edit split already used everywhere: a `New<Entity>Form` wrapping `Modal` for creation, an `<Entity>Card` for the grid, an `<Entity>DrawerContent` wrapping `Drawer` for edit + delete (delete always behind `useConfirm()`).
-- There is no auth/user-scoping anywhere in this app (single-user home daemon) — don't add per-user scoping to a new entity unless explicitly asked; it would be the only place in the codebase doing it.
+- One entry per module in `public/dashboards/<domain>/`, registered by adding one import and one `DASHBOARD_LIST` entry in `public/components/GlobalDrawerContext/index.tsx` — that's the only registration point, there's no separate dashboard-index file.
+- Reuse `public/components/*` as-is: `Modal`, `Drawer`, `Input`, `Select`, `Slider`, `RingPicker`, `Switch`, `Button`, `IconButton`, `useToast` (`ToastContext`), `useConfirm` (`ConfirmContext`). Don't write new primitives for something these already cover.
+- Follow the create/list/edit split already used everywhere: a form (often wrapped in `Modal`) for creation, a `<Entity>Card` for the grid, a `<Entity>DrawerContent` (wrapping `Drawer`) for edit + delete — delete always behind `useConfirm()`.
+- There is no auth/user-scoping anywhere in this app (single-user home daemon) — don't add per-user scoping to a new entity unless explicitly asked.
 
 ## 6. Naming & language
 
-- Code identifiers (types, table/column names, function names, file names) are always English, matching every existing module.
-- UI-visible text is always Portuguese (pt-BR), matching every existing screen — a label like `kind: "lamp"` renders as "Lâmpada".
-- Watch for collisions between a new concept's name and a value a lower layer already uses for something else (e.g. Tuya's own `workMode: "scene"` is unrelated to an app-level "scene"/"preset" feature) — pick a code identifier that doesn't collide, and keep the Portuguese UI word separate from the English code word if that avoids the clash.
+- Code identifiers (types, table/column names, function names, file names) are always English.
+- UI-visible text is always Portuguese (pt-BR) — a label like `kind: "lamp"` renders as "Lâmpada".
+- Watch for collisions between a new concept's name and a value a lower layer already uses for something else (e.g. Tuya's own `workMode: "scene"` is unrelated to an app-level "preset" feature) — pick a code identifier that doesn't collide.
 
 ## 7. Verification
 
 There is no automated test suite in this repo. Treat these as the equivalent:
 
-- `bun run lint` and `bun run format` (or `lint:fix` / `format:fix`) on every changed file.
-- `bunx tsc --noEmit` for a full typecheck — the dev loop otherwise only surfaces type errors through the IDE.
+- `bun run lint` (or `lint:fix`) on every changed file.
+- `bunx tsc --noEmit` for a full typecheck.
 - Actually run the change:
   - Backend-only change: `curl` the new/changed route(s) directly.
-  - UI change: rebuild the static assets (`bun run build:css && bun run build:client`) if the running dev server isn't also running the `dev:client`/`dev:css` watchers, then drive the page (Playwright or a real browser) through the golden path and at least one edge case (empty state, a validation error, a 404).
-- Before declaring a UI or route change done, confirm it in the running app, not just in the type checker — see the [`run`](../.claude/skills) skill pattern: launch, then interact, then look at the result.
+  - UI change: `bun run dev` already watches and rebuilds the frontend; drive the page (Playwright or a real browser) through the golden path and at least one edge case (empty state, a validation error, a 404).
+- Before declaring a UI or route change done, confirm it in the running app, not just in the type checker.
 
-## 8. Versioning & commits
+## Safety: real hardware, a shared database, and crons
 
-- Bump the patch version in `package.json` (`"version"`) with every feature/fix commit — check `git log` for the current pattern (`feat: ... and bump version to X.Y.Z` / `feat: ... and increment version to X.Y.Z`).
-- Commit messages use a `feat:`/`fix:` prefix and describe the *why*, not a line-by-line *what*.
-- Only commit when the user asks for it.
+This daemon controls real devices (a router, smart-home devices), talks to a shared Postgres instance, and its cron jobs hit real external services on a schedule.
 
-## Safety: real hardware & a shared database
-
-This daemon controls real devices in the user's home and talks to a Postgres instance on their home network (`DATABASE_URL` points at `192.168.0.3`, not a disposable local DB) — it is not a sandboxed toy project.
-
-- **Never trigger an action with a real-world side effect** (sending a command to a physical device, sending a notification, posting to an external API) while testing, unless the user explicitly asks you to verify that specific action. Cancel out of confirmation dialogs instead of confirming them when the only goal is checking that the dialog renders.
-- **Ask before running `bun run db:sync`** or anything else that writes to the shared Postgres instance, even for an additive, non-destructive change — the user should always get the chance to say no first.
+- **`bun run dev` disables cron jobs by default** (`server/cron.ts`, gated on `NODE_ENV`/`ENABLE_CRONS`) — leave it that way. Set `ENABLE_CRONS=true` only when you deliberately want to exercise one job locally, and expect it to actually hit the real router/SSH box/Discord channel/etc. when you do.
+- **Never trigger an action with a real-world side effect** (sending a command to a physical device, sending a Discord notification, posting to an external API) while testing, unless the user explicitly asks you to verify that specific action.
+- **Ask before running `bun run db:sync`** against the shared Postgres instance, even for an additive, non-destructive change.
 - Prefer read-only checks (`curl` a GET route, read a table via `db:studio`) over the corresponding write action whenever a read-only check answers the same question.
