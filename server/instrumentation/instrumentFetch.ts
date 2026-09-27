@@ -31,13 +31,22 @@ async function peekBody(
 
 type PreconnectOptions = Parameters<typeof globalThis.fetch.preconnect>["1"];
 
+/**
+ * Extended init type that allows callers to opt out of W3C trace context
+ * injection per-request. Set `skipTraceInjection: true` when the target
+ * does not understand or rejects trace headers (e.g. routers, IoT devices).
+ */
+interface InstrumentedInit extends RequestInit {
+  skipTraceInjection?: boolean;
+}
+
 export function instrumentFetch(): void {
   const originalFetch = globalThis.fetch;
   const tracer = trace.getTracer("fetch");
 
   const newFetch = async (
     input: string | Request | URL,
-    init?: BunFetchRequestInit,
+    init?: InstrumentedInit,
   ) => {
     const oltpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT!;
     const request = new Request(input, init);
@@ -72,9 +81,15 @@ export function instrumentFetch(): void {
           }
 
           const headers = new Headers(request.headers);
-          propagation.inject(context.active(), headers, {
-            set: (carrier, key, value) => carrier.set(key, value),
-          });
+
+          // Skip trace header injection when the caller explicitly opts out
+          // (e.g. for routers, IoT devices, or any host that doesn't
+          // understand W3C trace headers).
+          if (!init?.skipTraceInjection) {
+            propagation.inject(context.active(), headers, {
+              set: (carrier, key, value) => carrier.set(key, value),
+            });
+          }
 
           const response = await originalFetch(
             new Request(request, { headers }),
