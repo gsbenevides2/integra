@@ -23,6 +23,19 @@ import { HistoryService } from "./modules/tuya/service/history";
 const tracer = trace.getTracer("cron");
 const log = getLogger("cron");
 
+export interface CronJobEntry {
+  label: string;
+  schedule: string;
+  fn: () => Promise<void>;
+}
+
+/**
+ * Exported registry so the crons module can list available jobs and execute them
+ * on demand. Populated unconditionally (even when crons are disabled in dev) so
+ * the crons routes always have a complete view.
+ */
+export const jobRegistry = new Map<string, CronJobEntry>();
+
 /**
  * Guarantees every cron execution opens its own trace, regardless of whether the job
  * itself does any tracing — a single wrapping point instead of each job repeating the
@@ -55,6 +68,29 @@ function tracedCronJob(name: string, fn: () => Promise<void>) {
   };
 }
 
+const jobDefinitions: Array<{ name: string; label: string; schedule: string; fn: () => Promise<void> }> = [
+  // Daily off-hours DB hygiene; device/sensor state itself arrives live via Tuya Pulsar.
+  { name: "tuya.history.prune", label: "Podar histórico Tuya", schedule: "0 4 * * *", fn: () => HistoryService.pruneAll() },
+  { name: "google.calendar.schedule", label: "Agendar lembretes Google Calendar", schedule: "*/10 * * * *", fn: scheduleCalendarMessages },
+  { name: "google.calendar.send", label: "Enviar lembretes agendados", schedule: "* * * * *", fn: sendScheduledMessages },
+  { name: "google.gmail.support", label: "Verificar tickets de suporte", schedule: "*/1 * * * *", fn: watchSupportTickets },
+  { name: "google.gmail.accesscode", label: "Limpar e-mails de código de acesso", schedule: "0 * * * *", fn: cleanAccessCodeEmails },
+  { name: "google.gmail.payslip", label: "Extrair holerites", schedule: "0 12 * * *", fn: extractPayslips },
+  { name: "trainStatus.check", label: "Verificar status de trens", schedule: "*/2 * * * *", fn: checkTrainLinesStatus },
+  { name: "statusPlatform.check", label: "Verificar status de plataformas", schedule: "*/5 * * * *", fn: checkPlatformsStatus },
+  { name: "serverMetrics.collect", label: "Coletar métricas do servidor", schedule: "*/2 * * * *", fn: collectServerMetrics },
+  { name: "serverMetrics.speedtest", label: "Teste de velocidade", schedule: "*/30 * * * *", fn: collectSpeedtest },
+  { name: "tplink.sync", label: "Sincronizar TP-Link", schedule: "0/2 * * * *", fn: syncTpLinkData },
+  { name: "birthday.send", label: "Enviar mensagem de aniversário", schedule: "0 9 * * *", fn: sendBirthdayMessage },
+];
+
+/**
+ * Populate the registry unconditionally so crons endpoints always have a complete view.
+ */
+for (const def of jobDefinitions) {
+  jobRegistry.set(def.name, { label: def.label, schedule: def.schedule, fn: tracedCronJob(def.name, def.fn) });
+}
+
 export function registerCrons() {
   // Crons hit real hardware/APIs (routers, SSH boxes, Discord, Google, Tuya) — only
   // run them in production by default. Set ENABLE_CRONS=true to test one locally.
@@ -66,47 +102,7 @@ export function registerCrons() {
     return;
   }
 
-  // Daily off-hours DB hygiene; device/sensor state itself arrives live via Tuya Pulsar.
-  Bun.cron(
-    "0 4 * * *",
-    tracedCronJob("tuya.history.prune", () => HistoryService.pruneAll()),
-  );
-  Bun.cron(
-    "*/10 * * * *",
-    tracedCronJob("google.calendar.schedule", scheduleCalendarMessages),
-  );
-  Bun.cron(
-    "* * * * *",
-    tracedCronJob("google.calendar.send", sendScheduledMessages),
-  );
-  Bun.cron(
-    "*/1 * * * *",
-    tracedCronJob("google.gmail.support", watchSupportTickets),
-  );
-  Bun.cron(
-    "0 * * * *",
-    tracedCronJob("google.gmail.accesscode", cleanAccessCodeEmails),
-  );
-  Bun.cron(
-    "0 12 * * *",
-    tracedCronJob("google.gmail.payslip", extractPayslips),
-  );
-  Bun.cron(
-    "*/2 * * * *",
-    tracedCronJob("trainStatus.check", checkTrainLinesStatus),
-  );
-  Bun.cron(
-    "*/5 * * * *",
-    tracedCronJob("statusPlatform.check", checkPlatformsStatus),
-  );
-  Bun.cron(
-    "*/2 * * * *",
-    tracedCronJob("serverMetrics.collect", collectServerMetrics),
-  );
-  Bun.cron(
-    "*/30 * * * *",
-    tracedCronJob("serverMetrics.speedtest", collectSpeedtest),
-  );
-  Bun.cron("0/2 * * * *", tracedCronJob("tplink.sync", syncTpLinkData));
-  Bun.cron("0 9 * * *", tracedCronJob("birthday.send", sendBirthdayMessage));
+  for (const def of jobDefinitions) {
+    Bun.cron(def.schedule, tracedCronJob(def.name, def.fn));
+  }
 }

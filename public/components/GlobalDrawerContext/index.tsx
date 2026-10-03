@@ -5,6 +5,7 @@ import React, {
   useState,
 } from "react";
 
+import { cronsDashboard } from "@public/dashboards/crons";
 import { googleAccountsDashboard } from "@public/dashboards/google-accounts";
 import { serverMetricsDashboard } from "@public/dashboards/server-metrics";
 import { statusPlatformDashboard } from "@public/dashboards/status-platform";
@@ -42,6 +43,7 @@ const DASHBOARD_LIST: DashboardData[] = [
   statusPlatformDashboard,
   serverMetricsDashboard,
   tplinkDashboard,
+  cronsDashboard,
 ];
 
 const DEFAULT_STATE: GlobalDrawerContextValue = {
