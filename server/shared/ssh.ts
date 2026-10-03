@@ -47,3 +47,45 @@ export async function runSshCommand(
     },
   );
 }
+
+/** Writes `data` to `remotePath` over SFTP (no remote download, so no CDN/WAF in the way). */
+export async function writeSshFile(
+  remotePath: string,
+  data: Buffer,
+  attributes: Record<string, string> = {},
+): Promise<void> {
+  return withSpan(
+    tracer,
+    "ssh.write_file",
+    {
+      kind: SpanKind.CLIENT,
+      attributes: {
+        "server.address": process.env.SSH_DEFAULT_HOST ?? "",
+        "ssh.dest_path": remotePath,
+        "ssh.file.size": data.length,
+        ...attributes,
+      },
+    },
+    async () => {
+      const ssh = new NodeSSH();
+      try {
+        await ssh.connect({
+          host: safeEnvGet("SSH_DEFAULT_HOST"),
+          port: Number(process.env.SSH_DEFAULT_PORT ?? "22"),
+          username: safeEnvGet("SSH_DEFAULT_USERNAME"),
+          privateKey: safeEnvGet("SSH_DEFAULT_PRIVATE_KEY"),
+        });
+        await ssh.withSFTP(
+          (sftp) =>
+            new Promise<void>((resolve, reject) =>
+              sftp.writeFile(remotePath, data, (err) =>
+                err ? reject(err) : resolve(),
+              ),
+            ),
+        );
+      } finally {
+        ssh.dispose();
+      }
+    },
+  );
+}

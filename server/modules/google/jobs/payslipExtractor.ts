@@ -1,12 +1,11 @@
 import { sendDiscordMessage } from "@server/shared/discord";
-import { runSshCommand } from "@server/shared/ssh";
+import { writeSshFile } from "@server/shared/ssh";
 
 import { trace } from "@opentelemetry/api";
 import { z } from "zod";
 
 import { GmailService } from "../service/gmail";
 import { chatJson } from "../service/openrouter";
-import { deleteTemp, presignedUrl, uploadTemp } from "../service/s3";
 
 const OWNER_EMAIL = "guilherme.benevides@econverse.com.br";
 const PAYSLIP_SENDERS = [
@@ -98,36 +97,28 @@ export async function extractPayslips(): Promise<void> {
         email.id,
         attachmentId,
       );
-      const s3Key = `payslip-extractor/${crypto.randomUUID()}.pdf`;
-      await uploadTemp(s3Key, bytes, "application/pdf");
-      try {
-        const { response: classification } = await chatJson(
-          AI_SYSTEM_PROMPT,
-          [
-            { type: "text", text: `Assunto do Email: ${subject}` },
-            {
-              type: "file",
-              file: {
-                filename: "documento.pdf",
-                file_data: `data:application/pdf;base64,${bytes.toString("base64")}`,
-              },
+      const { response: classification } = await chatJson(
+        AI_SYSTEM_PROMPT,
+        [
+          { type: "text", text: `Assunto do Email: ${subject}` },
+          {
+            type: "file",
+            file: {
+              filename: "documento.pdf",
+              file_data: `data:application/pdf;base64,${bytes.toString("base64")}`,
             },
-          ],
-          classificationSchema,
-          "payslip_classification",
-        );
+          },
+        ],
+        classificationSchema,
+        "payslip_classification",
+      );
 
-        const destination = destinationFor(classification);
-        if (destination) {
-          const url = presignedUrl(s3Key);
-          await runSshCommand(`wget -O '${destination}' '${url}'`, {
-            "ssh.action": "save-payslip",
-            "ssh.dest_path": destination,
-          });
-          await sendDiscordMessage(`Arquivo salvo no servidor: ${destination}`);
-        }
-      } finally {
-        await deleteTemp(s3Key);
+      const destination = destinationFor(classification);
+      if (destination) {
+        await writeSshFile(destination, bytes, {
+          "ssh.action": "save-payslip",
+        });
+        await sendDiscordMessage(`Arquivo salvo no servidor: ${destination}`);
       }
     }
 
