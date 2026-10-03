@@ -73,10 +73,18 @@ export function instrumentGaxios(): void {
       opts: GaxiosOptions = {},
     ): GaxiosPromise<unknown> {
       const method = (opts.method ?? "GET").toUpperCase();
-      const rawUrl = opts.url?.toString() ?? "unknown";
+      let rawUrl = opts.url?.toString() ?? "unknown";
       let hostname = "unknown";
       try {
-        hostname = new URL(rawUrl).hostname;
+        const parsed = new URL(rawUrl);
+        hostname = parsed.hostname;
+        // googleapis sends query params via `opts.params`, not in the URL.
+        for (const [k, v] of Object.entries(opts.params ?? {})) {
+          for (const item of Array.isArray(v) ? v : [v]) {
+            if (item != null) parsed.searchParams.append(k, String(item));
+          }
+        }
+        rawUrl = parsed.toString();
       } catch {
         // use the default fallback
       }
