@@ -111,7 +111,8 @@ function NewDeviceForm({
       brand,
       type,
       isController: type === "router" ? isController : undefined,
-      routerPassword: type === "router" && routerPassword ? routerPassword : undefined,
+      routerPassword:
+        type === "router" && routerPassword ? routerPassword : undefined,
     });
     setIsSaving(false);
     if (error) {
@@ -125,13 +126,30 @@ function NewDeviceForm({
     setIsController(false);
     onCreated();
     onClose();
-  }, [name, brand, type, isController, routerPassword, onCreated, onClose, showToast]);
+  }, [
+    name,
+    brand,
+    type,
+    isController,
+    routerPassword,
+    onCreated,
+    onClose,
+    showToast,
+  ]);
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Novo dispositivo">
       <div className="flex flex-col gap-2">
-        <Input label="Nome" value={name} onChange={(e) => setName(e.target.value)} />
-        <Input label="Marca" value={brand} onChange={(e) => setBrand(e.target.value)} />
+        <Input
+          label="Nome"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <Input
+          label="Marca"
+          value={brand}
+          onChange={(e) => setBrand(e.target.value)}
+        />
         <Select
           label="Tipo"
           value={type}
@@ -179,7 +197,9 @@ function TplinkDashboard() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [onlineDevices, setOnlineDevices] = useState<OnlineDevice[]>([]);
   const [routerStatus, setRouterStatus] = useState<RouterStatus | null>(null);
-  const [routerStatusHistory, setRouterStatusHistory] = useState<RouterStatusHistoryPoint[]>([]);
+  const [routerStatusHistory, setRouterStatusHistory] = useState<
+    RouterStatusHistoryPoint[]
+  >([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [showNewDeviceForm, setShowNewDeviceForm] = useState(false);
@@ -188,18 +208,27 @@ function TplinkDashboard() {
   const fetchAll = useCallback(async (useLoading: boolean) => {
     if (useLoading) setIsLoading(true);
     const client = getTplinkEdenClient();
-    const [devicesRes, statusRes, checkRes, statusHistoryRes] = await Promise.all([
-      client.api.tplink.devices.get(),
-      client.api.tplink.settings["latest-router-status"].get(),
-      client.api.tplink.checks.latest.get(),
-      client.api.tplink.settings["router-status-history"].get({ query: {} }),
-    ]);
+    const [devicesRes, statusRes, checkRes, statusHistoryRes] =
+      await Promise.all([
+        client.api.tplink.devices.get(),
+        client.api.tplink.settings["latest-router-status"].get(),
+        client.api.tplink.checks.latest.get(),
+        client.api.tplink.settings["router-status-history"].get({ query: {} }),
+      ]);
     if (devicesRes.data) setDevices(devicesRes.data as unknown as Device[]);
-    if (statusRes.data) setRouterStatus(statusRes.data as unknown as RouterStatus);
-    if (checkRes.data) setOnlineDevices((checkRes.data as { devices: OnlineDevice[] }).devices ?? []);
+    if (statusRes.data)
+      setRouterStatus(statusRes.data as unknown as RouterStatus);
+    if (checkRes.data)
+      setOnlineDevices(
+        (checkRes.data as { devices: OnlineDevice[] }).devices ?? [],
+      );
     if (statusHistoryRes.data)
       setRouterStatusHistory(
-        (statusHistoryRes.data as unknown as { snapshots: RouterStatusHistoryPoint[] }).snapshots ?? [],
+        (
+          statusHistoryRes.data as unknown as {
+            snapshots: RouterStatusHistoryPoint[];
+          }
+        ).snapshots ?? [],
       );
     if (useLoading) setIsLoading(false);
   }, []);
@@ -213,7 +242,9 @@ function TplinkDashboard() {
   const onlineMacs = new Set(onlineDevices.map((d) => d.mac.toUpperCase()));
 
   function isDeviceOnline(device: Device) {
-    return device.interfaces.some((iface) => onlineMacs.has(iface.mac.toUpperCase()));
+    return device.interfaces.some((iface) =>
+      onlineMacs.has(iface.mac.toUpperCase()),
+    );
   }
 
   const sync = useCallback(async () => {
@@ -232,7 +263,8 @@ function TplinkDashboard() {
   const restartNetwork = useCallback(async () => {
     const ok = await confirm({
       title: "Reiniciar rede",
-      message: "Isso vai reiniciar todos os roteadores (agentes e controller). Continuar?",
+      message:
+        "Isso vai reiniciar todos os roteadores (agentes e controller). Continuar?",
     });
     if (!ok) return;
     const client = getTplinkEdenClient();
@@ -246,10 +278,14 @@ function TplinkDashboard() {
 
   const removeDevice = useCallback(
     async (device: Device) => {
-      const ok = await confirm({ message: `Remover o dispositivo "${device.name}"?` });
+      const ok = await confirm({
+        message: `Remover o dispositivo "${device.name}"?`,
+      });
       if (!ok) return;
       const client = getTplinkEdenClient();
-      const { error } = await client.api.tplink.devices({ id: device.id }).delete();
+      const { error } = await client.api.tplink
+        .devices({ id: device.id })
+        .delete();
       if (error) {
         showToast("Falha ao remover dispositivo", "error");
         return;
@@ -260,13 +296,18 @@ function TplinkDashboard() {
   );
 
   const openDevice = devices.find((d) => d.id === openDeviceId) ?? null;
-  const sortedDevices = [...devices].sort((a, b) => deviceSortOrder(a) - deviceSortOrder(b));
+  const sortedDevices = [...devices].sort(
+    (a, b) => deviceSortOrder(a) - deviceSortOrder(b),
+  );
 
   return (
     <div className="flex flex-col gap-4 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <IconButton onClick={() => globalDrawer.setIsOpen(true)} aria-label="Abrir menu">
+          <IconButton
+            onClick={() => globalDrawer.setIsOpen(true)}
+            aria-label="Abrir menu"
+          >
             <Bars3Icon className="size-5" />
           </IconButton>
           <h1 className="text-xl">TP-Link Center</h1>
@@ -287,14 +328,19 @@ function TplinkDashboard() {
         <>
           <RouterStatusPanel status={routerStatus} />
 
-          {routerStatusHistory.length > 0 && <RouterStatusChart data={routerStatusHistory} />}
+          {routerStatusHistory.length > 0 && (
+            <RouterStatusChart data={routerStatusHistory} />
+          )}
 
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-mist-300">
                 Dispositivos registrados ({devices.length})
               </h2>
-              <Button variant="secondary" onClick={() => setShowNewDeviceForm(true)}>
+              <Button
+                variant="secondary"
+                onClick={() => setShowNewDeviceForm(true)}
+              >
                 <PlusIcon className="size-4" /> Novo dispositivo
               </Button>
             </div>
@@ -308,9 +354,11 @@ function TplinkDashboard() {
             <div className="overflow-x-auto rounded-md bg-gray-800">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="
+                  <tr
+                    className="
                     border-b border-gray-700 text-left text-xs text-mist-400
-                  ">
+                  "
+                  >
                     <th className="px-3 py-2 font-normal">Nome</th>
                     <th className="px-3 py-2 font-normal">Marca</th>
                     <th className="px-3 py-2 font-normal">Tipo</th>
@@ -333,7 +381,9 @@ function TplinkDashboard() {
                         <WifiIcon className="size-4 shrink-0 text-mist-400" />
                         {device.name}
                       </td>
-                      <td className="px-3 py-2 text-mist-300">{device.brand}</td>
+                      <td className="px-3 py-2 text-mist-300">
+                        {device.brand}
+                      </td>
                       <td className="px-3 py-2">
                         {device.type === "router"
                           ? device.isController
@@ -346,13 +396,15 @@ function TplinkDashboard() {
                           className={`
                             rounded-full px-2 py-0.5 text-xs
                             ${
-                            isDeviceOnline(device)
-                              ? "bg-green-900 text-green-300"
-                              : "bg-red-950 text-red-300"
-                          }
+                              isDeviceOnline(device)
+                                ? "bg-green-900 text-green-300"
+                                : "bg-red-950 text-red-300"
+                            }
                           `}
                         >
-                          {isDeviceOnline(device) ? "Conectado" : "Desconectado"}
+                          {isDeviceOnline(device)
+                            ? "Conectado"
+                            : "Desconectado"}
                         </span>
                       </td>
                       <td className="px-3 py-2">
@@ -395,8 +447,18 @@ function TplinkDashboard() {
         </>
       )}
 
-      <Drawer isOpen={!!openDevice} onClose={() => setOpenDeviceId(null)} title={openDevice?.name}>
-        {openDevice && <DeviceDrawerContent device={openDevice} onChanged={() => fetchAll(false)} />}
+      <Drawer
+        isOpen={!!openDevice}
+        onClose={() => setOpenDeviceId(null)}
+        title={openDevice?.name}
+        enableSwipeClose
+      >
+        {openDevice && (
+          <DeviceDrawerContent
+            device={openDevice}
+            onChanged={() => fetchAll(false)}
+          />
+        )}
       </Drawer>
     </div>
   );

@@ -430,6 +430,7 @@ export function TuyaDashboard() {
       <Drawer
         isOpen={!!openDevice}
         onClose={() => setOpenDeviceId(null)}
+        enableSwipeClose
         title={openDevice?.name}
       >
         {openDevice && (
@@ -448,6 +449,7 @@ export function TuyaDashboard() {
       <Drawer
         isOpen={!!openSensor}
         onClose={() => setOpenSensorId(null)}
+        enableSwipeClose
         title={openSensor?.name}
       >
         {openSensor && (
@@ -459,6 +461,7 @@ export function TuyaDashboard() {
       </Drawer>
       <Drawer
         isOpen={!!openPreset}
+        enableSwipeClose
         onClose={() => setOpenPresetId(null)}
         title={openPreset?.name}
       >

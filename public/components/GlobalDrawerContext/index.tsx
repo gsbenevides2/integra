@@ -74,10 +74,13 @@ export function GlobalDrawerProvider({ children }: { children: ReactNode }) {
       <Drawer
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
+        onOpen={() => setIsOpen(true)}
         title="Menu"
         direction="left"
         size="small"
         removePadding
+        enableSwipeClose
+        enableSwipeOpen
         customContainerClassNames="h-full flex-1 max-h-[calc(100dvh-61px)]"
       >
         <Content />
