@@ -11,9 +11,17 @@ interface Props {
   preset: Preset;
   onOpen: () => void;
   onApply: () => void;
+  firstOnlineDeviceName?: string;
+  onQuickApply?: () => void;
 }
 
-export function PresetCard({ preset, onOpen, onApply }: Props) {
+export function PresetCard({
+  preset,
+  onOpen,
+  onApply,
+  firstOnlineDeviceName,
+  onQuickApply,
+}: Props) {
   const isColour = preset.workMode === "colour" && preset.colorHex !== null;
   const hsv = isColour ? hsvFromHex(preset.colorHex) : null;
   const tint = hsv ? hueHex(hsv) : whiteHex(preset.colorTemp);
@@ -41,9 +49,18 @@ export function PresetCard({ preset, onOpen, onApply }: Props) {
         </span>
       </div>
 
-      <Button variant="secondary" onClick={onApply}>
-        <PlayIcon className="size-4" /> Aplicar
-      </Button>
+      <div className="flex flex-col gap-2">
+        {onQuickApply && firstOnlineDeviceName && (
+          <Button variant="secondary" onClick={onQuickApply}>
+            <PlayIcon className="size-4 shrink-0" /> Aplicar na{" "}
+            {firstOnlineDeviceName}
+          </Button>
+        )}
+        <Button variant="secondary" onClick={onApply}>
+          <PlayIcon className="size-4" />{" "}
+          {onQuickApply ? "Aplicar em outra" : "Aplicar"}
+        </Button>
+      </div>
     </div>
   );
 }

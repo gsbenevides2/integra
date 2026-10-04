@@ -166,6 +166,8 @@ export function TuyaDashboard() {
   const visibleLamps = visibleDevices.filter(
     (device) => device.kind === "lamp",
   );
+  const firstOnlineLamp =
+    visibleLamps.find((device) => device.state.online) ?? visibleLamps[0];
   const visibleSwitches = visibleDevices.filter(
     (device) => device.kind === "switch",
   );
@@ -330,6 +332,19 @@ export function TuyaDashboard() {
                         preset={preset}
                         onOpen={() => setOpenPresetId(preset.id)}
                         onApply={() => setApplyPresetId(preset.id)}
+                        firstOnlineDeviceName={firstOnlineLamp?.name}
+                        onQuickApply={
+                          firstOnlineLamp
+                            ? () =>
+                                sendCommand(firstOnlineLamp, {
+                                  power: preset.power,
+                                  brightness: preset.brightness ?? undefined,
+                                  colorTemp: preset.colorTemp ?? undefined,
+                                  colorHex: preset.colorHex ?? undefined,
+                                  workMode: preset.workMode ?? undefined,
+                                })
+                            : undefined
+                        }
                       />
                     ))}
                   </div>
