@@ -67,8 +67,8 @@ export function DeviceCard({ device, isBusy, onCommand, onOpen }: Props) {
           {device.hidden && (
             <span
               className="
-              rounded-full bg-gray-700 px-2 py-0.5 text-xs text-mist-300
-            "
+                rounded-full bg-gray-700 px-2 py-0.5 text-xs text-mist-300
+              "
             >
               Oculta
             </span>

@@ -173,9 +173,9 @@ function TabButton({
           active
             ? "bg-gray-700 text-mist-200"
             : `
-            text-mist-400
-            hover:text-mist-300
-          `
+              text-mist-400
+              hover:text-mist-300
+            `
         }
       `}
     >

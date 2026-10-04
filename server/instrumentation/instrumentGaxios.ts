@@ -1,6 +1,6 @@
-import { type Span, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 import { createRequire } from "node:module";
 
+import { type Span, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 import { Gaxios, GaxiosOptions, GaxiosPromise, GaxiosResponse } from "gaxios";
 
 import { recordSpanError } from "./withSpan";

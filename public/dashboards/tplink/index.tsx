@@ -356,8 +356,8 @@ function TplinkDashboard() {
                 <thead>
                   <tr
                     className="
-                    border-b border-gray-700 text-left text-xs text-mist-400
-                  "
+                      border-b border-gray-700 text-left text-xs text-mist-400
+                    "
                   >
                     <th className="px-3 py-2 font-normal">Nome</th>
                     <th className="px-3 py-2 font-normal">Marca</th>
