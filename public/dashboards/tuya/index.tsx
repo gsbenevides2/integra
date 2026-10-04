@@ -12,8 +12,9 @@ import { useToast } from "@public/components/Toast";
 
 import { Bars3Icon, HomeIcon, PlusIcon } from "@heroicons/react/24/outline";
 
-import { getTuyaEdenClient } from "./client";
+import { getFrigateEdenClient, getTuyaEdenClient } from "./client";
 import { ApplyPresetModal } from "./component/ApplyPresetModal";
+import { CameraCard } from "./component/CameraCard";
 import { DeviceCard } from "./component/DeviceCard";
 import { DeviceDrawerContent } from "./component/DeviceDrawerContent";
 import { NewDeviceForm } from "./component/NewDeviceForm";
@@ -63,6 +64,7 @@ export function TuyaDashboard() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [sensors, setSensors] = useState<Sensor[]>([]);
   const [presets, setPresets] = useState<Preset[]>([]);
+  const [cameras, setCameras] = useState<string[]>([]);
   const [openSensorId, setOpenSensorId] = useState<string | null>(null);
   const [showHidden, setShowHidden] = useState(false);
   const [showHiddenDevices, setShowHiddenDevices] = useState(false);
@@ -108,6 +110,15 @@ export function TuyaDashboard() {
     const interval = setInterval(() => fetchAll(false), POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [fetchAll]);
+
+  // Loaded once, outside the poll, so the live <img> streams are never remounted.
+  useEffect(() => {
+    getFrigateEdenClient()
+      .api.frigate.cameras.get()
+      .then(({ data }) => {
+        if (data) setCameras(data as string[]);
+      });
+  }, []);
 
   const applyState = useCallback(
     (deviceId: string, state: Partial<DeviceState>) => {
@@ -226,149 +237,178 @@ export function TuyaDashboard() {
         <p className="text-sm text-mist-400">Carregando...</p>
       ) : (
         <>
-          <section className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
+          {cameras.length > 0 && (
+            <section className="flex flex-col gap-2">
               <h2 className="text-sm font-semibold text-mist-300">
-                Iluminação ({visibleLamps.length})
+                Câmeras ({cameras.length})
               </h2>
-              {hiddenDevices.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowHiddenDevices((current) => !current)}
-                  className="
-                    cursor-pointer text-xs text-mist-400 underline
-                    underline-offset-2
-                    hover:text-mist-300
-                  "
-                >
-                  {showHiddenDevices
-                    ? "Esconder ocultas"
-                    : `Mostrar ocultas (${hiddenDevices.length})`}
-                </button>
-              )}
+              <div
+                className="
+                  grid grid-cols-[repeat(auto-fill,minmax(min(100%,480px),1fr))]
+                  gap-3
+                "
+              >
+                {cameras.map((name) => (
+                  <CameraCard key={name} name={name} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          <div
+            className="
+              grid grid-cols-1 items-start gap-4
+              lg:grid-cols-2
+            "
+          >
+            <div className="flex flex-col gap-4">
+              <section className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold text-mist-300">
+                    Iluminação ({visibleLamps.length})
+                  </h2>
+                  {hiddenDevices.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setShowHiddenDevices((current) => !current)
+                      }
+                      className="
+                        cursor-pointer text-xs text-mist-400 underline
+                        underline-offset-2
+                        hover:text-mist-300
+                      "
+                    >
+                      {showHiddenDevices
+                        ? "Esconder ocultas"
+                        : `Mostrar ocultas (${hiddenDevices.length})`}
+                    </button>
+                  )}
+                </div>
+                {shownLamps.length === 0 ? (
+                  <p className="text-sm text-mist-400">
+                    {hiddenDevices.length > 0
+                      ? "Todas as lâmpadas estão ocultas."
+                      : "Nenhuma lâmpada ainda. Cadastre uma pelo device ID da Tuya."}
+                  </p>
+                ) : (
+                  <div
+                    className="
+                      grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3
+                    "
+                  >
+                    {shownLamps.map((device) => (
+                      <DeviceCard
+                        key={device.id}
+                        device={device}
+                        isBusy={busyDeviceIds.includes(device.id)}
+                        onCommand={(command) => sendCommand(device, command)}
+                        onOpen={() => setOpenDeviceId(device.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+              <section className="flex flex-col gap-2">
+                <h2 className="text-sm font-semibold text-mist-300">
+                  Modos ({presets.length})
+                </h2>
+                {presets.length === 0 ? (
+                  <p className="text-sm text-mist-400">
+                    Nenhum modo ainda. Cadastre um jeito de deixar a lâmpada
+                    para reaplicar quando quiser.
+                  </p>
+                ) : (
+                  <div
+                    className="
+                      grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3
+                    "
+                  >
+                    {presets.map((preset) => (
+                      <PresetCard
+                        key={preset.id}
+                        preset={preset}
+                        onOpen={() => setOpenPresetId(preset.id)}
+                        onApply={() => setApplyPresetId(preset.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
             </div>
-            {shownLamps.length === 0 ? (
-              <p className="text-sm text-mist-400">
-                {hiddenDevices.length > 0
-                  ? "Todas as lâmpadas estão ocultas."
-                  : "Nenhuma lâmpada ainda. Cadastre uma pelo device ID da Tuya."}
-              </p>
-            ) : (
-              <div
-                className="
-                  grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3
-                "
-              >
-                {shownLamps.map((device) => (
-                  <DeviceCard
-                    key={device.id}
-                    device={device}
-                    isBusy={busyDeviceIds.includes(device.id)}
-                    onCommand={(command) => sendCommand(device, command)}
-                    onOpen={() => setOpenDeviceId(device.id)}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="flex flex-col gap-2">
-            <h2 className="text-sm font-semibold text-mist-300">
-              Interruptores ({visibleSwitches.length})
-            </h2>
-            {shownSwitches.length === 0 ? (
-              <p className="text-sm text-mist-400">
-                Nenhum interruptor ainda. Cadastre um pelo device ID da Tuya.
-              </p>
-            ) : (
-              <div
-                className="
-                  grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3
-                "
-              >
-                {shownSwitches.map((device) => (
-                  <DeviceCard
-                    key={device.id}
-                    device={device}
-                    isBusy={busyDeviceIds.includes(device.id)}
-                    onCommand={(command) => sendCommand(device, command)}
-                    onOpen={() => setOpenDeviceId(device.id)}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-sm font-semibold text-mist-300">
-                Sensores ({visibleSensors.length})
-              </h2>
-              {hiddenSensors.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setShowHidden((current) => !current)}
-                  className="
-                    cursor-pointer text-xs text-mist-400 underline
-                    underline-offset-2
-                    hover:text-mist-300
-                  "
-                >
-                  {showHidden
-                    ? "Esconder ocultos"
-                    : `Mostrar ocultos (${hiddenSensors.length})`}
-                </button>
-              )}
+            <div className="flex flex-col gap-4">
+              <section className="flex flex-col gap-2">
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="text-sm font-semibold text-mist-300">
+                    Sensores ({visibleSensors.length})
+                  </h2>
+                  {hiddenSensors.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowHidden((current) => !current)}
+                      className="
+                        cursor-pointer text-xs text-mist-400 underline
+                        underline-offset-2
+                        hover:text-mist-300
+                      "
+                    >
+                      {showHidden
+                        ? "Esconder ocultos"
+                        : `Mostrar ocultos (${hiddenSensors.length})`}
+                    </button>
+                  )}
+                </div>
+                {shownSensors.length === 0 ? (
+                  <p className="text-sm text-mist-400">
+                    {hiddenSensors.length > 0
+                      ? "Todos os sensores estão ocultos."
+                      : "Nenhum sensor ainda. Cadastre um pelo device ID da Tuya."}
+                  </p>
+                ) : (
+                  <div
+                    className="
+                      grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3
+                    "
+                  >
+                    {shownSensors.map((sensor) => (
+                      <SensorCard
+                        key={sensor.id}
+                        sensor={sensor}
+                        onOpen={() => setOpenSensorId(sensor.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+              <section className="flex flex-col gap-2">
+                <h2 className="text-sm font-semibold text-mist-300">
+                  Interruptores ({visibleSwitches.length})
+                </h2>
+                {shownSwitches.length === 0 ? (
+                  <p className="text-sm text-mist-400">
+                    Nenhum interruptor ainda. Cadastre um pelo device ID da
+                    Tuya.
+                  </p>
+                ) : (
+                  <div
+                    className="
+                      grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3
+                    "
+                  >
+                    {shownSwitches.map((device) => (
+                      <DeviceCard
+                        key={device.id}
+                        device={device}
+                        isBusy={busyDeviceIds.includes(device.id)}
+                        onCommand={(command) => sendCommand(device, command)}
+                        onOpen={() => setOpenDeviceId(device.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
             </div>
-            {shownSensors.length === 0 ? (
-              <p className="text-sm text-mist-400">
-                {hiddenSensors.length > 0
-                  ? "Todos os sensores estão ocultos."
-                  : "Nenhum sensor ainda. Cadastre um pelo device ID da Tuya."}
-              </p>
-            ) : (
-              <div
-                className="
-                  grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3
-                "
-              >
-                {shownSensors.map((sensor) => (
-                  <SensorCard
-                    key={sensor.id}
-                    sensor={sensor}
-                    onOpen={() => setOpenSensorId(sensor.id)}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="flex flex-col gap-2">
-            <h2 className="text-sm font-semibold text-mist-300">
-              Modos ({presets.length})
-            </h2>
-            {presets.length === 0 ? (
-              <p className="text-sm text-mist-400">
-                Nenhum modo ainda. Cadastre um jeito de deixar a lâmpada para
-                reaplicar quando quiser.
-              </p>
-            ) : (
-              <div
-                className="
-                  grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3
-                "
-              >
-                {presets.map((preset) => (
-                  <PresetCard
-                    key={preset.id}
-                    preset={preset}
-                    onOpen={() => setOpenPresetId(preset.id)}
-                    onApply={() => setApplyPresetId(preset.id)}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
+          </div>
         </>
       )}
 

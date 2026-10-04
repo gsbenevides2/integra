@@ -10,6 +10,7 @@ import { setupLoggerProvider } from "./instrumentation/instrumentLogger";
 import { flushTelemetryOnExit } from "./instrumentation/shutdown";
 import { authentikRoutes } from "./modules/authentik";
 import { cronsRoutes } from "./modules/crons";
+import { frigateRoutes } from "./modules/frigate";
 import { googleRoutes } from "./modules/google";
 import { serverMetricsRoutes } from "./modules/server-metrics";
 import { statusPlatformRoutes } from "./modules/status-platform";
@@ -47,6 +48,7 @@ export const app = new Elysia()
     }),
   )
   .use(tuyaRoutes)
+  .use(frigateRoutes)
   .use(googleRoutes)
   .use(trainStatusRoutes)
   .use(statusPlatformRoutes)

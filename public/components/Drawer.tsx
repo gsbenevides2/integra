@@ -63,7 +63,7 @@ export function Drawer({
       >
         <div
           className="
-            sticky top-0 flex items-center justify-between border-b
+            sticky top-0 z-2 flex items-center justify-between border-b
             border-gray-700 bg-gray-900 p-4
           "
         >

@@ -38,12 +38,12 @@ interface GlobalDrawerContextValue {
 
 const DASHBOARD_LIST: DashboardData[] = [
   tuyaDashboard,
-  googleAccountsDashboard,
-  trainStatusDashboard,
-  statusPlatformDashboard,
   serverMetricsDashboard,
   tplinkDashboard,
+  statusPlatformDashboard,
+  trainStatusDashboard,
   cronsDashboard,
+  googleAccountsDashboard,
 ];
 
 const DEFAULT_STATE: GlobalDrawerContextValue = {
