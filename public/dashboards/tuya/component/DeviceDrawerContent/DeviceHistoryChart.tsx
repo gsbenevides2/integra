@@ -1,9 +1,9 @@
 import React from "react";
 
 import {
+  Area,
+  AreaChart,
   CartesianGrid,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -11,90 +11,99 @@ import {
 } from "recharts";
 
 import type { HistoryPoint } from "../../types";
+import {
+  evenTicks,
+  formatTime,
+  makeTickFormatter,
+  tooltipStyle,
+} from "../chartUtils";
 
-function formatTime(value: string) {
-  return new Date(value).toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+const HOUR = 3_600_000;
 
 export function DeviceHistoryChart({ data }: { data: HistoryPoint[] }) {
-  const chartData = data.map((point) => ({
-    ...point,
-    // Power and reachability are booleans; plotting them at full scale keeps them
-    // readable alongside the 0-100 brightness line.
-    powerLine: point.power ? 100 : 0,
-    onlineLine: point.online ? 100 : 0,
-  }));
+  const chartData = data
+    .map((point) => ({
+      ts: Date.parse(point.recordedAt),
+      // Off or unreachable counts as 0% so the area shows when light was really on.
+      brightness: point.power && point.online ? (point.brightness ?? 100) : 0,
+      colorHex: point.colorHex,
+      online: point.online,
+    }))
+    .sort((a, b) => a.ts - b.ts);
+
+  const span =
+    chartData.length > 1
+      ? chartData[chartData.length - 1].ts - chartData[0].ts
+      : 0;
+
+  // Raw snapshots are bursty (many toggles in minutes), so plot the
+  // time-weighted average brightness per bucket (~48 buckets, 1h minimum).
+  const bucketMs = Math.max(HOUR, Math.ceil(span / 48 / HOUR) * HOUR);
+  const start = chartData.length ? chartData[0].ts : 0;
+  const end = chartData.length ? chartData[chartData.length - 1].ts : 0;
+  const buckets: { ts: number; brightness: number }[] = [];
+  for (
+    let from = Math.floor(start / bucketMs) * bucketMs;
+    from <= end;
+    from += bucketMs
+  ) {
+    const to = from + bucketMs;
+    let sum = 0;
+    chartData.forEach((point, i) => {
+      const next = chartData[i + 1]?.ts ?? Math.max(to, end);
+      const overlap = Math.min(next, to) - Math.max(point.ts, from);
+      if (overlap > 0) sum += overlap * point.brightness;
+    });
+    buckets.push({
+      ts: from + bucketMs / 2,
+      brightness: Math.round(sum / bucketMs),
+    });
+  }
 
   return (
     <div className="flex flex-col gap-2 rounded-md bg-gray-800 p-3">
       <h3 className="text-sm font-semibold">Histórico</h3>
       <div className="h-56 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={chartData}>
+          <AreaChart data={buckets}>
             <CartesianGrid
               strokeDasharray="3 3"
               stroke="#374151"
               opacity={0.4}
             />
             <XAxis
-              dataKey="recordedAt"
-              tickFormatter={formatTime}
+              dataKey="ts"
+              type="number"
+              scale="time"
+              domain={["dataMin", "dataMax"]}
+              tickFormatter={makeTickFormatter(span)}
               tick={{ fontSize: 11 }}
               stroke="#9ca3af"
-              minTickGap={40}
+              ticks={evenTicks(start, end)}
+              interval="preserveStartEnd"
             />
             <YAxis
               tick={{ fontSize: 11 }}
               stroke="#9ca3af"
               domain={[0, 100]}
+              ticks={[0, 50, 100]}
               unit="%"
             />
             <Tooltip
-              labelFormatter={(value) => formatTime(String(value))}
-              formatter={(value, name, item) => {
-                if (name === "Ligada") {
-                  return [item.payload.power ? "Sim" : "Não", name];
-                }
-                if (name === "Alcançável") {
-                  return [item.payload.online ? "Sim" : "Não", name];
-                }
-                return [`${Number(value).toFixed(0)}%`, name];
-              }}
-              contentStyle={{
-                backgroundColor: "#111827",
-                border: "1px solid #374151",
-                fontSize: 12,
-              }}
+              labelFormatter={(value) => formatTime(Number(value))}
+              formatter={(value) => [`${value}%`, "Brilho médio"]}
+              contentStyle={tooltipStyle}
             />
-            <Line
-              type="stepAfter"
-              dataKey="powerLine"
-              name="Ligada"
-              stroke="#fbbf24"
-              dot={false}
-            />
-            <Line
-              type="stepAfter"
+            <Area
+              type="monotone"
               dataKey="brightness"
-              name="Brilho"
-              stroke="#38bdf8"
+              stroke="#fbbf24"
+              fill="#fbbf24"
+              fillOpacity={0.3}
               dot={false}
-              connectNulls
+              isAnimationActive={false}
             />
-            <Line
-              type="stepAfter"
-              dataKey="onlineLine"
-              name="Alcançável"
-              stroke="#22c55e"
-              strokeDasharray="4 2"
-              dot={false}
-            />
-          </LineChart>
+          </AreaChart>
         </ResponsiveContainer>
       </div>
     </div>

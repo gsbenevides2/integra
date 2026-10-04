@@ -75,9 +75,7 @@ export function SensorCard({
         flex cursor-pointer flex-col gap-3 rounded-md bg-gray-800 p-3 text-left
         transition-colors
         hover:bg-gray-700/60
-        ${
-        sensor.hidden ? "opacity-50" : ""
-      }
+        ${sensor.hidden ? "opacity-50" : ""}
       `}
     >
       <div className="flex items-start justify-between gap-2">
@@ -94,9 +92,7 @@ export function SensorCard({
             <EyeIcon
               className={`
                 size-5 shrink-0
-                ${
-                motionDetected ? "text-violet-300" : "text-mist-400"
-              }
+                ${motionDetected ? "text-violet-300" : "text-mist-400"}
               `}
             />
           ) : (
@@ -106,9 +102,11 @@ export function SensorCard({
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {sensor.hidden && (
-            <span className="
+            <span
+              className="
               rounded-full bg-gray-700 px-2 py-0.5 text-xs text-mist-300
-            ">
+            "
+            >
               Oculto
             </span>
           )}
@@ -116,10 +114,10 @@ export function SensorCard({
             className={`
               rounded-full px-2 py-0.5 text-xs
               ${
-              sensor.online
-                ? "bg-green-900 text-green-300"
-                : "bg-red-950 text-red-300"
-            }
+                sensor.online
+                  ? "bg-green-900 text-green-300"
+                  : "bg-red-950 text-red-300"
+              }
             `}
           >
             {sensor.online ? "Online" : "Offline"}

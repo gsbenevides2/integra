@@ -9,6 +9,22 @@ import { getTuyaEdenClient } from "../../client";
 import type { Sensor, SensorReading } from "../../types";
 import { SensorHistoryChart } from "./SensorHistoryChart";
 
+const HISTORY_CODES = [
+  "va_temperature",
+  "va_humidity",
+  "doorcontact_state",
+  "pir_state",
+  "battery_percentage",
+  "battery_state",
+];
+
+// Sensors that only report a coarse battery level are plotted on a 1-3 scale.
+const BATTERY_STATE_PERCENT: Record<string, string> = {
+  low: "1",
+  middle: "2",
+  high: "3",
+};
+
 export function SensorDrawerContent({
   sensor,
   onChanged,
@@ -25,15 +41,23 @@ export function SensorDrawerContent({
 
   useEffect(() => {
     let cancelled = false;
-    getTuyaEdenClient()
-      .api.tuya.sensors({ id: sensor.id })
-      .history.get({ query: {} })
-      .then(({ data }) => {
-        if (cancelled || !data) return;
-        setReadings(
-          (data as unknown as { readings: SensorReading[] }).readings ?? [],
-        );
-      });
+    // One request per code: a shared window lets chatty codes (temperature)
+    // push rare ones (battery, door) out of the page.
+    Promise.all(
+      HISTORY_CODES.map((code) =>
+        getTuyaEdenClient()
+          .api.tuya.sensors({ id: sensor.id })
+          .history.get({ query: { code } })
+          .then(({ data }) =>
+            data
+              ? ((data as unknown as { readings: SensorReading[] }).readings ??
+                [])
+              : [],
+          ),
+      ),
+    ).then((all) => {
+      if (!cancelled) setReadings(all.flat());
+    });
     return () => {
       cancelled = true;
     };
@@ -54,6 +78,10 @@ export function SensorDrawerContent({
       onChanged();
     },
     [sensor.id, showToast, onChanged],
+  );
+
+  const hasBatteryPercentage = readings.some(
+    (reading) => reading.code === "battery_percentage",
   );
 
   return (
@@ -122,8 +150,9 @@ export function SensorDrawerContent({
       <SensorHistoryChart
         readings={readings}
         code="doorcontact_state"
-        label="Porta aberta"
+        label="Aberturas da porta"
         boolean
+        eventLabel="aberturas"
         color="#fbbf24"
       />
       <SensorHistoryChart
@@ -133,22 +162,35 @@ export function SensorDrawerContent({
             : reading,
         )}
         code="pir_state"
-        label="Movimento"
+        label="Detecções de movimento"
         boolean
+        eventLabel="detecções"
         color="#a78bfa"
       />
       <SensorHistoryChart
-        readings={readings}
-        code="battery_percentage"
+        readings={
+          hasBatteryPercentage
+            ? readings
+            : readings.map((reading) =>
+                reading.code === "battery_state"
+                  ? {
+                      ...reading,
+                      value: BATTERY_STATE_PERCENT[reading.value] ?? "NaN",
+                    }
+                  : reading,
+              )
+        }
+        code={hasBatteryPercentage ? "battery_percentage" : "battery_state"}
         label="Bateria"
+        levels={hasBatteryPercentage ? undefined : ["Baixa", "Média", "Alta"]}
         unit=" %"
         color="#22c55e"
       />
 
       {readings.length === 0 && (
         <p className="text-sm text-mist-400">
-          Sem histórico ainda. O Integra consulta o log de eventos da Tuya a
-          cada 2 minutos e importa tudo o que aconteceu desde a última leitura.
+          Sem histórico ainda. O Integra grava os eventos que a Tuya envia assim
+          que o sensor reporta uma mudança.
         </p>
       )}
     </div>

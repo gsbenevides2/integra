@@ -256,13 +256,13 @@ function TabButton({
       className={`
         cursor-pointer rounded-full px-4 py-1 transition-colors
         ${
-        active
-          ? "bg-gray-700 text-mist-200"
-          : `
+          active
+            ? "bg-gray-700 text-mist-200"
+            : `
             text-mist-400
             hover:text-mist-300
           `
-      }
+        }
       `}
     >
       {children}
@@ -329,8 +329,8 @@ function Preset({
         size-7 cursor-pointer rounded-full
         disabled:cursor-not-allowed disabled:opacity-50
         ${
-        selected ? "ring-2 ring-white ring-offset-2 ring-offset-gray-900" : ""
-      }
+          selected ? "ring-2 ring-white ring-offset-2 ring-offset-gray-900" : ""
+        }
       `}
     />
   );

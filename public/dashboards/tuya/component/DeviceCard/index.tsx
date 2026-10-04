@@ -36,9 +36,7 @@ export function DeviceCard({ device, isBusy, onCommand, onOpen }: Props) {
     <div
       className={`
         flex flex-col gap-3 rounded-md bg-gray-800 p-3
-        ${
-        device.hidden ? "opacity-50" : ""
-      }
+        ${device.hidden ? "opacity-50" : ""}
       `}
     >
       <div className="flex items-start justify-between gap-2">
@@ -51,9 +49,7 @@ export function DeviceCard({ device, isBusy, onCommand, onOpen }: Props) {
             <BoltIcon
               className={`
                 size-5 shrink-0
-                ${
-                anyChannelOn ? "text-amber-300" : "text-mist-500"
-              }
+                ${anyChannelOn ? "text-amber-300" : "text-mist-500"}
               `}
             />
           ) : (
@@ -69,9 +65,11 @@ export function DeviceCard({ device, isBusy, onCommand, onOpen }: Props) {
         </button>
         <div className="flex shrink-0 items-center gap-1">
           {device.hidden && (
-            <span className="
+            <span
+              className="
               rounded-full bg-gray-700 px-2 py-0.5 text-xs text-mist-300
-            ">
+            "
+            >
               Oculta
             </span>
           )}
@@ -79,10 +77,10 @@ export function DeviceCard({ device, isBusy, onCommand, onOpen }: Props) {
             className={`
               rounded-full px-2 py-0.5 text-xs
               ${
-              state.online
-                ? "bg-green-900 text-green-300"
-                : "bg-red-950 text-red-300"
-            }
+                state.online
+                  ? "bg-green-900 text-green-300"
+                  : "bg-red-950 text-red-300"
+              }
             `}
           >
             {state.online ? "Online" : "Offline"}
