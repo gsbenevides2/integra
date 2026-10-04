@@ -11,6 +11,7 @@ const GOOGLE_AUTH_SCOPES = [
   "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/gmail.modify",
   "https://www.googleapis.com/auth/gmail.send",
+  "https://mail.google.com",
 ];
 
 const REDIRECT_PATHNAME = "/api/google/oauth/callback";
@@ -52,9 +53,7 @@ function clientFromRow(row: AccountRow): GoogleAccountClient {
       .update(googleAccounts)
       .set({
         accessToken: tokens.access_token ?? row.accessToken,
-        ...(tokens.refresh_token
-          ? { refreshToken: tokens.refresh_token }
-          : {}),
+        ...(tokens.refresh_token ? { refreshToken: tokens.refresh_token } : {}),
         expiryDate: tokens.expiry_date
           ? new Date(tokens.expiry_date)
           : row.expiryDate,

@@ -14,6 +14,7 @@ const SCHEDULE_LABELS: Record<string, string> = {
   "0 4 * * *": "Diário 04:00",
   "0 9 * * *": "Diário 09:00",
   "0 12 * * *": "Diário 12:00",
+  "0 0 * * *": "Diário 00:00",
 };
 
 export const cronsRoutes = new Elysia({

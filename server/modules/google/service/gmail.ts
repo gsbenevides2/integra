@@ -57,7 +57,10 @@ export abstract class GmailService {
       .map(summarize);
   }
 
-  static async getFull(email: string, messageId: string): Promise<EmailContent> {
+  static async getFull(
+    email: string,
+    messageId: string,
+  ): Promise<EmailContent> {
     const { authClient } = await GoogleAccountService.getClient(email);
     const gmail = google.gmail({ version: "v1", auth: authClient });
     const { data } = await gmail.users.messages.get({
@@ -82,7 +85,10 @@ export abstract class GmailService {
     return { ...summarize(data), body };
   }
 
-  static async findLabelId(email: string, name: string): Promise<string | null> {
+  static async findLabelId(
+    email: string,
+    name: string,
+  ): Promise<string | null> {
     const { authClient } = await GoogleAccountService.getClient(email);
     const gmail = google.gmail({ version: "v1", auth: authClient });
     const { data } = await gmail.users.labels.list({ userId: "me" });
@@ -127,6 +133,15 @@ export abstract class GmailService {
     await gmail.users.messages.trash({
       userId: "me",
       id: messageId,
+    });
+  }
+
+  static async batchDelete(email: string, messageIds: string[]): Promise<void> {
+    const { authClient } = await GoogleAccountService.getClient(email);
+    const gmail = google.gmail({ version: "v1", auth: authClient });
+    await gmail.users.messages.batchDelete({
+      userId: "me",
+      requestBody: { ids: messageIds },
     });
   }
 

@@ -78,7 +78,7 @@ export async function writeSshFile(
         await ssh.withSFTP(
           (sftp) =>
             new Promise<void>((resolve, reject) =>
-              sftp.writeFile(remotePath, data, (err) =>
+              sftp.writeFile(remotePath, data, (err: Error | null) =>
                 err ? reject(err) : resolve(),
               ),
             ),
