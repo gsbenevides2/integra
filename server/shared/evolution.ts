@@ -8,7 +8,7 @@ export async function sendEvolutionMessage(text: string): Promise<void> {
   const response = await fetch(url.toString(), {
     method: "POST",
     headers: {
-      apikey: `Bot ${safeEnvGet("EVOLUTION_API_KEY")}`,
+      apikey: xwsafeEnvGet("EVOLUTION_API_KEY"),
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -18,7 +18,7 @@ export async function sendEvolutionMessage(text: string): Promise<void> {
   });
   if (!response.ok) {
     throw new Error(
-      `Discord message failed: ${response.status} ${await response.text()}`,
+      `Evolution message failed: ${response.status} ${await response.text()}`,
     );
   }
 }
