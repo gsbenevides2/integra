@@ -33,9 +33,14 @@ jobs:
           github_action_config.pr_actions: '["opened", "reopened", "ready_for_review", "review_requested", "synchronize"]'
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      code-quality: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
       - name: Install dependencies
@@ -48,6 +53,17 @@ jobs:
         with:
           name: coverage
           path: coverage/lcov.info
+      - name: Convert lcov to Cobertura
+        run: |
+          pip install lcov_cobertura
+          lcov_cobertura coverage/lcov.info -o coverage.xml
+      - name: Upload coverage to PR
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/upload-code-coverage@v1
+        with:
+          file: coverage.xml
+          language: TypeScript
+          label: code-coverage/bun
   build:
     runs-on: ubuntu-latest
     steps:
