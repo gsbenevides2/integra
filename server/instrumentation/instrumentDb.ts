@@ -108,14 +108,11 @@ export function instrumentDb(client: SQL, connectionUrl: string): SQL {
     },
     get(target, prop) {
       if (prop === "unsafe") {
-        return (text: string, values?: unknown[] | Record<string, unknown>) =>
-          traceQuery(
-            tracer,
-            serverAddress,
-            text,
-            Array.isArray(values) ? values : values ? [values] : [],
-            target.unsafe(text, values as never),
-          );
+        return (text: string, values?: unknown[] | Record<string, unknown>) => {
+          const params = Array.isArray(values) ? values : values ? [values] : [];
+          const query = target.unsafe(text, values as never);
+          return traceQuery(tracer, serverAddress, text, params, query);
+        };
       }
       const value = Reflect.get(target, prop, target);
       return typeof value === "function" ? value.bind(target) : value;

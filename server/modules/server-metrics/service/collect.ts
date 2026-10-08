@@ -27,6 +27,9 @@ function parseUnitValue(value: string): number {
 }
 
 export abstract class ServerMetricsService {
+  // explicit ctor: bun cannot count an implicit one as covered
+  protected constructor() {}
+
   static async getServerStatus() {
     const scriptPath = process.env.STATS_SCRIPT_PATH ?? "/home/gsbenevides2/stats.sh";
     const { stdout } = await runSshCommand(scriptPath);

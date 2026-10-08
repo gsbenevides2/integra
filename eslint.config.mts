@@ -79,5 +79,17 @@ export default defineConfig([
     language: "css/css",
     extends: ["css/recommended"],
   },
+  {
+    // Tests mock third-party shapes and use underscore-prefixed unused args.
+    files: ["test/**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-require-imports": "off",
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+      "react/react-in-jsx-scope": "off",
+      "react/display-name": "off",
+      "better-tailwindcss/no-unknown-classes": "off",
+    },
+  },
   eslintConfigPrettier,
 ]);

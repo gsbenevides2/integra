@@ -32,6 +32,9 @@ function latestChecksSubquery() {
 }
 
 export abstract class StatusPlatformService {
+  // explicit ctor: bun cannot count an implicit one as covered
+  protected constructor() {}
+
   static checkOne(platform: PlatformRow): Promise<void> {
     return withSpan(
       tracer,

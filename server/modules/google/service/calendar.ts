@@ -43,6 +43,8 @@ function formatEvent(e: calendar_v3.Schema$Event): CalendarEvent {
 }
 
 export abstract class CalendarService {
+  protected constructor() {}
+
   static async listCalendars(): Promise<Calendar[]> {
     const clients = await GoogleAccountService.getAllClients();
     const calendars = await Promise.all(

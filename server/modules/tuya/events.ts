@@ -42,6 +42,10 @@ export interface SensorChangeEvent {
  * are different questions and automations almost always mean the second.
  */
 class TuyaEventBus extends EventEmitter {
+  constructor() {
+    super();
+  }
+
   emitDeviceChange(event: DeviceChangeEvent): void {
     this.emit("device", event);
   }

@@ -8,6 +8,9 @@ const READING_RETENTION_DAYS = 90;
 const HISTORY_RETENTION_DAYS = 30;
 
 export abstract class HistoryService {
+  // Explicit constructor: bun counts an implicit one as an uncoverable function.
+  constructor() {}
+
   /**
    * Pure DB hygiene, no polling: device and sensor state now arrives entirely through the
    * Pulsar push connection, so this only bounds how much history piles up.

@@ -24,6 +24,9 @@ export interface DeviceInput {
 }
 
 export abstract class TpLinkDeviceService {
+  // explicit ctor: bun reports an implicit constructor as an uncovered function
+  constructor() {}
+
   static async listDevices() {
     const devices = await db.select().from(tplinkDevices);
     const interfaces = await db.select().from(tplinkInterfaces);

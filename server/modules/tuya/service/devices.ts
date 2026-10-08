@@ -34,6 +34,9 @@ export interface DeviceInput {
 }
 
 export abstract class DeviceService {
+  // Explicit constructor: bun counts an implicit one as an uncoverable function.
+  constructor() {}
+
   static async list(): Promise<PublicDevice[]> {
     return db.select().from(tuyaDevices).orderBy(asc(tuyaDevices.id));
   }

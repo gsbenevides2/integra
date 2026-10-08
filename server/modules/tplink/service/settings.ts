@@ -32,6 +32,9 @@ const STATUS_KEYS = [
 ] as const;
 
 export abstract class TpLinkSettingsService {
+  // explicit ctor: bun reports an implicit constructor as an uncovered function
+  constructor() {}
+
   static async saveRouterStatus(status: Partial<RouterStatus>): Promise<void> {
     const entries = Object.entries(status).map(([key, value]) => ({
       key,

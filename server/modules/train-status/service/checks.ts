@@ -9,6 +9,9 @@ import { buildSegments } from "./history";
 const HISTORY_PAGE_SIZE = 100;
 
 export abstract class TrainStatusService {
+  // explicit ctor: bun cannot count an implicit one as covered
+  protected constructor() {}
+
   static async checkAll(): Promise<void> {
     const lines = await getTrainLinesStatus();
     if (lines.length === 0) return;

@@ -16,7 +16,7 @@ const DATA_CENTERS = {
 
 export type TuyaDataCenter = keyof typeof DATA_CENTERS;
 
-function baseUrl(): string {
+export function baseUrl(): string {
   const configured = process.env.TUYA_DATA_CENTER ?? "us";
   const host = DATA_CENTERS[configured as TuyaDataCenter];
   if (!host) {

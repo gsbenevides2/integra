@@ -33,7 +33,7 @@ bun run lint       # ESLint check
 bun run lint:fix    # ESLint fix
 ```
 
-There is no `format`/`format:fix` script and no automated test suite — see [`development.md`](./development.md) for how changes are verified instead (typecheck + actually running the app).
+There is no `format`/`format:fix` script. Tests run with `bun run test` (also in CI, see `.github/workflows/test.yml`) — see [`development.md`](./development.md) for how changes are verified instead (typecheck + actually running the app).
 
 ## Project Conventions
 

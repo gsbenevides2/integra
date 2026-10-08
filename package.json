@@ -3,7 +3,7 @@
   "displayName": "Integra",
   "description": "Personal home-automation and monitoring server (Bun + Elysia + React) integrating Tuya smart-home devices, a TP-Link router, Google accounts, server/network health, train and platform status, and Discord/Authentik notifications — fully traced end-to-end with OpenTelemetry.",
   "type": "module",
-  "version": "2.0.21",
+  "version": "2.0.22",
   "private": true,
   "repository": {
     "type": "git",
@@ -17,6 +17,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "bun run --watch server/index.ts",
+    "test": "bun test && bun test/check-coverage.ts",
     "lint": "bun --bun eslint .",
     "lint:fix": "bun --bun eslint . --fix",
     "db:sync": "bun --bun run drizzle-kit push --config server/db/drizzle.config.ts",
@@ -62,7 +63,10 @@
     "@eslint/js": "^10.0.1",
     "@eslint/json": "^2.1.0",
     "@eslint/markdown": "^8.0.3",
+    "@happy-dom/global-registrator": "^20.14.5",
     "@tailwindcss/cli": "^4.3.3",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/crypto-js": "^4.2.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

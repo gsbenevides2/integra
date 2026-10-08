@@ -32,6 +32,9 @@ function rowToState(row: HistoryRow): DeviceState {
 }
 
 export abstract class StateService {
+  // Explicit constructor: bun counts an implicit one as an uncoverable function.
+  constructor() {}
+
   static async getLatestState(deviceId: string): Promise<DeviceState | null> {
     const [row] = await db
       .select()

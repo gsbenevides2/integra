@@ -4,6 +4,9 @@ import { tplinkInterfaces, tplinkOnlineChecks, tplinkOnlineDeviceChecks } from "
 import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 
 export abstract class TpLinkChecksService {
+  // explicit ctor: bun reports an implicit constructor as an uncovered function
+  constructor() {}
+
   static async getLatestCheck() {
     const [latestCheck] = await db
       .select()

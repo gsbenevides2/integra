@@ -67,6 +67,8 @@ function clientFromRow(row: AccountRow): GoogleAccountClient {
 }
 
 export abstract class GoogleAccountService {
+  protected constructor() {}
+
   static getAuthUrl(serverURL: string): string {
     const oauth2Client = new google.auth.OAuth2({
       ...oauthCredentials(),

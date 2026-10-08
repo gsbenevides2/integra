@@ -8,7 +8,7 @@ A playbook for adding a feature or fixing a bug in this repo, whatever module it
 2. Extend a module's existing `model.ts`/`service/`/`index.ts` instead of starting new ones, unless the feature genuinely doesn't fit any existing module.
 3. Keep code identifiers in English, UI copy in Portuguese (pt-BR) — matches every existing screen.
 4. Reuse `public/components/*` and `server/shared/*` before writing new helpers.
-5. Run `bun run lint` and a `bunx tsc --noEmit` pass. No test suite exists — actually run the app and drive the change (curl the route, click through the UI) instead of trusting types alone.
+5. Run `bun run lint` and a `bunx tsc --noEmit` pass. Run `bun run test` (100% line/function coverage enforced; tests mirror the source tree under `test/`, e.g. `test/server/shared/authentik.test.ts`), then actually run the app and drive the change (curl the route, click through the UI) instead of trusting types alone.
 6. Never let a cron you're testing run unattended in dev — see [Safety](#safety-real-hardware-a-shared-database-and-crons) below.
 7. Only commit when the user asks for it.
 

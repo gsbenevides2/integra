@@ -18,6 +18,9 @@ export interface PresetInput {
 }
 
 export abstract class PresetService {
+  // Explicit constructor: bun counts an implicit one as an uncoverable function.
+  constructor() {}
+
   static async list(): Promise<Preset[]> {
     return db.select().from(tuyaPresets).orderBy(asc(tuyaPresets.name));
   }

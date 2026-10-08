@@ -27,6 +27,8 @@ function summarize(message: gmail_v1.Schema$Message): EmailSummary {
 }
 
 export abstract class GmailService {
+  protected constructor() {}
+
   static async search(
     email: string,
     query: string,

@@ -43,6 +43,8 @@ export interface ReadingHistoryPage {
 }
 
 export abstract class SensorService {
+  constructor() {}
+
   static kindForCategory(category: string, productName?: string): SensorKind {
     const known = KIND_BY_CATEGORY[category];
     if (known) return known;
