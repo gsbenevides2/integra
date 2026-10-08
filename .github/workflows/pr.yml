@@ -47,23 +47,6 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Run tests (100% coverage enforced)
         run: bun run test
-      - name: Upload coverage report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage
-          path: coverage/lcov.info
-      - name: Convert lcov to Cobertura
-        run: |
-          pip install lcov_cobertura
-          lcov_cobertura coverage/lcov.info -o coverage.xml
-      - name: Upload coverage to PR
-        if: github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/upload-code-coverage@v1
-        with:
-          file: coverage.xml
-          language: TypeScript
-          label: code-coverage/bun
   build:
     runs-on: ubuntu-latest
     steps:

@@ -1,10 +1,7 @@
 import safeEnvGet from "@server/safeEnvGet";
 
 export async function sendEvolutionMessage(text: string): Promise<void> {
-  const url = new URL(
-    "/message/sendText/default",
-    safeEnvGet("EVOLUTION_ENDPOINT"),
-  );
+  const url = new URL("/send/text", safeEnvGet("EVOLUTION_ENDPOINT"));
   const response = await fetch(url.toString(), {
     method: "POST",
     headers: {
@@ -13,7 +10,7 @@ export async function sendEvolutionMessage(text: string): Promise<void> {
     },
     body: JSON.stringify({
       number: safeEnvGet("PERSONAL_WHATSAPP_NUMBER"),
-      textMessage: { text },
+      text,
     }),
   });
   if (!response.ok) {
