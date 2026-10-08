@@ -8,7 +8,7 @@ export async function sendEvolutionMessage(text: string): Promise<void> {
   const response = await fetch(url.toString(), {
     method: "POST",
     headers: {
-      apikey: xwsafeEnvGet("EVOLUTION_API_KEY"),
+      apikey: safeEnvGet("EVOLUTION_API_KEY"),
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
