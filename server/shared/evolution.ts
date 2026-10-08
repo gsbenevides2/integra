@@ -2,8 +2,8 @@ import safeEnvGet from "@server/safeEnvGet";
 
 export async function sendEvolutionMessage(text: string): Promise<void> {
   const url = new URL(
-    safeEnvGet("EVOLUTION_ENDPOINT"),
     "/message/sendText/default",
+    safeEnvGet("EVOLUTION_ENDPOINT"),
   );
   const response = await fetch(url.toString(), {
     method: "POST",
