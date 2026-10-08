@@ -29,7 +29,22 @@ jobs:
           .github/workflows/release/prepare-release.sh
   test:
     needs: prepare-release
-    uses: ./.github/workflows/test.yml
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Run tests (100% coverage enforced)
+        run: bun run test
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage/lcov.info
   release:
     needs: prepare-release
     runs-on: ubuntu-latest
@@ -49,7 +64,7 @@ jobs:
           chmod +x .github/workflows/release/release.sh
           .github/workflows/release/release.sh
   docker:
-    needs: test
+    needs: [prepare-release, test]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
