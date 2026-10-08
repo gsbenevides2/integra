@@ -6,6 +6,8 @@ on:
 
 permissions:
   contents: read
+  packages: read
+  code-quality: write
 
 jobs:
   review:
