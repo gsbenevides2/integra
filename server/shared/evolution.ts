@@ -9,8 +9,6 @@ export async function sendEvolutionMessage(text: string): Promise<void> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      id: "default",
-      delay: 123,
       number: safeEnvGet("PERSONAL_WHATSAPP_NUMBER"),
       text,
     }),

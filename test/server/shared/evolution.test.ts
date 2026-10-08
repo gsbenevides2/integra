@@ -18,10 +18,8 @@ test("posts text to evolution", async () => {
   expect(url).toBe("http://evo.local/send/text");
   expect((init.headers as Record<string, string>).apikey).toBe("key");
   expect(JSON.parse(init.body as string)).toEqual({
-    id: "default",
     number: "551100",
     text: "oi",
-    delay: 123,
   });
 });
 
