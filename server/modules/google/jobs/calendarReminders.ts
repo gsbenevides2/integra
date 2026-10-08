@@ -1,9 +1,10 @@
 import { redisGet, redisSet } from "@server/shared/cache";
 import { sendDiscordMessage } from "@server/shared/discord";
+import { sendEvolutionMessage } from "@server/shared/evolution";
 
 import { trace } from "@opentelemetry/api";
 
-import { type CalendarEvent,CalendarService } from "../service/calendar";
+import { type CalendarEvent, CalendarService } from "../service/calendar";
 
 const OWNER_EMAIL = "guilherme.benevides@econverse.com.br";
 const ORG_DOMAIN = "@econverse.com.br";
@@ -48,7 +49,10 @@ function formatSaoPaulo(date: Date): string {
   return `${get("day")}/${get("month")}/${get("year")} ${get("hour")}:${get("minute")}`;
 }
 
-function formatEventMessage(event: CalendarEvent, calendarEmail: string): string {
+function formatEventMessage(
+  event: CalendarEvent,
+  calendarEmail: string,
+): string {
   let message =
     "🌸 Konnichiwa, senpai! A Bene-Chan aqui está te lembrando de um evento super importante que está chegando~ (✿◠‿◠)";
   message += `\n\n✨ **Evento:** ${event.summary}`;
@@ -63,13 +67,15 @@ function formatEventMessage(event: CalendarEvent, calendarEmail: string): string
   if (event.location) message += `\n📍 **Local:** ${event.location}`;
   if (event.htmlLink) {
     const link = new URL(event.htmlLink);
-    if (link.host.includes("google")) link.searchParams.set("authuser", calendarEmail);
+    if (link.host.includes("google"))
+      link.searchParams.set("authuser", calendarEmail);
     message += `\n🔗 **Link para evento:** ${link.toString()}`;
   }
-  const conferenceUri = event.conferenceUris.at(0);
+  const conferenceUri = event.conferenceUris[0];
   if (conferenceUri) {
     const uri = new URL(conferenceUri);
-    if (uri.host.includes("google")) uri.searchParams.set("authuser", calendarEmail);
+    if (uri.host.includes("google"))
+      uri.searchParams.set("authuser", calendarEmail);
     message += `\n💻 **Link para reunião:** ${uri.toString()}`;
   }
   message += "\n\n💪 Ganbatte, senpai! Você consegue~ (◕‿◕)✨";
@@ -150,7 +156,12 @@ export async function sendScheduledMessages(): Promise<void> {
   if (due.length === 0) return;
   trace.getActiveSpan()?.setAttribute("items.processed", due.length);
 
-  await Promise.all(due.map((reminder) => sendDiscordMessage(reminder.message)));
+  await Promise.all(
+    due.flatMap((reminder) => [
+      sendDiscordMessage(reminder.message),
+      sendEvolutionMessage(reminder.message),
+    ]),
+  );
 
   const dueIds = new Set(due.map((reminder) => reminder.eventId));
   await setPending(pending.filter((reminder) => !dueIds.has(reminder.eventId)));

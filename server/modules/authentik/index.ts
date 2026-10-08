@@ -1,4 +1,5 @@
 import { sendDiscordMessage } from "@server/shared/discord";
+import { sendEvolutionMessage } from "@server/shared/evolution";
 
 import Elysia from "elysia";
 
@@ -19,6 +20,7 @@ export const authentikRoutes = new Elysia({
       body.event_user_username,
     );
     await sendDiscordMessage(message);
+    await sendEvolutionMessage(message);
     return "OK";
   },
   {
