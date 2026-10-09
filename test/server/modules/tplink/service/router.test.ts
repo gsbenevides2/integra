@@ -29,6 +29,7 @@ let saved: any[];
 let history: any[];
 let loginFail: (ip: string) => boolean;
 let clientHost = "";
+let getNames: ReturnType<typeof spyOn>;
 
 const wanRow = {
   connIPv4Address: "5.5.5.5",
@@ -97,31 +98,21 @@ function baseHandlers(): Record<string, (n: number) => any> {
   };
 }
 
-// db.select order inside syncSettings: dhcp interfaces, dhcp devices, fw interfaces, fw devices
+// db.select order inside syncSettings: dhcp interfaces+device join, fw interfaces+device join
 function queueDb() {
   fake.queue(
     [
-      { mac: MAC("01"), ip: "1.1.1.1", deviceId: "c1", name: "n1" },
-      { mac: MAC("02"), ip: "1.1.1.2", deviceId: "r1", name: "n2" },
-      { mac: MAC("03"), ip: "1.1.1.3", deviceId: "ctl", name: "n3" },
-      { mac: MAC("04"), ip: "1.1.1.4", deviceId: "ghost", name: "n4" },
-      { mac: MAC("05"), ip: "1.1.1.5", deviceId: "c1", name: "n5" },
-      { mac: MAC("06"), ip: "1.1.1.6", deviceId: "c1", name: "n6" },
+      { mac: MAC("01"), ip: "1.1.1.1", type: "client", isController: false, name: "n1" },
+      { mac: MAC("02"), ip: "1.1.1.2", type: "router", isController: false, name: "n2" },
+      { mac: MAC("03"), ip: "1.1.1.3", type: "router", isController: true, name: "n3" },
+      { mac: MAC("05"), ip: "1.1.1.5", type: "client", isController: false, name: "n5" },
+      { mac: MAC("06"), ip: "1.1.1.6", type: "client", isController: false, name: "n6" },
     ],
     [
-      { id: "c1", type: "client", isController: false },
-      { id: "r1", type: "router", isController: false },
-      { id: "ctl", type: "router", isController: true },
-    ],
-    [
-      { mac: MAC("01"), ip: "1.1.1.1", deviceId: "c1", name: "f1" },
-      { mac: "aa:bb:cc:dd:ee:20", ip: "1.1.1.20", deviceId: "c1", name: "f2" },
-      { mac: MAC("21"), ip: "1.1.1.21", deviceId: "c1", name: "f4" },
-      { mac: MAC("22"), ip: "1.1.1.22", deviceId: "r1", name: "f3" },
-    ],
-    [
-      { id: "c1", type: "client", isController: false },
-      { id: "r1", type: "router", isController: false },
+      { mac: MAC("01"), ip: "1.1.1.1", type: "client", isController: false, name: "f1" },
+      { mac: "aa:bb:cc:dd:ee:20", ip: "1.1.1.20", type: "client", isController: false, name: "f2" },
+      { mac: MAC("21"), ip: "1.1.1.21", type: "client", isController: false, name: "f4" },
+      { mac: MAC("22"), ip: "1.1.1.22", type: "router", isController: false, name: "f3" },
     ],
   );
 }
@@ -173,7 +164,7 @@ beforeEach(() => {
   }) as any);
 
   spyOn(Dev, "getControllerRouter").mockResolvedValue({ id: "ctl", name: "C", ip: "10.0.0.1", password: "pw" });
-  spyOn(Dev, "getDeviceNameOfMac").mockImplementation(async (mac: string) => (mac === MAC("0E") ? "Known Name" : undefined));
+  getNames = spyOn(Dev, "getDeviceNamesByMacs").mockImplementation(async (macs: string[]) => new Map(macs.filter((m) => m === MAC("0E")).map((m) => [m, "Known Name"])));
   spyOn(Settings, "saveRouterStatus").mockImplementation(async (s: any) => void saved.push(s));
   spyOn(Settings, "saveRouterStatusHistory").mockImplementation(async (s: any) => void history.push(s));
 });
@@ -205,6 +196,7 @@ test("syncSettings full run: dhcp, firewall, devices, status", async () => {
   expect(byMac.get("aabbccddee0d").ip).toBe("7.7.7.7");
   expect(byMac.get("aabbccddee0d").routerInterface).toBe("Wifi 5 GHz no Canal 36");
   expect(byMac.get("aabbccddee0e").name).toBe("Known Name");
+  expect(getNames).toHaveBeenCalledTimes(1);
   expect(byMac.get("aabbccddee0e").routerInterface).toBe("Unknown");
   expect(byMac.get("aabbccddee0a").routerInterface).toBe("Roteador");
   expect(byMac.get("aabbccddee0a").name).toBe("Unknown");
@@ -267,12 +259,12 @@ test("firewall: access chain vanishing and empty chain rules", async () => {
   handlers.DEV2_FW_CHAIN = (n) =>
     n === 1 ? { data: [{ name: "ACCESSCTL_WHITE", enable: "1", ruleNumberOfEntries: "0", stack: "1,0,0,0,0,0" }] } : { data: [] };
   handlers.DEV2_FW_CHAIN_RULE = () => ({ data: [] });
-  fake.queue([], [], [{ mac: MAC("30"), ip: "i", deviceId: "c1", name: "x" }], [{ id: "c1", type: "client" }]);
+  fake.queue([], [{ mac: MAC("30"), ip: "i", type: "client", isController: false, name: "x" }]);
   await expect(R.syncSettings()).rejects.toThrow("Missing access chain");
 
   breaker.reset();
   handlers.DEV2_FW_CHAIN = () => ({ data: [{ name: "ACCESSCTL_WHITE", enable: "1", ruleNumberOfEntries: "0", stack: "1,0,0,0,0,0" }] });
-  fake.queue([], [], [{ mac: MAC("30"), ip: "i", deviceId: "c1", name: "x" }], [{ id: "c1", type: "client" }]);
+  fake.queue([], [{ mac: MAC("30"), ip: "i", type: "client", isController: false, name: "x" }]);
   addImpl = () => ({ data: { stack: "ok" } });
   await R.syncSettings();
   const add = calls.find((c) => c.op === "add" && c.oid === "DEV2_FW_CHAIN_RULE")!;

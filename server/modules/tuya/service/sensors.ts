@@ -161,18 +161,12 @@ export abstract class SensorService {
   static async getLatestReadings(
     sensorId: string,
   ): Promise<Record<string, string>> {
-    const rows = await db
-      .select()
-      .from(tuyaSensorReadings)
-      .where(eq(tuyaSensorReadings.sensorId, sensorId))
-      .orderBy(desc(tuyaSensorReadings.recordedAt))
-      .limit(READINGS_PAGE_SIZE);
-
-    const latest: Record<string, string> = {};
-    for (const row of rows) latest[row.code] ??= row.value;
-    return latest;
+    const latest = await SensorService.getLatestReadingsFor([sensorId]);
+    return latest.get(sensorId) ?? {};
   }
 
+  // DISTINCT ON rides the unique (sensorId, code, recordedAt) index and returns one row per
+  // data point, instead of reading the last 300 rows just to dedupe them in memory.
   static async getLatestReadingsFor(
     sensorIds: string[],
   ): Promise<Map<string, Record<string, string>>> {
@@ -180,15 +174,18 @@ export abstract class SensorService {
     if (sensorIds.length === 0) return out;
 
     const rows = await db
-      .select()
+      .selectDistinctOn([tuyaSensorReadings.sensorId, tuyaSensorReadings.code])
       .from(tuyaSensorReadings)
       .where(inArray(tuyaSensorReadings.sensorId, sensorIds))
-      .orderBy(desc(tuyaSensorReadings.recordedAt))
-      .limit(READINGS_PAGE_SIZE * sensorIds.length);
+      .orderBy(
+        tuyaSensorReadings.sensorId,
+        tuyaSensorReadings.code,
+        desc(tuyaSensorReadings.recordedAt),
+      );
 
     for (const row of rows) {
       const entry = out.get(row.sensorId) ?? {};
-      entry[row.code] ??= row.value;
+      entry[row.code] = row.value;
       out.set(row.sensorId, entry);
     }
     return out;

@@ -1,7 +1,7 @@
 import { db } from "@server/db";
 import { tplinkDevices, tplinkInterfaces } from "@server/db/schema";
 
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import { decryptRouterPassword, encryptRouterPassword } from "./passwordCrypto";
 
@@ -145,11 +145,14 @@ export abstract class TpLinkDeviceService {
     await db.delete(tplinkInterfaces).where(eq(tplinkInterfaces.id, interfaceId));
   }
 
-  static async getDeviceNameOfMac(mac: string): Promise<string | undefined> {
-    const [iface] = await db.select().from(tplinkInterfaces).where(eq(tplinkInterfaces.mac, mac));
-    if (!iface) return undefined;
-    const [device] = await db.select().from(tplinkDevices).where(eq(tplinkDevices.id, iface.deviceId));
-    return device?.name;
+  static async getDeviceNamesByMacs(macs: string[]): Promise<Map<string, string>> {
+    if (macs.length === 0) return new Map();
+    const rows = await db
+      .select({ mac: tplinkInterfaces.mac, name: tplinkDevices.name })
+      .from(tplinkInterfaces)
+      .innerJoin(tplinkDevices, eq(tplinkDevices.id, tplinkInterfaces.deviceId))
+      .where(inArray(tplinkInterfaces.mac, macs));
+    return new Map(rows.map((r) => [r.mac, r.name]));
   }
 
   static async getControllerRouter(): Promise<{

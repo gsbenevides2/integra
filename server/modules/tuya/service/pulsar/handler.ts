@@ -72,7 +72,7 @@ async function handleDeviceReport(
     device.kind === "switch"
       ? cloudStatusToSwitchState(full, online)
       : cloudStatusToDeviceState(full, online);
-  await StateService.saveStateIfChanged(device.id, state);
+  await StateService.saveStateIfChanged(device, state);
   return true;
 }
 

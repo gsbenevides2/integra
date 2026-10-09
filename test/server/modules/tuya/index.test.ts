@@ -45,7 +45,7 @@ async function call(method: string, path: string, body?: unknown) {
 test("GET /devices hides hidden devices and falls back to offline state", async () => {
   const list = [{ id: "1", hidden: false }, { id: "2", hidden: true }];
   spy(Device, "list", list);
-  spy(State, "getLatestState", async (id: string) => (id === "1" ? null : { ...OFFLINE_STATE, power: true }));
+  spy(State, "getLatestStates", new Map([["2", { ...OFFLINE_STATE, power: true }]]));
   const a = await call("GET", "/devices");
   expect(a.json).toHaveLength(1);
   expect(a.json[0].state.online).toBe(false);

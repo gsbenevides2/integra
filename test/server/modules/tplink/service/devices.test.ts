@@ -107,11 +107,13 @@ test("updateInterface rules", async () => {
   expect(sets()[0]).toEqual({ mac: "m" });
 });
 
-test("getDeviceNameOfMac", async () => {
+test("getDeviceNamesByMacs", async () => {
+  expect(await D.getDeviceNamesByMacs([])).toEqual(new Map());
+  expect(fake.calls).toHaveLength(0);
   fake.queue([]);
-  expect(await D.getDeviceNameOfMac("m")).toBeUndefined();
-  fake.queue([{ deviceId: "d" }], [{ name: "Phone" }]);
-  expect(await D.getDeviceNameOfMac("m")).toBe("Phone");
+  expect((await D.getDeviceNamesByMacs(["m"])).size).toBe(0);
+  fake.queue([{ mac: "m", name: "Phone" }, { mac: "n", name: "TV" }]);
+  expect(await D.getDeviceNamesByMacs(["m", "n"])).toEqual(new Map([["m", "Phone"], ["n", "TV"]]));
 });
 
 test("getControllerRouter", async () => {

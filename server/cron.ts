@@ -120,13 +120,15 @@ const jobDefinitions: Array<{
   {
     name: "statusPlatform.check",
     label: "Verificar status de plataformas",
-    schedule: "*/5 * * * *",
+    // offset by a minute so it does not land on the same second as the */2 and */10 jobs
+    schedule: "1/5 * * * *",
     fn: checkPlatformsStatus,
   },
   {
     name: "serverMetrics.collect",
     label: "Coletar métricas do servidor",
-    schedule: "*/2 * * * *",
+    // odd minutes: tplink.sync and trainStatus own the even ones
+    schedule: "1/2 * * * *",
     fn: collectServerMetrics,
   },
   {

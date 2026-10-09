@@ -18,8 +18,8 @@ afterAll(() => {
 });
 beforeEach(resetFakeDb);
 
-test("pruneAll deletes readings and state history", async () => {
+test("pruneAll deletes readings, state history and monitoring checks", async () => {
   expect(new (HistoryService as never as new () => object)()).toBeDefined();
   await HistoryService.pruneAll();
-  expect(fakeDbCalls.filter((c) => c.method === "delete")).toHaveLength(2);
+  expect(fakeDbCalls.filter((c) => c.method === "delete")).toHaveLength(9);
 });

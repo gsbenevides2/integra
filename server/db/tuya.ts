@@ -120,5 +120,10 @@ export const tuyaSensorReadings = tuya.table(
       table.code,
       table.recordedAt,
     ),
+    // History pages without a `code` filter, and the retention prune by recordedAt.
+    index("tuya_sensor_readings_sensor_recorded_idx").on(
+      table.sensorId,
+      table.recordedAt.desc(),
+    ),
   ],
 );

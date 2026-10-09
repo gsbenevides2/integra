@@ -2,7 +2,7 @@ import { db } from "@server/db";
 import { tplinkDevices, tplinkInterfaces, tplinkOnlineChecks, tplinkOnlineDeviceChecks } from "@server/db/schema";
 import { getLogger, logError, logWarn } from "@server/instrumentation/instrumentLogger";
 
-import { eq } from "drizzle-orm";
+import { eq, type SQL } from "drizzle-orm";
 import getVendor from "mac-oui-lookup";
 
 import type {
@@ -60,17 +60,15 @@ async function getConnectedEasyMeshDevices(client: TpLinkClient): Promise<Connec
     return "Unknown";
   }
 
-  return Promise.all(
-    result.data
-      .filter((item) => item.X_TP_Active === "1")
-      .map(async (item) => ({
-        ip: item.X_TP_IPAddress,
-        mac: item.MACAddress,
-        name: (await TpLinkDeviceService.getDeviceNameOfMac(item.MACAddress)) || item.X_TP_HostName || "Unknown",
-        routerInterface: processBackLinkType(item.backhaulLinkType),
-        vendor: getVendorCached(item.MACAddress),
-      })),
-  );
+  return result.data
+    .filter((item) => item.X_TP_Active === "1")
+    .map((item) => ({
+      ip: item.X_TP_IPAddress,
+      mac: item.MACAddress,
+      name: item.X_TP_HostName || "Unknown",
+      routerInterface: processBackLinkType(item.backhaulLinkType),
+      vendor: getVendorCached(item.MACAddress),
+    }));
 }
 
 async function getConnectedWifiDevices(client: TpLinkClient): Promise<ConnectedDevices> {
@@ -89,17 +87,15 @@ async function getConnectedWifiDevices(client: TpLinkClient): Promise<ConnectedD
     return `Wifi ${data.operatingFrequencyBand} GHz no Canal ${data.channel}`;
   }
 
-  return Promise.all(
-    assocDev.data
-      .filter((item) => item.active === "1")
-      .map(async (item) => ({
-        ip: item.X_TP_IPAddress,
-        mac: item.MACAddress,
-        name: (await TpLinkDeviceService.getDeviceNameOfMac(item.MACAddress)) || item.X_TP_HostName || "Unknown",
-        vendor: getVendorCached(item.MACAddress),
-        routerInterface: getRouterInterface(item.X_TP_RadioMac),
-      })),
-  );
+  return assocDev.data
+    .filter((item) => item.active === "1")
+    .map((item) => ({
+      ip: item.X_TP_IPAddress,
+      mac: item.MACAddress,
+      name: item.X_TP_HostName || "Unknown",
+      vendor: getVendorCached(item.MACAddress),
+      routerInterface: getRouterInterface(item.X_TP_RadioMac),
+    }));
 }
 
 async function getConnectedWiredDevices(client: TpLinkClient): Promise<ConnectedDevices> {
@@ -108,17 +104,15 @@ async function getConnectedWiredDevices(client: TpLinkClient): Promise<Connected
     pstack: "0,0,0,0,0,0",
   });
 
-  return Promise.all(
-    result.data
-      .filter((i) => i.active === "1")
-      .map(async (i) => ({
-        ip: i.IPAddress,
-        mac: i.MACAddress,
-        name: (await TpLinkDeviceService.getDeviceNameOfMac(i.MACAddress)) || i.X_TP_HostName || "Unknown",
-        routerInterface: "Cabeada",
-        vendor: getVendorCached(i.MACAddress),
-      })),
-  );
+  return result.data
+    .filter((i) => i.active === "1")
+    .map((i) => ({
+      ip: i.IPAddress,
+      mac: i.MACAddress,
+      name: i.X_TP_HostName || "Unknown",
+      routerInterface: "Cabeada",
+      vendor: getVendorCached(i.MACAddress),
+    }));
 }
 
 interface KnownHost {
@@ -189,7 +183,9 @@ async function getConnectedDevices(client: TpLinkClient): Promise<ConnectedDevic
     Promise.all([getConnectedEasyMeshDevices(client), getConnectedWifiDevices(client), getConnectedWiredDevices(client)]),
     listKnownHosts(client),
   ]);
-  return mergeConnectedDevices(result.flat(), hosts);
+  const merged = mergeConnectedDevices(result.flat(), hosts);
+  const names = await TpLinkDeviceService.getDeviceNamesByMacs(merged.map((d) => d.mac));
+  return merged.map((d) => ({ ...d, name: names.get(d.mac) || d.name }));
 }
 
 async function listDHCPEntry(client: TpLinkClient): Promise<DhcpEntries> {
@@ -376,15 +372,30 @@ async function getStatus(client: TpLinkClient): Promise<RouterStatus> {
   };
 }
 
-async function syncDhcp(client: TpLinkClient): Promise<void> {
-  const interfaces = await db.select().from(tplinkInterfaces).where(eq(tplinkInterfaces.reservedIp, true));
-  const devices = await db.select().from(tplinkDevices);
-  const deviceById = new Map(devices.map((d) => [d.id, d]));
+// One join instead of loading every device and matching in memory; interfaces whose device
+// is gone fall out of the inner join, as they did before.
+async function listInterfacesWithDevice(
+  where: SQL,
+  keep: (device: { type: "router" | "client"; isController: boolean }) => boolean,
+) {
+  const rows = await db
+    .select({
+      mac: tplinkInterfaces.mac,
+      ip: tplinkInterfaces.ip,
+      name: tplinkInterfaces.name,
+      type: tplinkDevices.type,
+      isController: tplinkDevices.isController,
+    })
+    .from(tplinkInterfaces)
+    .innerJoin(tplinkDevices, eq(tplinkDevices.id, tplinkInterfaces.deviceId))
+    .where(where);
+  return rows.filter(keep);
+}
 
-  const interfacesToSync = interfaces.filter((i) => {
-    const device = deviceById.get(i.deviceId);
-    return device?.type === "client" || (device?.type === "router" && !device.isController);
-  });
+async function syncDhcp(client: TpLinkClient): Promise<void> {
+  const interfacesToSync = await listInterfacesWithDevice(eq(tplinkInterfaces.reservedIp, true), (d) =>
+    d.type === "client" || (d.type === "router" && !d.isController),
+  );
 
   const routerEntries = await listDHCPEntry(client);
 
@@ -424,11 +435,7 @@ async function getAvailableFirewallRuleStackId(client: TpLinkClient): Promise<nu
 }
 
 async function syncFirewall(client: TpLinkClient): Promise<void> {
-  const interfaces = await db.select().from(tplinkInterfaces).where(eq(tplinkInterfaces.allowList, true));
-  const devices = await db.select().from(tplinkDevices);
-  const deviceById = new Map(devices.map((d) => [d.id, d]));
-
-  const clientInterfaces = interfaces.filter((i) => deviceById.get(i.deviceId)?.type === "client");
+  const clientInterfaces = await listInterfacesWithDevice(eq(tplinkInterfaces.allowList, true), (d) => d.type === "client");
 
   const chains = await listFirewallChains(client);
   const accessChain = chains.find((c) => c.name === "ACCESSCTL_WHITE");

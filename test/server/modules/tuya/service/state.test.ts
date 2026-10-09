@@ -37,35 +37,39 @@ test("getLatestState maps rows, including channels and null workMode", async () 
   expect(await StateService.getLatestState("d")).toBeNull();
 });
 
+test("getLatestStates batches devices into one query", async () => {
+  expect((await StateService.getLatestStates([])).size).toBe(0);
+  expect(fakeDbCalls).toHaveLength(0);
+  fakeDbResults.push([row({ deviceId: "a", channels: '{"1":true}' }), row({ deviceId: "b", workMode: null })]);
+  const map = await StateService.getLatestStates(["a", "b", "c"]);
+  expect(map.get("a")).toMatchObject({ channels: { "1": true } });
+  expect(map.get("b")).toMatchObject({ workMode: null });
+  expect(map.has("c")).toBe(false);
+  expect(fakeDbCalls.filter((c) => c.method === "selectDistinctOn")).toHaveLength(1);
+});
+
+const dev = { id: "d" } as never;
+
 test("saveStateIfChanged skips equal states", async () => {
   fakeDbResults.push([row({ workMode: "white" })]);
   const same = { online: true, power: true, brightness: 10, colorTemp: 20, colorHex: "#ffffff", workMode: "white" as const, channels: null };
-  expect(await StateService.saveStateIfChanged("d", same)).toBe(false);
+  expect(await StateService.saveStateIfChanged(dev, same)).toBe(false);
 });
 
 test("saveStateIfChanged inserts and emits the change event", async () => {
   const events: any[] = [];
   const off = tuyaEvents.onDeviceChange((e) => events.push(e));
-  // latest (none), device lookup, insert
-  fakeDbResults.push([], [{ id: "d" }]);
-  expect(await StateService.saveStateIfChanged("d", { ...OFFLINE_STATE, channels: { "1": true } })).toBe(true);
+  // latest (none), then insert: the device is passed in, no lookup
+  fakeDbResults.push([]);
+  expect(await StateService.saveStateIfChanged(dev, { ...OFFLINE_STATE, channels: { "1": true } })).toBe(true);
   expect(events).toHaveLength(1);
   expect(events[0].changed).toEqual([]);
   expect(fakeDbCalls.some((c) => c.method === "insert")).toBe(true);
 
-  // changed vs. previous, with device found
-  fakeDbResults.push([row()], [{ id: "d" }]);
-  await StateService.saveStateIfChanged("d", { ...OFFLINE_STATE, power: false });
+  // changed vs. previous
+  fakeDbResults.push([row()]);
+  await StateService.saveStateIfChanged(dev, { ...OFFLINE_STATE, power: false });
   expect(events[1].changed).toContain("online");
-  off();
-});
-
-test("saveStateIfChanged still inserts when the device no longer exists", async () => {
-  const events: unknown[] = [];
-  const off = tuyaEvents.onDeviceChange((e) => events.push(e));
-  fakeDbResults.push([], []);
-  expect(await StateService.saveStateIfChanged("gone", OFFLINE_STATE)).toBe(true);
-  expect(events).toHaveLength(0);
   off();
 });
 

@@ -1,6 +1,6 @@
 import { PLATFORMS } from "@server/modules/status-platform/model";
 
-import { pgSchema, text, timestamp } from "drizzle-orm/pg-core";
+import { index, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
 
 export const statusPlatform = pgSchema("status_platform");
 
@@ -35,4 +35,11 @@ export const platformStatusChecks = statusPlatform.table(
     problemDescription: text(),
     checkedAt: timestamp({ withTimezone: true }).notNull(),
   },
+  // Serves the DISTINCT ON "latest per platform" and the paginated history.
+  (table) => [
+    index("platform_status_checks_platform_checked_idx").on(
+      table.platformId,
+      table.checkedAt.desc(),
+    ),
+  ],
 );

@@ -14,6 +14,7 @@ const tracer = trace.getTracer("status-platform");
 const HISTORY_PAGE_SIZE = 100;
 
 type PlatformRow = typeof platforms.$inferSelect;
+type NewCheck = typeof platformStatusChecks.$inferInsert;
 
 function latestChecksSubquery() {
   return db
@@ -35,7 +36,8 @@ export abstract class StatusPlatformService {
   // explicit ctor: bun cannot count an implicit one as covered
   protected constructor() {}
 
-  static checkOne(platform: PlatformRow): Promise<void> {
+  /** Runs the fetcher and returns the row to store, without writing it. */
+  private static buildCheck(platform: PlatformRow): Promise<NewCheck> {
     return withSpan(
       tracer,
       "statusPlatform.check",
@@ -53,19 +55,19 @@ export abstract class StatusPlatformService {
         try {
           const result = await fetcher(platform.url);
           span.setAttribute("platform.status", result.status);
-          await db.insert(platformStatusChecks).values({
+          return {
             platformId: platform.id,
             status: result.status,
             problemDescription:
               result.status === "DOWN" ? result.problemDescription : null,
             checkedAt,
-          });
+          };
         } catch (error) {
           // A failing fetcher is stored as DOWN, but keep the real cause visible
           // (parser bug vs. real outage) without failing the whole cron run.
           span.setAttribute("platform.status", "DOWN");
           span.recordException(error as Error);
-          await db.insert(platformStatusChecks).values({
+          return {
             platformId: platform.id,
             status: "DOWN",
             problemDescription:
@@ -73,17 +75,26 @@ export abstract class StatusPlatformService {
                 ? error.message
                 : "Unknown error occurred",
             checkedAt,
-          });
+          };
         }
       },
     );
   }
 
+  static async checkOne(platform: PlatformRow): Promise<void> {
+    await db
+      .insert(platformStatusChecks)
+      .values(await StatusPlatformService.buildCheck(platform));
+  }
+
   static async checkAll(): Promise<void> {
     const all = await db.select().from(platforms);
-    await Promise.all(
-      all.map((platform) => StatusPlatformService.checkOne(platform)),
+    if (all.length === 0) return;
+    // One insert for the whole cycle instead of one per platform.
+    const rows = await Promise.all(
+      all.map((platform) => StatusPlatformService.buildCheck(platform)),
     );
+    await db.insert(platformStatusChecks).values(rows);
   }
 
   static list(platformId?: string) {

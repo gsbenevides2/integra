@@ -1,5 +1,6 @@
 import {
   doublePrecision,
+  index,
   integer,
   jsonb,
   pgSchema,
@@ -18,18 +19,22 @@ export interface DiskSnapshot {
   mountedAt: string;
 }
 
-export const serverMetricsSnapshots = serverMetrics.table("snapshots", {
-  id: text()
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  memoryTotalMb: integer().notNull(),
-  memoryUsedMb: integer().notNull(),
-  memoryFreeMb: integer().notNull(),
-  networkRxKbs: integer().notNull(),
-  networkTxKbs: integer().notNull(),
-  disks: jsonb().$type<DiskSnapshot[]>().notNull(),
-  collectedAt: timestamp({ withTimezone: true }).notNull(),
-});
+export const serverMetricsSnapshots = serverMetrics.table(
+  "snapshots",
+  {
+    id: text()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    memoryTotalMb: integer().notNull(),
+    memoryUsedMb: integer().notNull(),
+    memoryFreeMb: integer().notNull(),
+    networkRxKbs: integer().notNull(),
+    networkTxKbs: integer().notNull(),
+    disks: jsonb().$type<DiskSnapshot[]>().notNull(),
+    collectedAt: timestamp({ withTimezone: true }).notNull(),
+  },
+  (table) => [index("server_metrics_snapshots_collected_idx").on(table.collectedAt.desc())],
+);
 
 export const serverMetricsSpeedtestSnapshots = serverMetrics.table(
   "speedtest_snapshots",
@@ -42,4 +47,5 @@ export const serverMetricsSpeedtestSnapshots = serverMetrics.table(
     latencyMs: doublePrecision().notNull(),
     collectedAt: timestamp({ withTimezone: true }).notNull(),
   },
+  (table) => [index("server_metrics_speedtest_collected_idx").on(table.collectedAt.desc())],
 );

@@ -31,13 +31,13 @@ export const tuyaRoutes = new Elysia({
       const all = await DeviceService.list();
       const devices =
         query.includeHidden === "true" ? all : all.filter((d) => !d.hidden);
-      return Promise.all(
-        devices.map(async (device) => ({
-          ...device,
-          state:
-            (await StateService.getLatestState(device.id)) ?? OFFLINE_STATE,
-        })),
+      const states = await StateService.getLatestStates(
+        devices.map((device) => device.id),
       );
+      return devices.map((device) => ({
+        ...device,
+        state: states.get(device.id) ?? OFFLINE_STATE,
+      }));
     },
     {
       detail: {

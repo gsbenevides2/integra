@@ -66,9 +66,18 @@ describe("StatusPlatformService", () => {
     fake.push([platform, platform]);
     await StatusPlatformService.checkAll();
     expect(fetchSpy).toHaveBeenCalledTimes(2);
+    // one batched insert for the whole cycle, not one per platform
+    expect(fake.calls.filter((c) => c === "values")).toHaveLength(1);
     fake.push([platform]);
     await checkPlatformsStatus();
     expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
+  test("checkAll without platforms inserts nothing", async () => {
+    fake.push([]);
+    await StatusPlatformService.checkAll();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(fake.calls).not.toContain("values");
   });
 
   test("list with and without id", async () => {

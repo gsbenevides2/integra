@@ -70,24 +70,25 @@ test("saveReadings", async () => {
   expect(await SensorService.saveReadings([{ sensorId: "s", code: "c", value: "v", recordedAt: new Date() }])).toBe(1);
 });
 
-test("latest readings keep the newest value per code", async () => {
+test("latest readings: one row per code, grouped by sensor", async () => {
   fakeDbResults.push([
     { sensorId: "s", code: "a", value: "new" },
-    { sensorId: "s", code: "a", value: "old" },
     { sensorId: "s", code: "b", value: "x" },
   ]);
   expect(await SensorService.getLatestReadings("s")).toEqual({ a: "new", b: "x" });
+  fakeDbResults.push([]);
+  expect(await SensorService.getLatestReadings("s")).toEqual({});
 
   expect((await SensorService.getLatestReadingsFor([])).size).toBe(0);
   fakeDbResults.push([
     { sensorId: "s1", code: "a", value: "1" },
-    { sensorId: "s1", code: "a", value: "0" },
     { sensorId: "s1", code: "b", value: "2" },
     { sensorId: "s2", code: "a", value: "3" },
   ]);
   const map = await SensorService.getLatestReadingsFor(["s1", "s2"]);
   expect(map.get("s1")).toEqual({ a: "1", b: "2" });
   expect(map.get("s2")).toEqual({ a: "3" });
+  expect(fakeDbCalls.some((c) => c.method === "selectDistinctOn")).toBe(true);
 });
 
 test("getReadingHistory filters and paginates", async () => {

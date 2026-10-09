@@ -1,11 +1,11 @@
 import { db } from "@server/db";
 import { tuyaDeviceStateHistory } from "@server/db/schema";
 
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, desc, eq, inArray, lt } from "drizzle-orm";
 
 import { diffDeviceState, tuyaEvents } from "../events";
 import { type DeviceState, statesEqual, type WorkMode } from "../model";
-import { DeviceService } from "./devices";
+import type { Device } from "./devices";
 
 const HISTORY_PAGE_SIZE = 200;
 
@@ -46,22 +46,38 @@ export abstract class StateService {
     return row ? rowToState(row) : null;
   }
 
+  /** The newest state of every device in one query, instead of one per device. */
+  static async getLatestStates(
+    deviceIds: string[],
+  ): Promise<Map<string, DeviceState>> {
+    if (deviceIds.length === 0) return new Map();
+    const rows = await db
+      .selectDistinctOn([tuyaDeviceStateHistory.deviceId])
+      .from(tuyaDeviceStateHistory)
+      .where(inArray(tuyaDeviceStateHistory.deviceId, deviceIds))
+      .orderBy(
+        tuyaDeviceStateHistory.deviceId,
+        desc(tuyaDeviceStateHistory.recordedAt),
+      );
+    return new Map(rows.map((row) => [row.deviceId, rowToState(row)]));
+  }
+
   /**
    * Appends a history row only when the state actually differs from the last one recorded.
    * The device pushes a STATUS frame on every change, so this keeps one row per real change
    * instead of one row per poll.
    */
   static async saveStateIfChanged(
-    deviceId: string,
+    device: Device,
     state: DeviceState,
   ): Promise<boolean> {
-    const latest = await StateService.getLatestState(deviceId);
+    const latest = await StateService.getLatestState(device.id);
     if (latest && statesEqual(latest, state)) return false;
 
-    await StateService.publishDeviceChange(deviceId, latest, state);
+    StateService.publishDeviceChange(device, latest, state);
 
     await db.insert(tuyaDeviceStateHistory).values({
-      deviceId,
+      deviceId: device.id,
       online: state.online,
       power: state.power,
       brightness: state.brightness,
@@ -117,14 +133,11 @@ export abstract class StateService {
    * Announces the change to any script watching. Listener failures must never take down the
    * collector that produced the event, so each one is isolated.
    */
-  private static async publishDeviceChange(
-    deviceId: string,
+  private static publishDeviceChange(
+    device: Device,
     previous: DeviceState | null,
     current: DeviceState,
-  ): Promise<void> {
-    const device = await DeviceService.get(deviceId);
-    if (!device) return;
-
+  ): void {
     tuyaEvents.emitDeviceChange({
       device,
       previous,
