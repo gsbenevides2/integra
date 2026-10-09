@@ -7,6 +7,8 @@ import { withSpan } from "../instrumentation/withSpan";
 
 const tracer = trace.getTracer("redis");
 
+const serverAddress = new URL(safeEnvGet("REDIS_URL")).hostname;
+
 // Bun.redis gives up after maxRetries and never reconnects by itself: reconnect on demand.
 async function withReconnect<T>(op: () => Promise<T>): Promise<T> {
   try {
@@ -19,7 +21,6 @@ async function withReconnect<T>(op: () => Promise<T>): Promise<T> {
 }
 
 export async function redisGet(key: string): Promise<string | null> {
-  const serverAddress = new URL(safeEnvGet("REDIS_URL")).hostname;
   return withSpan(
     tracer,
     "redis.get",
@@ -30,6 +31,7 @@ export async function redisGet(key: string): Promise<string | null> {
         "db.operation.name": "GET",
         "db.redis.key": key,
         "server.address": serverAddress,
+        "peer.service": "redis",
       },
     },
     async (span) => {
@@ -53,6 +55,8 @@ export async function redisSet(key: string, value: string): Promise<void> {
         "db.operation.name": "SET",
         "db.redis.key": key,
         "db.redis.value": value,
+        "server.address": serverAddress,
+        "peer.service": "redis",
       },
     },
     async () => {
