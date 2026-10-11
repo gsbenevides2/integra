@@ -185,4 +185,17 @@ test("a failed creator grant rolls the new resource back", async () => {
     expect(revoke).toHaveBeenLastCalledWith(type, "new");
   }
   expect(grant).toHaveBeenCalledTimes(3);
+
+  // A failing cleanup neither skips the other step nor hides the grant error.
+  const remove = spy(Device, "delete", async () => {
+    throw new Error("delete failed");
+  });
+  revoke.mockImplementation((async () => {
+    throw new Error("revoke failed");
+  }) as never);
+  const res = await call("POST", "/devices", { name: "a", tuyaDeviceId: "t" });
+  expect(res.status).toBe(500);
+  expect(JSON.stringify(res.json)).not.toContain("failed");
+  expect(remove).toHaveBeenCalledWith("new");
+  expect(revoke).toHaveBeenLastCalledWith("tuya_device", "new");
 });

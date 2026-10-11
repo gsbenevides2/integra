@@ -154,9 +154,11 @@ WHERE u.uid = :'owner_uid'
 ON CONFLICT ("userId", "resourceType", "resourceId", action) DO NOTHING;
 
 -- 5. Optional: the Authentik login_failed service account gets exactly one
---    route grant. The whole section is skipped when owner_uid's companion
---    service variables are absent.
+--    route grant. The section runs only when both service_uid and
+--    service_username are set; if just one is, it is skipped with a warning
+--    instead of failing on an undefined variable mid-transaction.
 \if :{?service_uid}
+\if :{?service_username}
 INSERT INTO auth.users (id, uid, username)
 VALUES (gen_random_uuid()::text, :'service_uid', :'service_username')
 ON CONFLICT (uid) DO NOTHING;
@@ -166,6 +168,11 @@ SELECT gen_random_uuid()::text, u.id, 'POST /api/authentik/login-failed'
 FROM auth.users u
 WHERE u.uid = :'service_uid'
 ON CONFLICT ("userId", "routeKey") DO NOTHING;
+\else
+\echo 'WARNING: service_uid set without service_username; service account section skipped.'
+\endif
+\elif :{?service_username}
+\echo 'WARNING: service_username set without service_uid; service account section skipped.'
 \endif
 
 COMMIT;

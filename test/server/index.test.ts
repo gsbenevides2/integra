@@ -22,6 +22,13 @@ const gaxios = mock(() => {});
 const pulsar = mock(() => {});
 mock.module("@server/instrumentation/instrumentGaxios", () => ({ instrumentGaxios: gaxios }));
 mock.module("@server/modules/tuya/service/pulsar", () => ({ ...realPulsar, startTuyaPulsar: pulsar }));
+const realPermissionsService = { ...(await import("@server/modules/permissions/service")) };
+mock.module("@server/modules/permissions/service", () => ({
+  ...realPermissionsService,
+  runAuthzStartupChecks: async () => {
+    throw new Error("unexpected bug");
+  },
+}));
 
 const stop = mock(() => {});
 const serve = spyOn(Bun, "serve").mockImplementation((() => ({
@@ -44,6 +51,7 @@ afterAll(() => {
   globalThis.fetch = realFetch;
   mock.module("@server/instrumentation/instrumentGaxios", () => realGaxios);
   mock.module("@server/modules/tuya/service/pulsar", () => realPulsar);
+  mock.module("@server/modules/permissions/service", () => realPermissionsService);
   for (const [k, v] of Object.entries(saved)) {
     if (v === undefined) delete process.env[k];
     else process.env[k] = v;
@@ -65,6 +73,15 @@ test("startup warns about a half-configured dev identity override", () => {
   expect(warn).toHaveBeenCalledWith(
     expect.anything(),
     expect.stringContaining("USER_NAME is not set"),
+  );
+});
+
+test("an unexpected startup-check failure is logged, not left unhandled", async () => {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(warn).toHaveBeenCalledWith(
+    expect.anything(),
+    "[authz] startup checks failed unexpectedly",
+    { "error.message": "unexpected bug" },
   );
 });
 

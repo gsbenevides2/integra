@@ -71,7 +71,13 @@ const devOverrideWarning = warnDevOverrideConfig();
 if (devOverrideWarning) {
   logWarn(getLogger("authz"), devOverrideWarning);
 }
-void runAuthzStartupChecks();
+// The checks handle database errors themselves; this only guards against an
+// unexpected bug turning into an unhandled rejection at startup.
+void runAuthzStartupChecks().catch((error: unknown) => {
+  logWarn(getLogger("authz"), "[authz] startup checks failed unexpectedly", {
+    "error.message": error instanceof Error ? error.message : String(error),
+  });
+});
 
 // The OTEL Plugin overrides native home response.
 export const server = Bun.serve({

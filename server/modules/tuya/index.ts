@@ -49,8 +49,10 @@ async function grantCreatorOrRollback(
   try {
     await grantAllValidActions(userId, type, id);
   } catch (error) {
-    await remove(id);
-    await revokeResourceGrants(type, id);
+    // Best-effort cleanup: each step runs even if the other fails, and the
+    // caller always gets the original grant error, not a cleanup one.
+    await remove(id).catch(() => {});
+    await revokeResourceGrants(type, id).catch(() => {});
     throw error;
   }
 }
