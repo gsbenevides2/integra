@@ -7,7 +7,7 @@ installDb();
 import { chatJson } from "@server/modules/google/service/openrouter";
 
 const { GoogleAccountService } = await import("@server/modules/google/service/accounts");
-const { CalendarService } = await import("@server/modules/google/service/calendar");
+const { CalendarService, BRAZILIAN_HOLIDAYS_CALENDAR_ID } = await import("@server/modules/google/service/calendar");
 const { GmailService } = await import("@server/modules/google/service/gmail");
 afterAll(restoreDb);
 
@@ -53,6 +53,24 @@ describe("CalendarService", () => {
     expect(ev[1]).toMatchObject({ id: "", eventType: "default", attendees: [], conferenceUris: [] });
     track(spyOn(google, "calendar").mockReturnValue({ events: { list: async () => ({ data: {} }) } } as any));
     expect(await CalendarService.listEvents({ email: "a", primary: true, summary: "", calendarId: "c" }, "s", "e")).toEqual([]);
+  });
+  test("listHolidayEvents reads the Brazilian calendar with all-day dates", async () => {
+    track(spyOn(GoogleAccountService, "getAllClients").mockResolvedValue([{ email: "a", authClient: auth }] as any));
+    let seen: any;
+    track(spyOn(google, "calendar").mockReturnValue({
+      events: {
+        list: async (params: any) => {
+          seen = params;
+          return { data: { items: [{ id: "h", summary: "Natal", description: "Feriado público", start: { date: "2026-12-25" }, end: { date: "2026-12-26" } }] } };
+        },
+      },
+    } as any));
+    const events = await CalendarService.listHolidayEvents("s", "e");
+    expect(seen.calendarId).toBe(BRAZILIAN_HOLIDAYS_CALENDAR_ID);
+    expect(events[0]).toMatchObject({ id: "h", startDate: "2026-12-25", endDate: "2026-12-26" });
+
+    track(spyOn(GoogleAccountService, "getAllClients").mockResolvedValue([]));
+    await expect(CalendarService.listHolidayEvents("s", "e")).rejects.toThrow("No connected Google account");
   });
 });
 

@@ -17,6 +17,7 @@ import {
 } from "./modules/server-metrics/jobs/collect";
 import { checkPlatformsStatus } from "./modules/status-platform/jobs/checkStatus";
 import { syncTpLinkData } from "./modules/tplink/jobs/sync";
+import { checkTrainLinesAlarm } from "./modules/train-status/jobs/alarm";
 import { checkTrainLinesStatus } from "./modules/train-status/jobs/checkStatus";
 import { HistoryService } from "./modules/tuya/service/history";
 
@@ -116,6 +117,13 @@ const jobDefinitions: Array<{
     label: "Verificar status de trens",
     schedule: "*/2 * * * *",
     fn: checkTrainLinesStatus,
+  },
+  {
+    name: "trainStatus.alarm",
+    label: "Alarme de trens",
+    // odd minutes: one minute after trainStatus.check (*/2)
+    schedule: "1/2 * * * *",
+    fn: checkTrainLinesAlarm,
   },
   {
     name: "statusPlatform.check",
