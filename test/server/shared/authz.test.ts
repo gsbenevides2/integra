@@ -369,7 +369,7 @@ describe("resource requirements", () => {
       ["POST /api/crons/run/:jobName", { type: "cron_job", id: "job", action: "execute" }],
     ];
     for (const [key, expected] of cases) {
-      expect(authz.resourceRequirements(key, ctx)).toEqual([expected]);
+      expect(authz.resourceRequirements(key, ctx)).toEqual([expected] as never);
     }
     expect(
       authz.resourceRequirements("POST /api/tuya/presets/:id/apply", ctx),

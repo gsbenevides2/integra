@@ -2,7 +2,7 @@ import { MANAGER_ROUTE_KEY } from "@server/modules/permissions/constants";
 
 import { afterAll, expect, mock, spyOn, test } from "bun:test";
 
-const envKeys = ["DATABASE_URL", "TUYA_ACCESS_ID", "TUYA_ACCESS_SECRET", "NODE_ENV", "ENABLE_CRONS"];
+const envKeys = ["DATABASE_URL", "TUYA_ACCESS_ID", "TUYA_ACCESS_SECRET", "NODE_ENV", "ENABLE_CRONS", "USER_UID", "USER_NAME"];
 const saved = Object.fromEntries(envKeys.map((k) => [k, process.env[k]]));
 const realFetch = globalThis.fetch;
 
@@ -11,6 +11,9 @@ process.env.TUYA_ACCESS_ID ??= "id";
 process.env.TUYA_ACCESS_SECRET ??= "secret";
 process.env.NODE_ENV = "development"; // registerCrons becomes a no-op
 delete process.env.ENABLE_CRONS;
+// Half-configured dev override: startup must warn about the missing USER_NAME.
+process.env.USER_UID = "dev-uid";
+delete process.env.USER_NAME;
 
 // Stub every process-level side effect index.ts triggers on import.
 const realGaxios = { ...(await import("@server/instrumentation/instrumentGaxios")) };
@@ -28,6 +31,8 @@ const serve = spyOn(Bun, "serve").mockImplementation((() => ({
 })) as never);
 const once = spyOn(process, "once").mockImplementation((() => process) as never);
 const log = spyOn(console, "log").mockImplementation(() => {});
+const loggerMod = await import("@server/instrumentation/instrumentLogger");
+const warn = spyOn(loggerMod, "logWarn").mockImplementation(() => {});
 
 const mod = await import("@server/index");
 
@@ -35,6 +40,7 @@ afterAll(() => {
   serve.mockRestore();
   once.mockRestore();
   log.mockRestore();
+  warn.mockRestore();
   globalThis.fetch = realFetch;
   mock.module("@server/instrumentation/instrumentGaxios", () => realGaxios);
   mock.module("@server/modules/tuya/service/pulsar", () => realPulsar);
@@ -53,6 +59,13 @@ test("startup wires instrumentation, server, pulsar and crons", () => {
   expect(opts.development).toBe(true);
   expect(once).toHaveBeenCalledWith("SIGTERM", expect.any(Function));
   expect(mod.server.port).toBe(3000);
+});
+
+test("startup warns about a half-configured dev identity override", () => {
+  expect(warn).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.stringContaining("USER_NAME is not set"),
+  );
 });
 
 test("serves favicon redirect and service worker", async () => {

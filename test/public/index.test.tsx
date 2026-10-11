@@ -49,7 +49,7 @@ test("entry point mounts the app and boots instrumentation + service worker", as
   expect(root.textContent).toContain(ME_FIXTURE.username);
   expect(root.textContent).toContain("GB");
 
-  act(() => create.mock.results[0]!.value.unmount());
+  act(() => (create.mock.results[0]!.value as ReactDom.Root).unmount());
   create.mockRestore();
   tuyaDashboard.content = realContent;
   spies.forEach((s) => s.mockRestore());

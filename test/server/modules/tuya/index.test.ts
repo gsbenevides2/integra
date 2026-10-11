@@ -64,6 +64,11 @@ test("device create/update/delete", async () => {
   expect((await call("PUT", "/devices/1", { name: "x" })).json).toEqual({ id: "u" });
   upd.mockImplementation((async () => null) as never);
   expect((await call("PUT", "/devices/1", { name: "x" })).status).toBe(404);
+  upd.mockImplementation((async () => ({ id: "u" })) as never);
+  const byTuyaId = spy(Sensor, "getByTuyaId", { id: "s" });
+  expect((await call("PUT", "/devices/1", { tuyaDeviceId: "t" })).status).toBe(400);
+  byTuyaId.mockImplementation((async () => null) as never);
+  expect((await call("PUT", "/devices/1", { tuyaDeviceId: "t" })).json).toEqual({ id: "u" });
   spy(Device, "delete", undefined);
   expect((await call("DELETE", "/devices/1")).json).toEqual({ ok: true });
 });

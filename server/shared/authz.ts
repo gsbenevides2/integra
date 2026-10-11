@@ -50,13 +50,9 @@ function testOverrideActive(): boolean {
 }
 
 /** A set that reports membership for everything. */
-class AllReadableSet extends Set<string> {
-  override has(): boolean {
-    return true;
-  }
-}
-
-const ALL_READABLE = new AllReadableSet();
+const ALL_READABLE: Set<string> = Object.assign(new Set<string>(), {
+  has: () => true,
+});
 
 export type ResourceType =
   | "tuya_device"
@@ -464,14 +460,14 @@ export const authz = new Elysia({ name: AUTHZ_PLUGIN_NAME })
 
     const headerIdentity = identityFromHeaders(guardCtx.request.headers);
     const identity = headerIdentity ?? devOverrideIdentity();
-    if (!identity) return forbidden();
+    if (!identity) throw forbidden();
 
     const user = await resolveUser(identity);
     setCurrentUser(ctx, user);
 
     if (key === ME_ROUTE_KEY) return;
     const allowed = await hasRouteGrant(user.id, key);
-    if (!allowed) return forbidden();
+    if (!allowed) throw forbidden();
   })
   .onBeforeHandle(async (ctx) => {
     const guardCtx = ctx as unknown as GuardContext;
