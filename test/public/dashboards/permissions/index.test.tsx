@@ -3,11 +3,13 @@ import "@public/components/GlobalDrawerContext";
 
 import React from "react";
 
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test } from "bun:test";
 
-import { fail, useApi } from "../../../helpers/dash-api";
+import { fail, malformed, useApi } from "../../../helpers/dash-api";
 import { renderWithMe } from "../../../helpers/me";
+
+const MANAGER = "POST /api/permissions/users/:id/route-grants";
 
 const users = [
   { id: "u1", uid: "uid-1", username: "alice", createdAt: "", updatedAt: "" },
@@ -16,11 +18,15 @@ const users = [
 
 const routeOptions = [
   { key: "GET /api/tuya/devices", method: "GET", path: "/api/tuya/devices", tag: "Tuya", summary: "List Devices" },
-  { key: "POST /api/permissions/users/:id/route-grants", method: "POST", path: "/api/permissions/users/:id/route-grants", tag: "Permissions", summary: "Grant Route" },
+  { key: "DELETE /api/tuya/devices/:id", method: "DELETE", path: "/api/tuya/devices/:id", tag: "Tuya", summary: "Delete Device" },
+  { key: MANAGER, method: "POST", path: "/api/permissions/users/:id/route-grants", tag: "Permissions", summary: "Grant Route" },
+  { key: "TRACE /x", method: "TRACE", path: "/x", tag: "Other", summary: "Odd Method" },
 ];
 
 const resourceOptions = [
   { resourceType: "tuya_device", resourceId: "d1", label: "Lamp", actions: ["read", "write"] },
+  { resourceType: "frigate_camera", resourceId: "frente", label: "frente", actions: ["read"] },
+  { resourceType: "frigate_camera", resourceId: "tras", label: "tras", actions: ["read"] },
   { resourceType: "cron_job", resourceId: "job", label: "Job", actions: ["read", "execute"] },
 ];
 
@@ -29,36 +35,40 @@ interface Cfg {
   grants?: unknown;
   resources?: unknown;
   frigateAvailable?: boolean;
+  failUsers?: boolean;
+  malformedUsers?: boolean;
+  malformedGrants?: boolean;
   failRouteGrant?: boolean;
+  malformedRouteGrant?: boolean;
   failRouteDelete?: boolean;
   failResourceGrant?: boolean;
   failResourceDelete?: boolean;
-  routeDeleteError?: string;
 }
 
 let cfg: Cfg = {};
 
 const calls = useApi({
-  "GET /api/permissions/users": () => cfg.users ?? users,
+  "GET /api/permissions/users": () =>
+    cfg.failUsers ? fail(500) : cfg.malformedUsers ? malformed() : (cfg.users ?? users),
   "GET /api/permissions/users/:id/grants": () =>
-    cfg.grants ?? { routes: [], resources: [] },
+    cfg.malformedGrants ? malformed() : (cfg.grants ?? { routes: [], resources: [] }),
   "GET /api/permissions/routes": () => routeOptions,
   "GET /api/permissions/resources": () => ({
     resources: cfg.resources ?? resourceOptions,
     frigateAvailable: cfg.frigateAvailable ?? true,
   }),
   "POST /api/permissions/users/:id/route-grants": () =>
-    cfg.failRouteGrant
-      ? fail(500, { error: "boom" })
-      : { id: "gr", routeKey: "GET /api/tuya/devices", status: "ok" },
+    cfg.malformedRouteGrant
+      ? malformed()
+      : cfg.failRouteGrant
+        ? fail(500, { error: "boom" })
+        : { id: "gr" },
   "POST /api/permissions/users/:id/resource-grants": () =>
     cfg.failResourceGrant ? fail(500, { error: "boom" }) : { id: "rr" },
   "DELETE /api/permissions/route-grants/:grantId": () =>
-    cfg.routeDeleteError
-      ? fail(409, { error: cfg.routeDeleteError })
-      : cfg.failRouteDelete
-        ? fail(500, { error: "boom" })
-        : { ok: true },
+    cfg.failRouteDelete
+      ? fail(409, { error: "Cannot remove the last permission manager" })
+      : { ok: true },
   "DELETE /api/permissions/resource-grants/:grantId": () =>
     cfg.failResourceDelete ? fail(500, { error: "boom" }) : { ok: true },
 });
@@ -68,9 +78,25 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-const { PermissionsDashboard, permissionsDashboard, errorText } = await import(
-  "@public/dashboards/permissions/index"
-);
+const {
+  PermissionsDashboard,
+  permissionsDashboard,
+  errorText,
+  matchesSearch,
+  buildResourceSections,
+} = await import("@public/dashboards/permissions/index");
+
+const posts = (suffix: string) =>
+  calls.filter((c) => c.method === "POST" && c.path.endsWith(suffix));
+const deletes = (fragment: string) =>
+  calls.filter((c) => c.method === "DELETE" && c.path.includes(fragment));
+
+const section = (name: string) => screen.getByRole("region", { name });
+
+async function renderLoaded() {
+  renderWithMe(<PermissionsDashboard />);
+  await screen.findByRole("option", { name: /alice/ });
+}
 
 test("errorText unwraps server error and message bodies", () => {
   expect(errorText({ value: { error: "nope" } }, "fallback")).toBe("nope");
@@ -81,88 +107,232 @@ test("errorText unwraps server error and message bodies", () => {
   expect(errorText({ value: "x" }, "fallback")).toBe("fallback");
 });
 
+test("matchesSearch ignores case, accents and blank queries", () => {
+  expect(matchesSearch("", "anything")).toBe(true);
+  expect(matchesSearch("  ", "anything")).toBe(true);
+  expect(matchesSearch("câmera", "List Cameras")).toBe(true);
+  expect(matchesSearch("LAMP", "x", "lamp")).toBe(true);
+  expect(matchesSearch("fan", "Lamp")).toBe(false);
+});
+
+test("buildResourceSections orders types and appends orphaned grants", () => {
+  const sections = buildResourceSections(
+    [
+      { resourceType: "cron_job", resourceId: "j", label: "Job", actions: ["read"] },
+      { resourceType: "tuya_device", resourceId: "b", label: "B", actions: ["read"] },
+      { resourceType: "tuya_device", resourceId: "a", label: "A", actions: ["read"] },
+    ],
+    [
+      { id: "1", resourceType: "tuya_device", resourceId: "a", action: "read", label: "A", status: "ok" },
+      { id: "2", resourceType: "frigate_camera", resourceId: "cam", action: "read", label: null, status: "unverified" },
+      { id: "3", resourceType: "tuya_device", resourceId: "gone", action: "read", label: null, status: "orphaned" },
+      { id: "4", resourceType: "tuya_device", resourceId: "gone", action: "write", label: null, status: "orphaned" },
+      { id: "5", resourceType: "zzz", resourceId: "q", action: "read", label: "Q", status: "orphaned" },
+      { id: "6", resourceType: "aaa", resourceId: "q", action: "read", label: "Q", status: "orphaned" },
+    ],
+  );
+  expect(sections.map((s) => s.type)).toEqual([
+    "frigate_camera",
+    "tuya_device",
+    "cron_job",
+    "aaa",
+    "zzz",
+  ]);
+  expect(sections[0]!.rows[0]).toMatchObject({ label: "cam", flag: "não verificada" });
+  const devices = sections[1]!.rows;
+  expect(devices.map((r) => r.label)).toEqual(["A", "B", "gone"]);
+  expect(devices[2]).toMatchObject({ actions: ["read", "write"], flag: "órfã" });
+});
+
 test("exports the dashboard descriptor", () => {
   expect(permissionsDashboard.id).toBe("permissions");
   expect(permissionsDashboard.content).toBe(PermissionsDashboard);
   expect(permissionsDashboard.name).toBe("Permissões");
 });
 
-test("renders users, grants, flags and the manager marker", async () => {
-  cfg.grants = {
-    routes: [
-      { id: "g1", routeKey: "GET /api/tuya/devices", status: "ok" },
-      { id: "g2", routeKey: "GET /api/gone", status: "orphaned" },
-      { id: "g3", routeKey: "POST /api/permissions/users/:id/route-grants", status: "ok" },
-    ],
-    resources: [
-      { id: "r1", resourceType: "tuya_device", resourceId: "d1", action: "write", label: "Lamp", status: "ok" },
-      { id: "r2", resourceType: "cron_job", resourceId: "job", action: "execute", label: "Job", status: "orphaned" },
-      { id: "r4", resourceType: "frigate_camera", resourceId: "cam", action: "read", label: null, status: "unverified" },
-    ],
-  };
+test("shows the loading state", () => {
   renderWithMe(<PermissionsDashboard />);
-  expect(await screen.findByText("GET /api/tuya/devices")).toBeTruthy();
-  expect(screen.getByText("Gerenciador de permissões")).toBeTruthy();
-  expect(screen.getAllByText("(órfã)").length).toBe(2);
-  expect(screen.getByText("(não verificada)")).toBeTruthy();
-  expect(screen.getAllByText("(inclui leitura)").length).toBe(2);
-  expect(screen.getByText("Dispositivos Tuya")).toBeTruthy();
-  fireEvent.click(screen.getByLabelText("Abrir menu"));
+  expect(screen.getByText("Carregando permissões...")).toBeTruthy();
 });
 
-test("omits the implied-read hint when an explicit read grant exists", async () => {
+test("shows the empty state", async () => {
+  cfg.users = [];
+  renderWithMe(<PermissionsDashboard />);
+  await screen.findByText("Nenhum usuário registrado");
+});
+
+test("shows an error with retry when the API fails", async () => {
+  cfg.failUsers = true;
+  renderWithMe(<PermissionsDashboard />);
+  await screen.findByText("Não foi possível carregar as permissões");
+  cfg.failUsers = false;
+  fireEvent.click(screen.getByText("Tentar novamente"));
+  await screen.findByRole("option", { name: /alice/ });
+});
+
+test("shows an error when the request itself rejects", async () => {
+  cfg.malformedUsers = true;
+  renderWithMe(<PermissionsDashboard />);
+  await screen.findByText("Não foi possível carregar as permissões");
+});
+
+test("toasts when a user's grants cannot be loaded", async () => {
+  cfg.malformedGrants = true;
+  renderWithMe(<PermissionsDashboard />);
+  await screen.findByText("Falha ao carregar permissões do usuário");
+});
+
+test("lists every camera and device with its grant state", async () => {
   cfg.grants = {
-    routes: [],
+    routes: [{ id: "m", routeKey: MANAGER, status: "ok" }],
     resources: [
-      { id: "r1", resourceType: "tuya_device", resourceId: "d1", action: "read", label: "Lamp", status: "ok" },
+      { id: "r1", resourceType: "frigate_camera", resourceId: "frente", action: "read", label: "frente", status: "ok" },
       { id: "r2", resourceType: "tuya_device", resourceId: "d1", action: "write", label: "Lamp", status: "ok" },
     ],
   };
-  renderWithMe(<PermissionsDashboard />);
-  await screen.findByText(/Lamp — Editar/);
-  expect(screen.queryByText("(inclui leitura)")).toBeNull();
+  await renderLoaded();
+  await screen.findByText("Gerenciador de permissões");
+  const cameras = section("Câmeras");
+  expect(within(cameras).getByText("(1/2)")).toBeTruthy();
+  expect(within(cameras).getByLabelText("Ler frente").getAttribute("aria-pressed")).toBe("true");
+  expect(within(cameras).getByLabelText("Ler tras").getAttribute("aria-pressed")).toBe("false");
+  // write implies read: the read chip shows as on, but can't be toggled.
+  const impliedRead = screen.getByLabelText("Ler Lamp") as HTMLButtonElement;
+  expect(impliedRead.getAttribute("aria-pressed")).toBe("true");
+  expect(impliedRead.disabled).toBe(true);
+  expect(screen.getByText("Recursos (2)")).toBeTruthy();
+  fireEvent.click(screen.getByLabelText("Abrir menu"));
 });
 
-test("adds a route grant", async () => {
-  renderWithMe(<PermissionsDashboard />);
-  await screen.findByText("alice");
-  fireEvent.change(screen.getByLabelText("Rota"), { target: { value: "GET /api/tuya/devices" } });
-  fireEvent.click(screen.getAllByText("Adicionar")[0]!);
-  await screen.findByText("Permissão de rota concedida");
-  expect(calls.some((c) => c.method === "POST" && c.path.endsWith("/route-grants"))).toBe(true);
+test("switches the selected user", async () => {
+  await renderLoaded();
+  fireEvent.click(screen.getByRole("option", { name: /bob/ }));
+  await screen.findByText("uid: uid-2");
+  await waitFor(() =>
+    expect(calls.some((c) => c.path === "/api/permissions/users/u2/grants")).toBe(true),
+  );
 });
 
-test("adds a resource grant with an action", async () => {
-  renderWithMe(<PermissionsDashboard />);
-  await screen.findByText("alice");
-  fireEvent.change(screen.getByLabelText("Recurso"), { target: { value: "tuya_device:d1" } });
-  await screen.findByLabelText("Ação");
-  fireEvent.change(screen.getByLabelText("Ação"), { target: { value: "write" } });
-  fireEvent.click(screen.getAllByText("Adicionar")[1]!);
-  await screen.findByText("Permissão de recurso concedida");
-  const post = calls.find((c) => c.method === "POST" && c.path.endsWith("/resource-grants"));
-  expect(post?.body).toEqual({ resourceType: "tuya_device", resourceId: "d1", action: "write" });
-});
+test("toggles a resource grant on and off", async () => {
+  await renderLoaded();
+  fireEvent.click(screen.getByLabelText("Ler tras"));
+  await waitFor(() => expect(posts("/resource-grants").length).toBe(1));
+  expect(posts("/resource-grants")[0]!.body).toEqual({
+    resourceType: "frigate_camera",
+    resourceId: "tras",
+    action: "read",
+  });
 
-test("removes a resource grant and surfaces failures", async () => {
+  cleanup();
   cfg.grants = {
     routes: [],
     resources: [
-      { id: "r1", resourceType: "tuya_device", resourceId: "d1", action: "read", label: "Lamp", status: "ok" },
+      { id: "r1", resourceType: "frigate_camera", resourceId: "tras", action: "read", label: "tras", status: "ok" },
     ],
   };
-  cfg.failResourceDelete = true;
-  renderWithMe(<PermissionsDashboard />);
-  await screen.findByText(/Lamp — Ler/);
-  fireEvent.click(screen.getByText("Remover"));
-  await screen.findByText("boom");
+  await renderLoaded();
+  await waitFor(() =>
+    expect(screen.getByLabelText("Ler tras").getAttribute("aria-pressed")).toBe("true"),
+  );
+  fireEvent.click(screen.getByLabelText("Ler tras"));
+  await waitFor(() => expect(deletes("/resource-grants/r1").length).toBe(1));
 });
 
-test("removes a route grant, confirming the user's own management grant", async () => {
+test("grants read on a whole section and removes it again", async () => {
   cfg.grants = {
-    routes: [
-      { id: "m", routeKey: "POST /api/permissions/users/:id/route-grants", status: "ok" },
+    routes: [],
+    resources: [
+      { id: "r1", resourceType: "frigate_camera", resourceId: "frente", action: "read", label: "frente", status: "ok" },
     ],
+  };
+  await renderLoaded();
+  await within(section("Câmeras")).findByText("(1/2)");
+  fireEvent.click(within(section("Câmeras")).getByText("Liberar leitura de todos"));
+  await waitFor(() => expect(posts("/resource-grants").length).toBe(1));
+  expect(posts("/resource-grants")[0]!.body.resourceId).toBe("tras");
+  fireEvent.click(within(section("Câmeras")).getByText("Remover todos"));
+  await waitFor(() => expect(deletes("/resource-grants/").length).toBe(1));
+});
+
+test("surfaces failed resource grants and removals", async () => {
+  cfg.failResourceGrant = true;
+  cfg.failResourceDelete = true;
+  cfg.grants = {
+    routes: [],
+    resources: [
+      { id: "r1", resourceType: "cron_job", resourceId: "job", action: "read", label: "Job", status: "ok" },
+    ],
+  };
+  await renderLoaded();
+  fireEvent.click(screen.getByLabelText("Ler frente"));
+  await screen.findByText("boom");
+  await waitFor(() =>
+    expect(screen.getByLabelText("Ler Job").getAttribute("aria-pressed")).toBe("true"),
+  );
+  fireEvent.click(screen.getByLabelText("Ler Job"));
+  await waitFor(() => expect(screen.getAllByText("boom").length).toBe(2));
+});
+
+test("orphaned grants can be removed but not granted", async () => {
+  cfg.frigateAvailable = false;
+  cfg.resources = [];
+  cfg.grants = {
+    routes: [],
+    resources: [
+      { id: "r1", resourceType: "frigate_camera", resourceId: "cam", action: "read", label: null, status: "unverified" },
+    ],
+  };
+  await renderLoaded();
+  await screen.findByText("Frigate indisponível: câmeras não verificadas.");
+  await screen.findByText("(não verificada)");
+  const removeAll = within(section("Câmeras")).getByText("Remover todos");
+  expect(
+    (within(section("Câmeras")).getByText("Liberar leitura de todos") as HTMLButtonElement).disabled,
+  ).toBe(true);
+  fireEvent.click(removeAll);
+  await waitFor(() => expect(deletes("/resource-grants/r1").length).toBe(1));
+});
+
+test("filters resources by search", async () => {
+  await renderLoaded();
+  fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "lamp" } });
+  expect(screen.getByText("Lamp")).toBeTruthy();
+  expect(screen.queryByRole("region", { name: "Câmeras" })).toBeNull();
+});
+
+test("routes tab toggles, bulk-grants and filters routes", async () => {
+  cfg.grants = {
+    routes: [{ id: "g1", routeKey: "GET /api/tuya/devices", status: "ok" }],
+    resources: [],
+  };
+  await renderLoaded();
+  fireEvent.click(screen.getByRole("tab", { name: /Rotas/ }));
+  const tuya = section("Tuya");
+  await within(tuya).findByText("(1/2)");
+  expect(screen.getByText("TRACE")).toBeTruthy();
+
+  const [listSwitch, deleteSwitch] = within(tuya).getAllByRole("switch");
+  fireEvent.click(deleteSwitch!);
+  await waitFor(() => expect(posts("/route-grants").length).toBe(1));
+  expect(posts("/route-grants")[0]!.body).toEqual({ routeKey: "DELETE /api/tuya/devices/:id" });
+
+  fireEvent.click(listSwitch!);
+  await waitFor(() => expect(deletes("/route-grants/g1").length).toBe(1));
+
+  fireEvent.click(within(section("Permissions")).getByText("Liberar todas"));
+  await waitFor(() => expect(posts("/route-grants").length).toBe(2));
+
+  fireEvent.click(within(tuya).getByText("Remover todas"));
+  await waitFor(() => expect(deletes("/route-grants/g1").length).toBe(2));
+
+  fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "odd" } });
+  expect(screen.queryByRole("region", { name: "Tuya" })).toBeNull();
+  expect(screen.getByRole("region", { name: "Other" })).toBeTruthy();
+});
+
+test("removing your own manager grant asks for confirmation", async () => {
+  cfg.grants = {
+    routes: [{ id: "m", routeKey: MANAGER, status: "ok" }],
     resources: [],
   };
   renderWithMe(<PermissionsDashboard />, {
@@ -172,95 +342,42 @@ test("removes a route grant, confirming the user's own management grant", async 
     routes: [],
     resources: [],
   });
-  await screen.findByText("POST /api/permissions/users/:id/route-grants");
-  fireEvent.click(screen.getByText("Remover"));
-  const confirm = await screen.findByText("Confirmar");
-  fireEvent.click(confirm);
-  await screen.findByText("Permissão removida");
+  await screen.findByRole("option", { name: /alice/ });
+  fireEvent.click(screen.getByRole("tab", { name: /Rotas/ }));
+  await within(section("Permissions")).findByText("(1/1)");
+
+  fireEvent.click(within(section("Permissions")).getByRole("switch"));
+  fireEvent.click(await screen.findByText("Cancelar"));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(deletes("/route-grants/m").length).toBe(0);
+
+  fireEvent.click(within(section("Permissions")).getByRole("switch"));
+  fireEvent.click(await screen.findByText("Confirmar"));
+  await waitFor(() => expect(deletes("/route-grants/m").length).toBe(1));
 });
 
-test("shows the empty state", async () => {
-  cfg.users = [];
-  renderWithMe(<PermissionsDashboard />);
-  await screen.findByText("Nenhum usuário registrado");
-});
-
-test("notes when frigate is unavailable", async () => {
-  cfg.frigateAvailable = false;
-  cfg.resources = [];
-  renderWithMe(<PermissionsDashboard />);
-  await screen.findByText("Frigate indisponível: câmeras não verificadas.");
-});
-
-test("shows the loading state", () => {
-  renderWithMe(<PermissionsDashboard />);
-  expect(screen.getByText("Carregando permissões...")).toBeTruthy();
-});
-
-test("surfaces a failed route grant as an error toast", async () => {
-  cfg.failRouteGrant = true;
-  renderWithMe(<PermissionsDashboard />);
-  await screen.findByText("alice");
-  fireEvent.change(screen.getByLabelText("Rota"), { target: { value: "GET /api/tuya/devices" } });
-  fireEvent.click(screen.getAllByText("Adicionar")[0]!);
-  await screen.findByText("boom");
-});
-
-test("surfaces a failed resource grant as an error toast", async () => {
-  cfg.failResourceGrant = true;
-  renderWithMe(<PermissionsDashboard />);
-  await screen.findByText("alice");
-  fireEvent.change(screen.getByLabelText("Recurso"), { target: { value: "tuya_device:d1" } });
-  await screen.findByLabelText("Ação");
-  fireEvent.click(screen.getAllByText("Adicionar")[1]!);
-  await screen.findByText("boom");
-});
-
-test("removes a resource grant successfully", async () => {
-  cfg.grants = {
-    routes: [],
-    resources: [
-      { id: "r1", resourceType: "tuya_device", resourceId: "d1", action: "read", label: "Lamp", status: "ok" },
-    ],
-  };
-  renderWithMe(<PermissionsDashboard />);
-  await screen.findByText(/Lamp — Ler/);
-  fireEvent.click(screen.getByText("Remover"));
-  await screen.findByText("Permissão removida");
-});
-
-test("surfaces a failed route grant removal", async () => {
-  cfg.grants = {
-    routes: [
-      { id: "g1", routeKey: "GET /api/tuya/devices", status: "ok" },
-    ],
-    resources: [],
-  };
+test("lists orphaned route grants and surfaces failures", async () => {
   cfg.failRouteDelete = true;
-  renderWithMe(<PermissionsDashboard />);
-  await screen.findByText("GET /api/tuya/devices");
-  fireEvent.click(screen.getByText("Remover"));
-  await screen.findByText("boom");
-});
-
-test("shows the server's 409 message when the last manager cannot be removed", async () => {
   cfg.grants = {
-    routes: [
-      { id: "g1", routeKey: "GET /api/tuya/devices", status: "ok" },
-    ],
+    routes: [{ id: "g2", routeKey: "GET /api/gone", status: "orphaned" }],
     resources: [],
   };
-  cfg.routeDeleteError = "Cannot remove the last permission manager";
-  renderWithMe(<PermissionsDashboard />);
-  await screen.findByText("GET /api/tuya/devices");
+  await renderLoaded();
+  fireEvent.click(screen.getByRole("tab", { name: /Rotas/ }));
+  await screen.findByText("GET /api/gone");
+  expect(screen.getByText("(órfã)")).toBeTruthy();
   fireEvent.click(screen.getByText("Remover"));
   await screen.findByText("Cannot remove the last permission manager");
 });
 
-test("ignores add clicks without a selection", async () => {
-  renderWithMe(<PermissionsDashboard />);
-  await screen.findByText("alice");
-  fireEvent.click(screen.getAllByText("Adicionar")[0]!);
-  fireEvent.click(screen.getAllByText("Adicionar")[1]!);
-  await waitFor(() => expect(screen.queryByText("Permissão de rota concedida")).toBeNull());
+test("surfaces failed and rejected route grants", async () => {
+  cfg.failRouteGrant = true;
+  await renderLoaded();
+  fireEvent.click(screen.getByRole("tab", { name: /Rotas/ }));
+  fireEvent.click(within(section("Other")).getByRole("switch"));
+  await screen.findByText("boom");
+
+  cfg.malformedRouteGrant = true;
+  fireEvent.click(within(section("Other")).getByRole("switch"));
+  await screen.findByText("Falha ao conceder rota");
 });
