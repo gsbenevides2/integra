@@ -316,6 +316,24 @@ test("filters resources by search", async () => {
   expect(screen.queryByRole("region", { name: "Câmeras" })).toBeNull();
 });
 
+test("shows each device and sensor kind and searches by it", async () => {
+  cfg.resources = [
+    ...resourceOptions,
+    { resourceType: "tuya_sensor", resourceId: "s1", label: "Entrada", actions: ["read"], kind: "door" },
+    { resourceType: "tuya_sensor", resourceId: "s2", label: "Sala", actions: ["read"], kind: "motion" },
+    { resourceType: "tuya_sensor", resourceId: "s3", label: "Novo", actions: ["read"], kind: "weird" },
+    { resourceType: "tuya_device", resourceId: "d2", label: "Teto", actions: ["read"], kind: "lamp" },
+  ];
+  await renderLoaded();
+  expect(within(section("Sensores Tuya")).getByText("Porta")).toBeTruthy();
+  expect(within(section("Sensores Tuya")).getByText("Presença")).toBeTruthy();
+  expect(within(section("Sensores Tuya")).getByText("weird")).toBeTruthy();
+  expect(within(section("Dispositivos Tuya")).getByText("Lâmpada")).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "presenca" } });
+  expect(screen.getByText("Sala")).toBeTruthy();
+  expect(screen.queryByText("Entrada")).toBeNull();
+});
+
 test("routes tab toggles, bulk-grants and filters routes", async () => {
   cfg.grants = {
     routes: [{ id: "g1", routeKey: "GET /api/tuya/devices", status: "ok" }],

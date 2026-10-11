@@ -62,6 +62,7 @@ interface ResourceOption {
   resourceId: string;
   label: string;
   actions: string[];
+  kind?: string;
 }
 
 type Tab = "resources" | "routes";
@@ -82,6 +83,16 @@ export const ACTION_LABELS: Record<string, string> = {
   write: "Editar",
   apply: "Aplicar",
   execute: "Executar",
+};
+
+/** What a Tuya device or sensor is, shown next to its name. */
+export const KIND_LABELS: Record<string, string> = {
+  lamp: "Lâmpada",
+  switch: "Interruptor",
+  door: "Porta",
+  motion: "Presença",
+  temperature_humidity: "Temperatura e umidade",
+  unknown: "Desconhecido",
 };
 
 const STATUS_FLAGS: Record<string, string> = {
@@ -131,6 +142,7 @@ interface ResourceRow {
   resourceId: string;
   label: string;
   actions: string[];
+  kind?: string;
   /** Set when the resource only exists as a grant (no longer in the catalog). */
   flag?: string;
 }
@@ -183,6 +195,17 @@ export function buildResourceSections(
       type,
       rows: rows.sort((a, b) => a.label.localeCompare(b.label)),
     }));
+}
+
+function KindBadge({ kind }: { kind?: string }) {
+  if (!kind) return null;
+  return (
+    <span className="
+      ml-2 rounded-full bg-gray-700 px-2 py-0.5 text-xs text-mist-300
+    ">
+      {KIND_LABELS[kind] ?? kind}
+    </span>
+  );
 }
 
 function FlagText({ flag }: { flag?: string }) {
@@ -562,7 +585,12 @@ export function PermissionsDashboard() {
           )}
           {sections.map(({ type, rows }) => {
             const visible = rows.filter((row) =>
-              matchesSearch(search, row.label, row.resourceId),
+              matchesSearch(
+                search,
+                row.label,
+                row.resourceId,
+                row.kind ? (KIND_LABELS[row.kind] ?? row.kind) : "",
+              ),
             );
             if (visible.length === 0) return null;
             const typeLabel = RESOURCE_TYPE_LABELS[type] ?? type;
@@ -643,6 +671,7 @@ export function PermissionsDashboard() {
                       >
                         <span className="min-w-0 text-sm text-mist-100">
                           {row.label}
+                          <KindBadge kind={row.kind} />
                           <FlagText flag={row.flag} />
                         </span>
                         <div className="flex flex-wrap gap-1">

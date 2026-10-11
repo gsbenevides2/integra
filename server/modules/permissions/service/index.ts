@@ -86,11 +86,15 @@ export interface ResourceOption {
   resourceId: string;
   label: string;
   actions: ResourceAction[];
+  /** Tuya devices and sensors only: what the thing is (lamp, door sensor, ...). */
+  kind?: string;
 }
 
 export interface Catalog {
   /** id → label for every resource without an external source of truth. */
   labels: Record<ResourceType, Map<string, string>>;
+  /** id → kind for Tuya devices and sensors. */
+  kinds: Map<string, string>;
   /** Camera names, or null when Frigate is unreachable. */
   cameras: Map<string, string> | null;
 }
@@ -100,8 +104,12 @@ const TUYA_TYPES: ResourceType[] = ["tuya_device", "tuya_sensor", "tuya_preset"]
 /** Reads the database-backed resources plus Frigate's camera list. */
 export async function loadCatalog(): Promise<Catalog> {
   const [devices, sensors, presets] = await Promise.all([
-    db.select({ id: tuyaDevices.id, name: tuyaDevices.name }).from(tuyaDevices),
-    db.select({ id: tuyaSensors.id, name: tuyaSensors.name }).from(tuyaSensors),
+    db
+      .select({ id: tuyaDevices.id, name: tuyaDevices.name, kind: tuyaDevices.kind })
+      .from(tuyaDevices),
+    db
+      .select({ id: tuyaSensors.id, name: tuyaSensors.name, kind: tuyaSensors.kind })
+      .from(tuyaSensors),
     db.select({ id: tuyaPresets.id, name: tuyaPresets.name }).from(tuyaPresets),
   ]);
 
@@ -114,6 +122,11 @@ export async function loadCatalog(): Promise<Catalog> {
     ),
     frigate_camera: new Map(),
   };
+  const kinds = new Map<string, string>(
+    [...devices, ...sensors]
+      .filter((row) => row.kind)
+      .map((row) => [row.id, row.kind]),
+  );
 
   let cameras: Map<string, string> | null = null;
   try {
@@ -130,7 +143,7 @@ export async function loadCatalog(): Promise<Catalog> {
     cameras = null;
   }
 
-  return { labels, cameras };
+  return { labels, kinds, cameras };
 }
 
 function sourceFor(
@@ -487,6 +500,7 @@ export async function listResources(): Promise<{
         resourceId,
         label,
         actions: VALID_ACTIONS[type],
+        kind: type === "tuya_preset" ? undefined : catalog.kinds.get(resourceId),
       });
     }
   }

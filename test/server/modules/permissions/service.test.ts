@@ -42,8 +42,8 @@ function mockFrigate(response: Response | Error) {
       : Promise.resolve(response)) as never);
 }
 function queueCatalog(
-  devices: { id: string; name: string }[] = [],
-  sensors: { id: string; name: string }[] = [],
+  devices: { id: string; name: string; kind?: string }[] = [],
+  sensors: { id: string; name: string; kind?: string }[] = [],
   presets: { id: string; name: string }[] = [],
 ) {
   fakeDbResults.push(devices, sensors, presets);
@@ -293,10 +293,19 @@ describe("pickers", () => {
   });
 
   test("listResources gathers tuya, cron and cameras", async () => {
-    queueCatalog([{ id: "d1", name: "L" }], [{ id: "s1", name: "S" }], [{ id: "p1", name: "P" }]);
+    queueCatalog(
+      [{ id: "d1", name: "L", kind: "lamp" }],
+      [{ id: "s1", name: "S", kind: "door" }, { id: "s2", name: "Old" }],
+      [{ id: "p1", name: "P" }],
+    );
     mockFrigate(new Response(JSON.stringify({ cameras: { cam1: {} } }), { status: 200 }));
     const result = await service.listResources();
     expect(result.frigateAvailable).toBe(true);
+    const kindOf = (id: string) => result.resources.find((r) => r.resourceId === id)?.kind;
+    expect(kindOf("d1")).toBe("lamp");
+    expect(kindOf("s1")).toBe("door");
+    expect(kindOf("s2")).toBeUndefined();
+    expect(kindOf("p1")).toBeUndefined();
     expect(result.resources.map((r) => r.resourceType)).toEqual(
       expect.arrayContaining(["tuya_device", "tuya_sensor", "tuya_preset", "cron_job", "frigate_camera"]),
     );
