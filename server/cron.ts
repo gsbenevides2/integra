@@ -125,7 +125,7 @@ const jobDefinitions: Array<{
     label: "Alarme de trens",
     // odd minutes: one minute after trainStatus.check (*/2)
     schedule: "1/2 * * * *",
-    fn: checkTrainLinesAlarm,
+    fn: () => checkTrainLinesAlarm(),
   },
   {
     name: "statusPlatform.check",

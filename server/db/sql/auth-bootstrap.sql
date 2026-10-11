@@ -145,6 +145,7 @@ CROSS JOIN (
     ('google.gmail.accesscode'),
     ('google.gmail.payslip'),
     ('trainStatus.check'),
+    ('trainStatus.alarm'),
     ('statusPlatform.check'),
     ('serverMetrics.collect'),
     ('serverMetrics.speedtest'),
