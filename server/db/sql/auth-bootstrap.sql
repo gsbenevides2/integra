@@ -19,13 +19,16 @@
 --     -f server/db/sql/auth-bootstrap.sql
 --
 -- Omit the -v service_* pairs to skip the service-account section.
+--
+-- The id columns have no database default (Drizzle generates them in the app),
+-- so every insert here generates its own with gen_random_uuid() (PostgreSQL 13+).
 -- =============================================================================
 
 BEGIN;
 
 -- 1. The owner's user row.
-INSERT INTO auth.users (uid, username)
-VALUES (:'owner_uid', :'owner_username')
+INSERT INTO auth.users (id, uid, username)
+VALUES (gen_random_uuid()::text, :'owner_uid', :'owner_username')
 ON CONFLICT (uid) DO NOTHING;
 
 -- 2. Every guarded route key, including the permission management routes and
@@ -95,32 +98,32 @@ WITH route_keys(route_key) AS (
     ('GET /api/permissions/routes'),
     ('GET /api/permissions/resources')
 )
-INSERT INTO auth.route_grants ("userId", "routeKey")
-SELECT u.id, r.route_key
+INSERT INTO auth.route_grants (id, "userId", "routeKey")
+SELECT gen_random_uuid()::text, u.id, r.route_key
 FROM auth.users u
 CROSS JOIN route_keys r
 WHERE u.uid = :'owner_uid'
 ON CONFLICT ("userId", "routeKey") DO NOTHING;
 
 -- 3. All actions on every existing Tuya resource.
-INSERT INTO auth.resource_grants ("userId", "resourceType", "resourceId", action)
-SELECT u.id, 'tuya_device', d.id, a.action
+INSERT INTO auth.resource_grants (id, "userId", "resourceType", "resourceId", action)
+SELECT gen_random_uuid()::text, u.id, 'tuya_device'::auth.resource_type, d.id, a.action::auth.resource_action
 FROM auth.users u
 CROSS JOIN tuya.devices d
 CROSS JOIN (VALUES ('read'), ('write')) AS a(action)
 WHERE u.uid = :'owner_uid'
 ON CONFLICT ("userId", "resourceType", "resourceId", action) DO NOTHING;
 
-INSERT INTO auth.resource_grants ("userId", "resourceType", "resourceId", action)
-SELECT u.id, 'tuya_sensor', s.id, a.action
+INSERT INTO auth.resource_grants (id, "userId", "resourceType", "resourceId", action)
+SELECT gen_random_uuid()::text, u.id, 'tuya_sensor'::auth.resource_type, s.id, a.action::auth.resource_action
 FROM auth.users u
 CROSS JOIN tuya.sensors s
 CROSS JOIN (VALUES ('read'), ('write')) AS a(action)
 WHERE u.uid = :'owner_uid'
 ON CONFLICT ("userId", "resourceType", "resourceId", action) DO NOTHING;
 
-INSERT INTO auth.resource_grants ("userId", "resourceType", "resourceId", action)
-SELECT u.id, 'tuya_preset', p.id, a.action
+INSERT INTO auth.resource_grants (id, "userId", "resourceType", "resourceId", action)
+SELECT gen_random_uuid()::text, u.id, 'tuya_preset'::auth.resource_type, p.id, a.action::auth.resource_action
 FROM auth.users u
 CROSS JOIN tuya.presets p
 CROSS JOIN (VALUES ('read'), ('write'), ('apply')) AS a(action)
@@ -128,8 +131,8 @@ WHERE u.uid = :'owner_uid'
 ON CONFLICT ("userId", "resourceType", "resourceId", action) DO NOTHING;
 
 -- 4. read + execute on every job registered when this file was written.
-INSERT INTO auth.resource_grants ("userId", "resourceType", "resourceId", action)
-SELECT u.id, 'cron_job', j.name, a.action
+INSERT INTO auth.resource_grants (id, "userId", "resourceType", "resourceId", action)
+SELECT gen_random_uuid()::text, u.id, 'cron_job'::auth.resource_type, j.name, a.action::auth.resource_action
 FROM auth.users u
 CROSS JOIN (
   VALUES
@@ -154,12 +157,12 @@ ON CONFLICT ("userId", "resourceType", "resourceId", action) DO NOTHING;
 --    route grant. The whole section is skipped when owner_uid's companion
 --    service variables are absent.
 \if :{?service_uid}
-INSERT INTO auth.users (uid, username)
-VALUES (:'service_uid', :'service_username')
+INSERT INTO auth.users (id, uid, username)
+VALUES (gen_random_uuid()::text, :'service_uid', :'service_username')
 ON CONFLICT (uid) DO NOTHING;
 
-INSERT INTO auth.route_grants ("userId", "routeKey")
-SELECT u.id, 'POST /api/authentik/login-failed'
+INSERT INTO auth.route_grants (id, "userId", "routeKey")
+SELECT gen_random_uuid()::text, u.id, 'POST /api/authentik/login-failed'
 FROM auth.users u
 WHERE u.uid = :'service_uid'
 ON CONFLICT ("userId", "routeKey") DO NOTHING;
