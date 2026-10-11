@@ -14,10 +14,12 @@
 -- Authentik login_failed service account:
 --
 --   psql "$DATABASE_URL" \
---     -v owner_uid="'<your-uid>'"     -v owner_username="'<your-username>'" \
---     -v service_uid="'<svc-uid>'"     -v service_username="'<svc-username>'" \
+--     -v owner_uid='<your-uid>'     -v owner_username='<your-username>' \
+--     -v service_uid='<svc-uid>'     -v service_username='<svc-username>' \
 --     -f server/db/sql/auth-bootstrap.sql
 --
+-- Pass the raw values: the script quotes them itself (:'owner_uid'), so values
+-- wrapped in extra SQL quotes would be stored with literal quote characters.
 -- Omit the -v service_* pairs to skip the service-account section.
 --
 -- The id columns have no database default (Drizzle generates them in the app),

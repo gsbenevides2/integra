@@ -52,8 +52,6 @@ function queueCatalog(
 beforeEach(() => {
   resetFakeDb();
   authz.registerGuardedRoutes({ routes: [] });
-  mockFrigate(new Response("nope", { status: 500 }));
-  fetchSpy?.mockRestore();
   mockFrigate(new Response(JSON.stringify({ cameras: {} }), { status: 200 }));
 });
 
