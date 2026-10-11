@@ -8,13 +8,13 @@ import { tuyaDashboard } from "@public/dashboards/tuya";
 import { openobserveLogs } from "@openobserve/browser-logs";
 import { openobserveRum } from "@openobserve/browser-rum";
 import { act } from "@testing-library/react";
-import { expect, spyOn, test } from "bun:test";
+import { afterAll, expect, spyOn, test } from "bun:test";
 
 import { ME_FIXTURE } from "../helpers/me";
 
 // The OTLP span exporter would otherwise flush over the (absent) network.
-spyOn(XMLHttpRequest.prototype, "send").mockImplementation(() => {});
-spyOn(globalThis, "fetch").mockImplementation((async (input: unknown) => {
+const xhrSend = spyOn(XMLHttpRequest.prototype, "send").mockImplementation(() => {});
+const fetchSpy = spyOn(globalThis, "fetch").mockImplementation((async (input: unknown) => {
   const url = String(input);
   if (url.includes("/api/me")) {
     return new Response(JSON.stringify(ME_FIXTURE), {
@@ -23,6 +23,13 @@ spyOn(globalThis, "fetch").mockImplementation((async (input: unknown) => {
   }
   return new Response("{}");
 }) as never);
+
+// Restore the globals: a later file's spyOn(fetch) would otherwise reuse this
+// spy and see its recorded /api/me call.
+afterAll(() => {
+  fetchSpy.mockRestore();
+  xhrSend.mockRestore();
+});
 
 test("entry point mounts the app and boots instrumentation + service worker", async () => {
   const spies = [
