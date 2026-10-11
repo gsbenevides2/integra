@@ -1,3 +1,5 @@
+import { authz } from "@server/shared/authz";
+
 import Elysia from "elysia";
 import { z } from "zod";
 
@@ -9,6 +11,7 @@ export const trainStatusRoutes = new Elysia({
     tags: ["TrainStatus"],
   },
 })
+  .use(authz)
   .get("/lines", () => TrainStatusService.listLatest(), {
     detail: {
       summary: "List Train Lines",

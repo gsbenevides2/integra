@@ -10,6 +10,28 @@ There is no CLI argument parser (no `--only-run`, `--debug`, `--only`) — the o
 |----------|---------|---------|
 | `NODE_ENV` | `production` enables cron jobs and disables Bun's dev/HMR mode | unset |
 | `ENABLE_CRONS` | `true` runs cron jobs even when `NODE_ENV !== "production"` — use to test one job locally | unset |
+| `USER_UID` | Development-only identity override: the Authentik UID to act as. Both this and `USER_NAME` must be set; ignored when `NODE_ENV=production` and ignored whenever a request carries `x-authentik-uid` | unset |
+| `USER_NAME` | Development-only identity override: the username paired with `USER_UID` | unset |
+
+## Authentication (Authentik forwardAuth)
+
+Every `/api/*` route, plus `GET /openapi` and `GET /openapi/json`, is deny-all: a request is only allowed when it carries an identity and the user holds the matching **route grant**. Access comes exclusively from explicit grants; there is no admin bypass.
+
+The app trusts the headers the Authentik proxy outpost injects. It never validates a JWT itself:
+
+- `x-authentik-uid` — required; becomes `auth.users.uid`.
+- `x-authentik-username` — required; stored in `auth.users.username`.
+- `x-authentik-name` — optional; shown in the drawer and `/api/me`, never stored, falls back to the username.
+
+**Deployment requirements** (infrastructure, not this repository):
+
+1. forwardAuth must cover the whole host, on every path.
+2. The outpost response must overwrite the identity headers (in Traefik, list `X-authentik-uid`, `X-authentik-username`, `X-authentik-name` in `authResponseHeaders`), so a client cannot forge them.
+3. The app port must not be published directly; the app is reachable only through the proxy.
+
+**Development override.** Outside production, when both `USER_UID` and `USER_NAME` are set and a request has no `x-authentik-uid`, those values are used. The header always wins. If only one variable is set, the server logs a warning and the override is ignored. `test/setup.ts` never sets them. The production `Dockerfile` sets `NODE_ENV=production`, so the override cannot activate in the deployed image.
+
+**Bootstrap.** The first permission manager must be seeded manually, because a brand-new user has zero grants. Run the idempotent `server/db/sql/auth-bootstrap.sql` with your own UID and username (and optionally the `login_failed` service account) as described in the file header. It grants the owner every guarded route plus every existing Tuya resource and cron job. Frigate cameras are not in the database, so grant them through the **Permissões** dashboard afterwards. A service account omitted from the bootstrap is auto-created with zero grants on its first webhook call (which returns `403`); grant it `POST /api/authentik/login-failed` through the dashboard.
 
 ## Core
 

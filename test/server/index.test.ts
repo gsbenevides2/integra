@@ -1,3 +1,5 @@
+import { MANAGER_ROUTE_KEY } from "@server/modules/permissions/constants";
+
 import { afterAll, expect, mock, spyOn, test } from "bun:test";
 
 const envKeys = ["DATABASE_URL", "TUYA_ACCESS_ID", "TUYA_ACCESS_SECRET", "NODE_ENV", "ENABLE_CRONS"];
@@ -60,5 +62,30 @@ test("serves favicon redirect and service worker", async () => {
   const sw = await mod.app.handle(new Request("http://localhost/sw.js"));
   expect(sw.headers.get("content-type")).toBe("text/javascript");
   expect((await sw.text()).length).toBeGreaterThan(0);
+});
+
+test("guarded route registry has real metadata and the manager key", async () => {
+  const { guardedRoutes, guardedRouteKeys } = await import(
+    "@server/shared/authz"
+  );
+  const routes = guardedRoutes();
+  expect(routes.length).toBeGreaterThan(0);
+  for (const route of routes) {
+    expect(route.tag.trim().length).toBeGreaterThan(0);
+    expect(route.summary.trim().length).toBeGreaterThan(0);
+    // The fallback summary is the route key; a real one never is.
+    expect(route.summary).not.toBe(route.key);
+  }
+  const keys = guardedRouteKeys();
+  expect(keys).toContain(MANAGER_ROUTE_KEY);
+  expect(keys).toContain("GET /openapi");
+  expect(keys).toContain("GET /openapi/json");
+  expect(keys).not.toContain("GET /api/me");
+  expect(keys).not.toContain("POST /v1/traces");
+});
+
+test("bootstrap SQL contains the manager route key", async () => {
+  const sql = await Bun.file("server/db/sql/auth-bootstrap.sql").text();
+  expect(sql).toContain(MANAGER_ROUTE_KEY);
 });
 

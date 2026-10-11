@@ -1,3 +1,5 @@
+import { authz } from "@server/shared/authz";
+
 import Elysia from "elysia";
 
 import { deviceBody, deviceHistoryQuery, interfaceBody, routerStatusHistoryQuery } from "./model";
@@ -10,6 +12,7 @@ export const tplinkRoutes = new Elysia({
   prefix: "/api/tplink",
   detail: { tags: ["TpLink"] },
 })
+  .use(authz)
   .get("/devices", async () => TpLinkDeviceService.listDevices(), {
     detail: { summary: "List devices", description: "Lists all registered TP-Link devices and their interfaces." },
   })

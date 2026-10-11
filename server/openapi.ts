@@ -1,6 +1,9 @@
 import path from "node:path";
 
+import { authz } from "@server/shared/authz";
+
 import { openapi as elysiaOpenapi } from "@elysia/openapi";
+import { Elysia } from "elysia";
 
 import {
   author,
@@ -18,27 +21,31 @@ licenseUrl.pathname = path.posix.join(
   "/blob/main/LICENSE",
 );
 
-export const openapi = elysiaOpenapi({
-  documentation: {
-    info: {
-      title,
-      version,
-      contact: {
-        email: author.email,
-        name: author.name,
-        url: author.url,
+export const openapi = new Elysia()
+  .use(authz)
+  .use(
+    elysiaOpenapi({
+      documentation: {
+        info: {
+          title,
+          version,
+          contact: {
+            email: author.email,
+            name: author.name,
+            url: author.url,
+          },
+          description,
+          license: {
+            name: license,
+            url: licenseUrl.toString(),
+          },
+        },
       },
-      description,
-      license: {
-        name: license,
-        url: licenseUrl.toString(),
+      scalar: {
+        withDefaultFonts: false,
+        showDeveloperTools: "localhost",
+        hideDarkModeToggle: true,
+        forceDarkModeState: "dark",
       },
-    },
-  },
-  scalar: {
-    withDefaultFonts: false,
-    showDeveloperTools: "localhost",
-    hideDarkModeToggle: true,
-    forceDarkModeState: "dark",
-  },
-});
+    }),
+  );

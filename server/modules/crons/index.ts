@@ -1,3 +1,5 @@
+import { authz, currentUser, readableResourceIds } from "@server/shared/authz";
+
 import Elysia from "elysia";
 
 import { jobRegistry } from "../../cron";
@@ -23,21 +25,28 @@ export const cronsRoutes = new Elysia({
   prefix: "/api/crons",
   detail: { tags: ["Crons"] },
 })
+  .use(authz)
   .get(
     "/list",
-    () => {
-      const jobs = Array.from(jobRegistry.entries()).map(([name, info]) => ({
-        name,
-        label: info.label,
-        schedule: info.schedule,
-        scheduleLabel: SCHEDULE_LABELS[info.schedule] ?? info.schedule,
-      }));
+    async (ctx) => {
+      const user = currentUser(ctx);
+      const readable = await readableResourceIds(user.id, "cron_job");
+      const jobs = Array.from(jobRegistry.entries())
+        .filter(([name]) => readable.has(name))
+        .map(([name, info]) => ({
+          name,
+          label: info.label,
+          schedule: info.schedule,
+          scheduleLabel: SCHEDULE_LABELS[info.schedule] ?? info.schedule,
+        }));
       return { ok: true, jobs };
     },
     {
       detail: {
         summary: "List crons",
-        description: "Lists all registered cron jobs with their schedules.",
+        description:
+          "Lists the registered cron jobs the user can read (execute " +
+          "implies read), with their schedules.",
       },
     },
   )

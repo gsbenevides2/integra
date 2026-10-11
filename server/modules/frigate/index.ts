@@ -1,4 +1,9 @@
 import safeEnvGet from "@server/safeEnvGet";
+import {
+  authz,
+  currentUser,
+  readableResourceIds,
+} from "@server/shared/authz";
 import { concatUrlAndResolveTrallingSlash } from "@server/utils/concatUrlAndResolveTrallingSlash";
 
 import Elysia, { redirect, status, StatusMap } from "elysia";
@@ -10,22 +15,26 @@ export const frigateRoutes = new Elysia({
   prefix: "/api/frigate",
   detail: { tags: ["Frigate"] },
 })
+  .use(authz)
   .get(
     "/cameras",
-    async (): Promise<string[]> => {
+    async (ctx): Promise<string[]> => {
+      const user = currentUser(ctx);
       const res = await frigateFetch("/api/config");
       if (!res.ok) throw status(502, { error: "Frigate indisponível" });
       const config = (await res.json()) as {
         cameras: Record<string, { enabled?: boolean }>;
       };
+      const readable = await readableResourceIds(user.id, "frigate_camera");
       return Object.entries(config.cameras)
         .filter(([, camera]) => camera.enabled !== false)
-        .map(([name]) => name);
+        .map(([name]) => name)
+        .filter((name) => readable.has(name));
     },
     {
       detail: {
         summary: "List Cameras",
-        description: "Lists the enabled Frigate cameras.",
+        description: "Lists the enabled Frigate cameras the user can read.",
       },
     },
   )

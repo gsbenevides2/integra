@@ -1,7 +1,8 @@
 import { buildSegments } from "@server/modules/train-status/service/history";
 
-import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 
+import { installTestAuthz } from "../../../helpers/auth";
 import { makeFakeDb } from "../../../helpers/modules-db";
 
 let fake = makeFakeDb();
@@ -19,8 +20,11 @@ mock.module("@server/modules/train-status/service/fetchers", () => ({
 }));
 const { TrainStatusService } = await import("@server/modules/train-status/service/checks");
 const { checkTrainLinesStatus } = await import("@server/modules/train-status/jobs/checkStatus");
+const restoreAuthz = await installTestAuthz();
 const { trainStatusRoutes } = await import("@server/modules/train-status/index");
 const { TRAIN_LINES } = await import("@server/modules/train-status/model");
+
+afterAll(() => restoreAuthz());
 
 let fetchSpy: ReturnType<typeof spyOn>;
 function respond(handler: (url: string) => Response) {

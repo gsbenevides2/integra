@@ -1,11 +1,15 @@
 import { afterAll, describe, expect, mock, test } from "bun:test";
 
+import { installTestAuthz } from "../../../helpers/auth";
+
 mock.module("@server/db", () => ({ db: {} }));
+const restoreAuthz = await installTestAuthz();
 
 const envKeys = ["TUYA_ACCESS_ID", "TUYA_ACCESS_SECRET", "DATABASE_URL"];
 const prev = envKeys.map((k) => process.env[k]);
 for (const k of envKeys) process.env[k] ??= "x";
 afterAll(() => {
+  restoreAuthz();
   envKeys.forEach((k, i) => {
     if (prev[i] === undefined) delete process.env[k];
     else process.env[k] = prev[i];

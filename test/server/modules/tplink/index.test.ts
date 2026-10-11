@@ -2,11 +2,13 @@ import "@server/modules/tplink/model";
 
 import { afterAll, beforeAll, expect, mock, spyOn, test } from "bun:test";
 
+import { installTestAuthz } from "../../../helpers/auth";
 import { createFakeDb } from "../../../helpers/tplink-db";
 
 const fake = createFakeDb();
 let app: { handle: (r: Request) => Promise<Response> };
 let Dev: any, Checks: any, Settings: any, job: typeof import("@server/modules/tplink/jobs/sync");
+let restoreAuthz: () => void;
 const seen: string[] = [];
 const syncSettings = mock(async () => {});
 const restartNetwork = mock(async () => {});
@@ -16,6 +18,7 @@ beforeAll(async () => {
   mock.module("@server/db", () => ({ db: fake.db }));
   realRouter = { ...(await import("@server/modules/tplink/service/router")) };
   mock.module("@server/modules/tplink/service/router", () => ({ ...realRouter, syncSettings, restartNetwork }));
+  restoreAuthz = await installTestAuthz();
   ({ tplinkRoutes: app } = (await import("@server/modules/tplink/index")) as any);
   Dev = (await import("@server/modules/tplink/service/devices")).TpLinkDeviceService;
   Checks = (await import("@server/modules/tplink/service/checks")).TpLinkChecksService;
@@ -31,6 +34,7 @@ beforeAll(async () => {
   }
 });
 afterAll(() => {
+  restoreAuthz?.();
   mock.restore();
   mock.module("@server/modules/tplink/service/router", () => realRouter);
 });

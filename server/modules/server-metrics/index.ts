@@ -1,3 +1,5 @@
+import { authz } from "@server/shared/authz";
+
 import Elysia from "elysia";
 
 import { historyQuery } from "./model";
@@ -9,6 +11,7 @@ export const serverMetricsRoutes = new Elysia({
     tags: ["ServerMetrics"],
   },
 })
+  .use(authz)
   .get("/latest", () => ServerMetricsService.latest(), {
     detail: {
       summary: "Latest Server Snapshot",

@@ -1,3 +1,5 @@
+import { authz } from "@server/shared/authz";
+
 import Elysia, { status } from "elysia";
 
 import { oauthCallbackQuery } from "./model";
@@ -9,6 +11,7 @@ export const googleRoutes = new Elysia({
     tags: ["Google"],
   },
 })
+  .use(authz)
   .get(
     "/oauth/start",
     ({ request }) =>

@@ -4,6 +4,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 
 import { ConfirmDialog, ConfirmProvider } from "@public/components/Confirm";
+import { MeProvider } from "@public/components/MeContext";
 import { ToastContainer, ToastProvider } from "@public/components/Toast";
 
 import { GlobalDrawerProvider } from "./components/GlobalDrawerContext";
@@ -14,14 +15,16 @@ instrumentFrontend();
 
 function App() {
   return (
-    <ToastProvider>
-      <ConfirmProvider>
-        <GlobalDrawerProvider>
-          <ConfirmDialog />
-          <ToastContainer />
-        </GlobalDrawerProvider>
-      </ConfirmProvider>
-    </ToastProvider>
+    <MeProvider>
+      <ToastProvider>
+        <ConfirmProvider>
+          <GlobalDrawerProvider>
+            <ConfirmDialog />
+            <ToastContainer />
+          </GlobalDrawerProvider>
+        </ConfirmProvider>
+      </ToastProvider>
+    </MeProvider>
   );
 }
 

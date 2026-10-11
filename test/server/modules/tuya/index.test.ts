@@ -2,6 +2,7 @@ import { OFFLINE_STATE } from "@server/modules/tuya/model";
 
 import { afterAll, afterEach, beforeAll, expect, spyOn, test } from "bun:test";
 
+import { installTestAuthz } from "../../../helpers/auth";
 import { setTuyaEnv } from "../../../helpers/tuya-cloud";
 import { installFakeDb } from "../../../helpers/tuya-db";
 
@@ -16,6 +17,7 @@ const spies: { mockRestore(): void }[] = [];
 beforeAll(async () => {
   restores.push(setTuyaEnv());
   restores.push(await installFakeDb());
+  restores.push(await installTestAuthz());
   ({ tuyaRoutes: routes } = await import("@server/modules/tuya/index"));
   ({ DeviceService: Device } = await import("@server/modules/tuya/service/devices"));
   ({ PresetService: Preset } = await import("@server/modules/tuya/service/presets"));
