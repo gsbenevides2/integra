@@ -20,6 +20,7 @@ const mods = {
   "@server/modules/server-metrics/jobs/collect": ["collectServerMetrics", "collectSpeedtest"],
   "@server/modules/status-platform/jobs/checkStatus": ["checkPlatformsStatus"],
   "@server/modules/tplink/jobs/sync": ["syncTpLinkData"],
+  "@server/modules/train-status/jobs/alarm": ["checkTrainLinesAlarm"],
   "@server/modules/train-status/jobs/checkStatus": ["checkTrainLinesStatus"],
 } as const;
 
@@ -57,7 +58,7 @@ afterAll(() => {
 });
 
 test("registry lists every job with label and schedule", () => {
-  expect(jobRegistry.size).toBe(12);
+  expect(jobRegistry.size).toBe(13);
   for (const e of jobRegistry.values()) {
     expect(e.label).toBeString();
     expect(e.schedule).toBeString();
@@ -90,11 +91,11 @@ test("registerCrons schedules all jobs in production or when enabled", async () 
   const cron = spyOn(Bun, "cron").mockImplementation((() => {}) as never);
   process.env.NODE_ENV = "production";
   registerCrons();
-  expect(cron).toHaveBeenCalledTimes(12);
+  expect(cron).toHaveBeenCalledTimes(13);
   process.env.NODE_ENV = "development";
   process.env.ENABLE_CRONS = "true";
   registerCrons();
-  expect(cron).toHaveBeenCalledTimes(24);
+  expect(cron).toHaveBeenCalledTimes(26);
   // the scheduled callback is the traced wrapper
   await (cron.mock.calls[0]![1] as unknown as () => Promise<void>)();
   cron.mockRestore();
