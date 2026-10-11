@@ -1,3 +1,4 @@
+import { authz } from "@server/shared/authz";
 import { sendDiscordMessage } from "@server/shared/discord";
 import { sendEvolutionMessage } from "@server/shared/evolution";
 
@@ -11,7 +12,9 @@ export const authentikRoutes = new Elysia({
   detail: {
     tags: ["Authentik"],
   },
-}).post(
+})
+  .use(authz)
+  .post(
   "/login-failed",
   async ({ body }) => {
     const message = generateMessage(

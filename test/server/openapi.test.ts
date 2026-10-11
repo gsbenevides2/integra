@@ -1,7 +1,11 @@
-import { openapi } from "@server/openapi";
-
-import { expect, test } from "bun:test";
+import { afterAll, expect, test } from "bun:test";
 import { Elysia } from "elysia";
+
+import { installTestAuthz } from "../helpers/auth";
+
+const restoreAuthz = await installTestAuthz();
+const { openapi } = await import("@server/openapi");
+afterAll(() => restoreAuthz());
 
 test("openapi plugin serves a spec with project info", async () => {
   const app = new Elysia().use(openapi).get("/x", () => "ok");

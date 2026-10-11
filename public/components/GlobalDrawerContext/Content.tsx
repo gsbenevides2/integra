@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 
+import { initialsOf, useMe } from "@public/components/MeContext";
 import { APP_VERSION } from "@public/version";
 
 import { getRumSessionId } from "../../instrumentFrontend";
@@ -9,7 +10,11 @@ import { useGlobalDrawer } from "./index";
 export function Content() {
   const [sessionId] = useState<string>(() => getRumSessionId() ?? "");
   const toast = useToast();
+  const { me } = useMe();
   const { dashboardList, page, setPage, setIsOpen } = useGlobalDrawer();
+
+  const name = me?.name ?? "";
+  const username = me?.username ?? "";
 
   const copyRumSessionId = () => {
     navigator.clipboard.writeText(sessionId);
@@ -25,11 +30,11 @@ export function Content() {
             bg-blue-900 text-lg
           "
         >
-          GB
+          {initialsOf(name)}
         </div>
         <div className="flex min-w-0 flex-col text-sm">
-          <span className="truncate text-lg">Guilherme Benevides</span>
-          <span className="truncate">gsbenevides2</span>
+          <span className="truncate text-lg">{name}</span>
+          <span className="truncate">{username}</span>
         </div>
       </div>
       <nav className="flex flex-1 flex-col gap-1 px-2">

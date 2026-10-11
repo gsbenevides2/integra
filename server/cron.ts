@@ -69,6 +69,8 @@ function tracedCronJob(name: string, fn: () => Promise<void>) {
   };
 }
 
+// Each job is called through an arrow so it resolves its import at run time
+// (keeps a single module instance mockable in tests).
 const jobDefinitions: Array<{
   name: string;
   label: string;
@@ -86,76 +88,76 @@ const jobDefinitions: Array<{
     name: "google.calendar.schedule",
     label: "Agendar lembretes Google Calendar",
     schedule: "*/10 * * * *",
-    fn: scheduleCalendarMessages,
+    fn: () => scheduleCalendarMessages(),
   },
   {
     name: "google.calendar.send",
     label: "Enviar lembretes agendados",
     schedule: "* * * * *",
-    fn: sendScheduledMessages,
+    fn: () => sendScheduledMessages(),
   },
   {
     name: "google.gmail.support",
     label: "Verificar tickets de suporte",
     schedule: "*/1 * * * *",
-    fn: watchSupportTickets,
+    fn: () => watchSupportTickets(),
   },
   {
     name: "google.gmail.accesscode",
     label: "Limpar e-mails de código de acesso",
     schedule: "0 0 * * *",
-    fn: cleanAccessCodeEmails,
+    fn: () => cleanAccessCodeEmails(),
   },
   {
     name: "google.gmail.payslip",
     label: "Extrair holerites",
     schedule: "0 12 * * *",
-    fn: extractPayslips,
+    fn: () => extractPayslips(),
   },
   {
     name: "trainStatus.check",
     label: "Verificar status de trens",
     schedule: "*/2 * * * *",
-    fn: checkTrainLinesStatus,
+    fn: () => checkTrainLinesStatus(),
   },
   {
     name: "trainStatus.alarm",
     label: "Alarme de trens",
     // odd minutes: one minute after trainStatus.check (*/2)
     schedule: "1/2 * * * *",
-    fn: checkTrainLinesAlarm,
+    fn: () => checkTrainLinesAlarm(),
   },
   {
     name: "statusPlatform.check",
     label: "Verificar status de plataformas",
     // offset by a minute so it does not land on the same second as the */2 and */10 jobs
     schedule: "1/5 * * * *",
-    fn: checkPlatformsStatus,
+    fn: () => checkPlatformsStatus(),
   },
   {
     name: "serverMetrics.collect",
     label: "Coletar métricas do servidor",
     // odd minutes: tplink.sync and trainStatus own the even ones
     schedule: "1/2 * * * *",
-    fn: collectServerMetrics,
+    fn: () => collectServerMetrics(),
   },
   {
     name: "serverMetrics.speedtest",
     label: "Teste de velocidade",
     schedule: "*/30 * * * *",
-    fn: collectSpeedtest,
+    fn: () => collectSpeedtest(),
   },
   {
     name: "tplink.sync",
     label: "Sincronizar TP-Link",
     schedule: "0/2 * * * *",
-    fn: syncTpLinkData,
+    fn: () => syncTpLinkData(),
   },
   {
     name: "birthday.send",
     label: "Enviar mensagem de aniversário",
     schedule: "0 9 * * *",
-    fn: sendBirthdayMessage,
+    fn: () => sendBirthdayMessage(),
   },
 ];
 

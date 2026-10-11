@@ -1,3 +1,12 @@
+import {
+  authz,
+  currentUser,
+  grantAllValidActions,
+  readableResourceIds,
+  type ResourceType,
+  revokeResourceGrants,
+} from "@server/shared/authz";
+
 import Elysia, { status } from "elysia";
 
 import {
@@ -19,18 +28,51 @@ import { PresetService } from "./service/presets";
 import { SensorService } from "./service/sensors";
 import { StateService } from "./service/state";
 
+const DEVICE_AS_SENSOR = {
+  error: "Tuya device ID already registered as a sensor",
+};
+const SENSOR_AS_DEVICE = {
+  error: "Tuya device ID already registered as a device",
+};
+
+/**
+ * Gives the creator every action on a resource it just created. If that fails,
+ * the resource is deleted and any partial grants revoked, so nothing is left
+ * behind that its own creator cannot access.
+ */
+async function grantCreatorOrRollback(
+  userId: string,
+  type: ResourceType,
+  id: string,
+  remove: (id: string) => Promise<unknown>,
+): Promise<void> {
+  try {
+    await grantAllValidActions(userId, type, id);
+  } catch (error) {
+    // Best-effort cleanup: each step runs even if the other fails, and the
+    // caller always gets the original grant error, not a cleanup one.
+    await remove(id).catch(() => {});
+    await revokeResourceGrants(type, id).catch(() => {});
+    throw error;
+  }
+}
+
 export const tuyaRoutes = new Elysia({
   prefix: "/api/tuya",
   detail: {
     tags: ["Tuya"],
   },
 })
+  .use(authz)
   .get(
     "/devices",
-    async ({ query }): Promise<DeviceWithState[]> => {
+    async (ctx): Promise<DeviceWithState[]> => {
+      const user = currentUser(ctx);
+      const readable = await readableResourceIds(user.id, "tuya_device");
       const all = await DeviceService.list();
-      const devices =
-        query.includeHidden === "true" ? all : all.filter((d) => !d.hidden);
+      const devices = (
+        ctx.query.includeHidden === "true" ? all : all.filter((d) => !d.hidden)
+      ).filter((device) => readable.has(device.id));
       const states = await StateService.getLatestStates(
         devices.map((device) => device.id),
       );
@@ -44,21 +86,40 @@ export const tuyaRoutes = new Elysia({
         summary: "List Devices",
         description:
           "Lists configured devices with their latest known state. Hidden " +
-          "devices are left out unless includeHidden is set.",
+          "devices are left out unless includeHidden is set. Only devices the " +
+          "user can read are returned.",
       },
       query: includeHiddenQuery,
     },
   )
-  .post("/devices", async ({ body }) => DeviceService.create(body), {
-    detail: {
-      summary: "Create Device",
-      description: "Registers a new Tuya-connected device.",
+  .post(
+    "/devices",
+    async (ctx) => {
+      const user = currentUser(ctx);
+      const conflict = await SensorService.getByTuyaId(ctx.body.tuyaDeviceId);
+      if (conflict) return status(400, DEVICE_AS_SENSOR);
+      const created = await DeviceService.create(ctx.body);
+      await grantCreatorOrRollback(user.id, "tuya_device", created.id, (id) =>
+        DeviceService.delete(id),
+      );
+      return created;
     },
-    body: deviceBody,
-  })
+    {
+      detail: {
+        summary: "Create Device",
+        description:
+          "Registers a new Tuya-connected device. The creator gets read and write.",
+      },
+      body: deviceBody,
+    },
+  )
   .put(
     "/devices/:id",
     async ({ params, body }) => {
+      if (body.tuyaDeviceId !== undefined) {
+        const conflict = await SensorService.getByTuyaId(body.tuyaDeviceId);
+        if (conflict) return status(400, DEVICE_AS_SENSOR);
+      }
       const updated = await DeviceService.update(params.id, body);
       if (!updated) return status(404, { error: "Device not found" });
       return updated;
@@ -75,12 +136,13 @@ export const tuyaRoutes = new Elysia({
     "/devices/:id",
     async ({ params }) => {
       await DeviceService.delete(params.id);
+      await revokeResourceGrants("tuya_device", params.id);
       return { ok: true };
     },
     {
       detail: {
         summary: "Delete Device",
-        description: "Removes a device.",
+        description: "Removes a device and its resource grants.",
       },
     },
   )
@@ -144,21 +206,38 @@ export const tuyaRoutes = new Elysia({
   )
   .get(
     "/presets",
-    async () => PresetService.list(),
+    async (ctx) => {
+      const user = currentUser(ctx);
+      const readable = await readableResourceIds(user.id, "tuya_preset");
+      const all = await PresetService.list();
+      return all.filter((preset) => readable.has(preset.id));
+    },
     {
       detail: {
         summary: "List Presets",
-        description: "Lists saved presets.",
+        description: "Lists saved presets the user can read.",
       },
     },
   )
-  .post("/presets", async ({ body }) => PresetService.create(body), {
-    detail: {
-      summary: "Create Preset",
-      description: "Saves a new preset.",
+  .post(
+    "/presets",
+    async (ctx) => {
+      const user = currentUser(ctx);
+      const created = await PresetService.create(ctx.body);
+      await grantCreatorOrRollback(user.id, "tuya_preset", created.id, (id) =>
+        PresetService.delete(id),
+      );
+      return created;
     },
-    body: presetBody,
-  })
+    {
+      detail: {
+        summary: "Create Preset",
+        description:
+          "Saves a new preset. The creator gets read, write and apply.",
+      },
+      body: presetBody,
+    },
+  )
   .put(
     "/presets/:id",
     async ({ params, body }) => {
@@ -178,12 +257,13 @@ export const tuyaRoutes = new Elysia({
     "/presets/:id",
     async ({ params }) => {
       await PresetService.delete(params.id);
+      await revokeResourceGrants("tuya_preset", params.id);
       return { ok: true };
     },
     {
       detail: {
         summary: "Delete Preset",
-        description: "Removes a saved preset.",
+        description: "Removes a saved preset and its resource grants.",
       },
     },
   )
@@ -212,10 +292,13 @@ export const tuyaRoutes = new Elysia({
   )
   .get(
     "/sensors",
-    async ({ query }) => {
+    async (ctx) => {
+      const user = currentUser(ctx);
+      const readable = await readableResourceIds(user.id, "tuya_sensor");
       const all = await SensorService.list();
-      const sensors =
-        query.includeHidden === "true" ? all : all.filter((s) => !s.hidden);
+      const sensors = (
+        ctx.query.includeHidden === "true" ? all : all.filter((s) => !s.hidden)
+      ).filter((sensor) => readable.has(sensor.id));
       const latest = await SensorService.getLatestReadingsFor(
         sensors.map((sensor) => sensor.id),
       );
@@ -229,18 +312,33 @@ export const tuyaRoutes = new Elysia({
         summary: "List Sensors",
         description:
           "Lists configured sensors with their latest readings. Hidden " +
-          "sensors are left out unless includeHidden is set.",
+          "sensors are left out unless includeHidden is set. Only sensors the " +
+          "user can read are returned.",
       },
       query: includeHiddenQuery,
     },
   )
-  .post("/sensors", async ({ body }) => SensorService.create(body), {
-    detail: {
-      summary: "Create Sensor",
-      description: "Registers a new Tuya-connected sensor.",
+  .post(
+    "/sensors",
+    async (ctx) => {
+      const user = currentUser(ctx);
+      const conflict = await DeviceService.getByTuyaId(ctx.body.tuyaDeviceId);
+      if (conflict) return status(400, SENSOR_AS_DEVICE);
+      const created = await SensorService.create(ctx.body);
+      await grantCreatorOrRollback(user.id, "tuya_sensor", created.id, (id) =>
+        SensorService.delete(id),
+      );
+      return created;
     },
-    body: sensorBody,
-  })
+    {
+      detail: {
+        summary: "Create Sensor",
+        description:
+          "Registers a new Tuya-connected sensor. The creator gets read and write.",
+      },
+      body: sensorBody,
+    },
+  )
   .put(
     "/sensors/:id",
     async ({ params, body }) => {
@@ -266,12 +364,13 @@ export const tuyaRoutes = new Elysia({
     "/sensors/:id",
     async ({ params }) => {
       await SensorService.delete(params.id);
+      await revokeResourceGrants("tuya_sensor", params.id);
       return { ok: true };
     },
     {
       detail: {
         summary: "Delete Sensor",
-        description: "Removes a sensor.",
+        description: "Removes a sensor and its resource grants.",
       },
     },
   )

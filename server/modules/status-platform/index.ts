@@ -1,3 +1,5 @@
+import { authz } from "@server/shared/authz";
+
 import Elysia from "elysia";
 
 import { historyQuery, platformBody } from "./model";
@@ -9,6 +11,7 @@ export const statusPlatformRoutes = new Elysia({
     tags: ["StatusPlatform"],
   },
 })
+  .use(authz)
   .get("/list", () => StatusPlatformService.list(), {
     detail: {
       summary: "List Platforms",

@@ -7,6 +7,7 @@ import React, {
 
 import { cronsDashboard } from "@public/dashboards/crons";
 import { googleAccountsDashboard } from "@public/dashboards/google-accounts";
+import { permissionsDashboard } from "@public/dashboards/permissions";
 import { serverMetricsDashboard } from "@public/dashboards/server-metrics";
 import { statusPlatformDashboard } from "@public/dashboards/status-platform";
 import { tplinkDashboard } from "@public/dashboards/tplink";
@@ -44,6 +45,7 @@ const DASHBOARD_LIST: DashboardData[] = [
   trainStatusDashboard,
   cronsDashboard,
   googleAccountsDashboard,
+  permissionsDashboard,
 ];
 
 const DEFAULT_STATE: GlobalDrawerContextValue = {

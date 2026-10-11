@@ -1,7 +1,10 @@
 import { afterAll, beforeAll, beforeEach, expect, mock, spyOn, test } from "bun:test";
 
+import { installTestAuthz } from "../../../helpers/auth";
+
 let app: { handle: (r: Request) => Promise<Response> };
 let realAuth: any;
+let restoreAuthz: () => void;
 let fetchSpy: ReturnType<typeof spyOn>;
 const env = { ...process.env };
 const login = mock(async (_id: string) => ({ access_token: "TOK" }));
@@ -11,9 +14,11 @@ beforeAll(async () => {
   process.env.FRIGATE_ENDPOINT = "http://frigate.local/";
   realAuth = { ...(await import("@server/shared/authentik")) };
   mock.module("@server/shared/authentik", () => ({ ...realAuth, loginInAuthentik: login }));
+  restoreAuthz = await installTestAuthz();
   ({ frigateRoutes: app } = (await import("@server/modules/frigate/index")) as any);
 });
 afterAll(() => {
+  restoreAuthz();
   mock.module("@server/shared/authentik", () => realAuth);
   process.env = env;
 });

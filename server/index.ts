@@ -6,12 +6,14 @@ import { registerCrons } from "./cron";
 import { instrumentFetch } from "./instrumentation/instrumentFetch";
 import { instrumentGaxios } from "./instrumentation/instrumentGaxios";
 import { elysiaOtel } from "./instrumentation/instrumentHttpServer";
-import { setupLoggerProvider } from "./instrumentation/instrumentLogger";
+import { getLogger, logWarn,setupLoggerProvider } from "./instrumentation/instrumentLogger";
 import { flushTelemetryOnExit } from "./instrumentation/shutdown";
 import { authentikRoutes } from "./modules/authentik";
 import { cronsRoutes } from "./modules/crons";
 import { frigateRoutes } from "./modules/frigate";
 import { googleRoutes } from "./modules/google";
+import { meRoutes, permissionsRoutes } from "./modules/permissions";
+import { runAuthzStartupChecks } from "./modules/permissions/service";
 import { serverMetricsRoutes } from "./modules/server-metrics";
 import { statusPlatformRoutes } from "./modules/status-platform";
 import { tplinkRoutes } from "./modules/tplink";
@@ -19,6 +21,10 @@ import { trainStatusRoutes } from "./modules/train-status";
 import { tuyaRoutes } from "./modules/tuya";
 import { startTuyaPulsar } from "./modules/tuya/service/pulsar";
 import { openapi } from "./openapi";
+import {
+  registerGuardedRoutes,
+  warnDevOverrideConfig,
+} from "./shared/authz";
 
 instrumentFetch();
 setupLoggerProvider();
@@ -55,7 +61,23 @@ export const app = new Elysia()
   .use(serverMetricsRoutes)
   .use(tplinkRoutes)
   .use(cronsRoutes)
-  .use(authentikRoutes);
+  .use(authentikRoutes)
+  .use(meRoutes)
+  .use(permissionsRoutes);
+
+registerGuardedRoutes(app);
+
+const devOverrideWarning = warnDevOverrideConfig();
+if (devOverrideWarning) {
+  logWarn(getLogger("authz"), devOverrideWarning);
+}
+// The checks handle database errors themselves; this only guards against an
+// unexpected bug turning into an unhandled rejection at startup.
+void runAuthzStartupChecks().catch((error: unknown) => {
+  logWarn(getLogger("authz"), "[authz] startup checks failed unexpectedly", {
+    "error.message": error instanceof Error ? error.message : String(error),
+  });
+});
 
 // The OTEL Plugin overrides native home response.
 export const server = Bun.serve({

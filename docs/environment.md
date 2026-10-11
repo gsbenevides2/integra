@@ -6,6 +6,8 @@
 - **PostgreSQL** — application data, one schema per module
 - **Redis** — caching (`server/shared/cache.ts`), read via Bun's built-in client
 
+See [Configuration → Authentication (Authentik forwardAuth)](./configuration.md#authentication-authentik-forwardauth) for the proxy headers, the development override and the authorization bootstrap.
+
 ## Quick Start
 
 ```bash

@@ -42,7 +42,7 @@ for (const [p, names] of Object.entries(mods)) {
 const { HistoryService } = await import("@server/modules/tuya/service/history");
 const prune = spyOn(HistoryService, "pruneAll").mockResolvedValue(undefined as never);
 
-const { jobRegistry, registerCrons } = await import("@server/cron.ts?isolated");
+const { jobRegistry, registerCrons } = await import("@server/cron");
 
 afterAll(() => {
   prune.mockRestore();
@@ -97,6 +97,6 @@ test("registerCrons schedules all jobs in production or when enabled", async () 
   registerCrons();
   expect(cron).toHaveBeenCalledTimes(26);
   // the scheduled callback is the traced wrapper
-  await (cron.mock.calls[0]![1] as () => Promise<void>)();
+  await (cron.mock.calls[0]![1] as unknown as () => Promise<void>)();
   cron.mockRestore();
 });

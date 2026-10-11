@@ -2,7 +2,9 @@ import * as metricsMod from "@server/instrumentation/metrics";
 import { appResource, SERVICE_NAME } from "@server/instrumentation/resource";
 import { flushTelemetry, flushTelemetryOnExit } from "@server/instrumentation/shutdown";
 
-import { afterEach, expect, spyOn, test } from "bun:test";
+import { metrics, trace } from "@opentelemetry/api";
+import { logs } from "@opentelemetry/api-logs";
+import { afterEach, beforeEach, expect, mock, spyOn, test } from "bun:test";
 
 test("resource has service identity", () => {
   expect(SERVICE_NAME).toBeString();
@@ -23,12 +25,33 @@ test("metrics instruments exist and accept data", () => {
   expect(metricsMod.meter).toBeDefined();
 });
 
-test("flushTelemetry resolves with the default (noop) providers", async () => {
-  await flushTelemetry();
+// Other test files register real OTLP providers globally; flushing those hits
+// the network, so stub the providers to keep these tests order-independent.
+const forceFlush = mock(async () => {});
+let providerSpies: ReturnType<typeof spyOn>[] = [];
+beforeEach(() => {
+  forceFlush.mockClear();
+  providerSpies = [
+    // A proxy provider that delegates to the real one...
+    spyOn(trace, "getTracerProvider").mockReturnValue({
+      getDelegate: () => ({ forceFlush }),
+    } as never),
+    // ...and plain providers, with and without forceFlush.
+    spyOn(logs, "getLoggerProvider").mockReturnValue({ forceFlush } as never),
+    spyOn(metrics, "getMeterProvider").mockReturnValue({} as never),
+  ];
 });
 
 let onceSpy: ReturnType<typeof spyOn>;
-afterEach(() => onceSpy?.mockRestore());
+afterEach(() => {
+  onceSpy?.mockRestore();
+  providerSpies.forEach((spy) => spy.mockRestore());
+});
+
+test("flushTelemetry flushes delegated and plain providers", async () => {
+  await flushTelemetry();
+  expect(forceFlush).toHaveBeenCalledTimes(2);
+});
 
 test("flushTelemetryOnExit registers SIGTERM/SIGINT and flushes then exits", async () => {
   const handlers: Record<string, () => void> = {};

@@ -2,6 +2,7 @@ import { OFFLINE_STATE } from "@server/modules/tuya/model";
 
 import { afterAll, afterEach, beforeAll, expect, spyOn, test } from "bun:test";
 
+import { installTestAuthz } from "../../../helpers/auth";
 import { setTuyaEnv } from "../../../helpers/tuya-cloud";
 import { installFakeDb } from "../../../helpers/tuya-db";
 
@@ -16,6 +17,7 @@ const spies: { mockRestore(): void }[] = [];
 beforeAll(async () => {
   restores.push(setTuyaEnv());
   restores.push(await installFakeDb());
+  restores.push(await installTestAuthz());
   ({ tuyaRoutes: routes } = await import("@server/modules/tuya/index"));
   ({ DeviceService: Device } = await import("@server/modules/tuya/service/devices"));
   ({ PresetService: Preset } = await import("@server/modules/tuya/service/presets"));
@@ -62,6 +64,11 @@ test("device create/update/delete", async () => {
   expect((await call("PUT", "/devices/1", { name: "x" })).json).toEqual({ id: "u" });
   upd.mockImplementation((async () => null) as never);
   expect((await call("PUT", "/devices/1", { name: "x" })).status).toBe(404);
+  upd.mockImplementation((async () => ({ id: "u" })) as never);
+  const byTuyaId = spy(Sensor, "getByTuyaId", { id: "s" });
+  expect((await call("PUT", "/devices/1", { tuyaDeviceId: "t" })).status).toBe(400);
+  byTuyaId.mockImplementation((async () => null) as never);
+  expect((await call("PUT", "/devices/1", { tuyaDeviceId: "t" })).json).toEqual({ id: "u" });
   spy(Device, "delete", undefined);
   expect((await call("DELETE", "/devices/1")).json).toEqual({ ok: true });
 });
@@ -155,4 +162,40 @@ test("sensors listing, create, update, delete, history", async () => {
   expect(hist.mock.calls[0]![1]).toEqual({ code: undefined, before: undefined });
   await call("GET", "/sensors/1/history?code=c&before=2026-01-01T00:00:00.000Z");
   expect(hist.mock.calls[1]![1]).toEqual({ code: "c", before: new Date("2026-01-01T00:00:00.000Z") });
+});
+
+test("a failed creator grant rolls the new resource back", async () => {
+  const authzMod = await import("@server/shared/authz");
+  const grant = spy(authzMod, "grantAllValidActions", async () => {
+    throw new Error("db down");
+  });
+  const revoke = spy(authzMod, "revokeResourceGrants", undefined);
+  spy(Sensor, "getByTuyaId", null);
+  spy(Device, "getByTuyaId", null);
+  const cases = [
+    { path: "/devices", body: { name: "a", tuyaDeviceId: "t" }, svc: Device, type: "tuya_device" },
+    { path: "/sensors", body: { name: "a", tuyaDeviceId: "t" }, svc: Sensor, type: "tuya_sensor" },
+    { path: "/presets", body: { name: "a" }, svc: Preset, type: "tuya_preset" },
+  ] as const;
+  for (const { path, body, svc, type } of cases) {
+    spy(svc, "create", { id: "new" });
+    const remove = spy(svc, "delete", undefined);
+    expect((await call("POST", path, body)).status).toBe(500);
+    expect(remove).toHaveBeenCalledWith("new");
+    expect(revoke).toHaveBeenLastCalledWith(type, "new");
+  }
+  expect(grant).toHaveBeenCalledTimes(3);
+
+  // A failing cleanup neither skips the other step nor hides the grant error.
+  const remove = spy(Device, "delete", async () => {
+    throw new Error("delete failed");
+  });
+  revoke.mockImplementation((async () => {
+    throw new Error("revoke failed");
+  }) as never);
+  const res = await call("POST", "/devices", { name: "a", tuyaDeviceId: "t" });
+  expect(res.status).toBe(500);
+  expect(JSON.stringify(res.json)).not.toContain("failed");
+  expect(remove).toHaveBeenCalledWith("new");
+  expect(revoke).toHaveBeenLastCalledWith("tuya_device", "new");
 });

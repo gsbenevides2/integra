@@ -3,6 +3,7 @@ import { runCloudflareSpeedtest } from "@server/modules/server-metrics/service/c
 
 import { afterAll, afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 
+import { installTestAuthz } from "../../../helpers/auth";
 import { makeFakeDb } from "../../../helpers/modules-db";
 
 let fake = makeFakeDb();
@@ -20,11 +21,13 @@ mock.module(sshPath, () => ({
   },
 }));
 afterAll(() => {
+  restoreAuthz();
   mock.module(sshPath, () => realSsh);
 });
 
 const { ServerMetricsService } = await import("@server/modules/server-metrics/service/collect");
 const { collectServerMetrics, collectSpeedtest } = await import("@server/modules/server-metrics/jobs/collect");
+const restoreAuthz = await installTestAuthz();
 const { serverMetricsRoutes } = await import("@server/modules/server-metrics/index");
 
 const status = {

@@ -2,6 +2,9 @@ import { generateMessage } from "@server/modules/authentik/service/message";
 
 import { afterAll, describe, expect, mock, test } from "bun:test";
 
+import { installTestAuthz } from "../../../helpers/auth";
+
+const restoreAuthz = await installTestAuthz();
 const discord = { ...(await import("@server/shared/discord")) };
 const evolution = { ...(await import("@server/shared/evolution")) };
 const sent: string[] = [];
@@ -15,6 +18,7 @@ mock.module("@server/shared/evolution", () => ({
 }));
 const { authentikRoutes } = await import("@server/modules/authentik/index");
 afterAll(() => {
+  restoreAuthz();
   mock.module("@server/shared/discord", () => discord);
   mock.module("@server/shared/evolution", () => evolution);
 });

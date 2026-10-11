@@ -1,13 +1,18 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { afterAll } from "bun:test";
 
+import { installTestAuthz } from "../../../helpers/auth";
 import { installDb, restoreDb } from "../../../helpers/google-db";
 installDb();
+const restoreAuthz = await installTestAuthz();
 import { oauthCallbackQuery } from "@server/modules/google/model";
 
 const { googleRoutes } = await import("@server/modules/google/index");
 const { GoogleAccountService } = await import("@server/modules/google/service/accounts");
-afterAll(restoreDb);
+afterAll(() => {
+  restoreAuthz();
+  restoreDb();
+});
 
 const req = (path: string, method = "GET") => googleRoutes.handle(new Request(`http://localhost${path}`, { method }));
 const spies: { mockRestore(): void }[] = [];

@@ -1,8 +1,9 @@
 import { platformBody } from "@server/modules/status-platform/model";
 import { buildSegments } from "@server/modules/status-platform/service/history";
 
-import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 
+import { installTestAuthz } from "../../../helpers/auth";
 import { makeFakeDb } from "../../../helpers/modules-db";
 
 let fake = makeFakeDb();
@@ -10,7 +11,10 @@ mock.module("@server/db", () => ({ db: new Proxy({}, { get: (_t, p) => (fake.db 
 
 const { StatusPlatformService } = await import("@server/modules/status-platform/service/platforms");
 const { checkPlatformsStatus } = await import("@server/modules/status-platform/jobs/checkStatus");
+const restoreAuthz = await installTestAuthz();
 const { statusPlatformRoutes } = await import("@server/modules/status-platform/index");
+
+afterAll(() => restoreAuthz());
 
 const platform = { id: "p1", name: "N", url: "https://x.io", type: "generic" } as never;
 const at = (s: string) => new Date(s);

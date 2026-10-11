@@ -8,11 +8,28 @@ import { tuyaDashboard } from "@public/dashboards/tuya";
 import { openobserveLogs } from "@openobserve/browser-logs";
 import { openobserveRum } from "@openobserve/browser-rum";
 import { act } from "@testing-library/react";
-import { expect, spyOn, test } from "bun:test";
+import { afterAll, expect, spyOn, test } from "bun:test";
+
+import { ME_FIXTURE } from "../helpers/me";
 
 // The OTLP span exporter would otherwise flush over the (absent) network.
-spyOn(XMLHttpRequest.prototype, "send").mockImplementation(() => {});
-spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
+const xhrSend = spyOn(XMLHttpRequest.prototype, "send").mockImplementation(() => {});
+const fetchSpy = spyOn(globalThis, "fetch").mockImplementation((async (input: unknown) => {
+  const url = String(input);
+  if (url.includes("/api/me")) {
+    return new Response(JSON.stringify(ME_FIXTURE), {
+      headers: { "content-type": "application/json" },
+    });
+  }
+  return new Response("{}");
+}) as never);
+
+// Restore the globals: a later file's spyOn(fetch) would otherwise reuse this
+// spy and see its recorded /api/me call.
+afterAll(() => {
+  fetchSpy.mockRestore();
+  xhrSend.mockRestore();
+});
 
 test("entry point mounts the app and boots instrumentation + service worker", async () => {
   const spies = [
@@ -35,8 +52,11 @@ test("entry point mounts the app and boots instrumentation + service worker", as
   expect(spies[0]!).toHaveBeenCalled();
   expect(root.textContent).toContain("tuya page");
   expect(root.textContent).toContain("Menu");
+  expect(root.textContent).toContain(ME_FIXTURE.name);
+  expect(root.textContent).toContain(ME_FIXTURE.username);
+  expect(root.textContent).toContain("GB");
 
-  act(() => create.mock.results[0]!.value.unmount());
+  act(() => (create.mock.results[0]!.value as ReactDom.Root).unmount());
   create.mockRestore();
   tuyaDashboard.content = realContent;
   spies.forEach((s) => s.mockRestore());
