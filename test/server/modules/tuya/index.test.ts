@@ -163,3 +163,26 @@ test("sensors listing, create, update, delete, history", async () => {
   await call("GET", "/sensors/1/history?code=c&before=2026-01-01T00:00:00.000Z");
   expect(hist.mock.calls[1]![1]).toEqual({ code: "c", before: new Date("2026-01-01T00:00:00.000Z") });
 });
+
+test("a failed creator grant rolls the new resource back", async () => {
+  const authzMod = await import("@server/shared/authz");
+  const grant = spy(authzMod, "grantAllValidActions", async () => {
+    throw new Error("db down");
+  });
+  const revoke = spy(authzMod, "revokeResourceGrants", undefined);
+  spy(Sensor, "getByTuyaId", null);
+  spy(Device, "getByTuyaId", null);
+  const cases = [
+    { path: "/devices", body: { name: "a", tuyaDeviceId: "t" }, svc: Device, type: "tuya_device" },
+    { path: "/sensors", body: { name: "a", tuyaDeviceId: "t" }, svc: Sensor, type: "tuya_sensor" },
+    { path: "/presets", body: { name: "a" }, svc: Preset, type: "tuya_preset" },
+  ] as const;
+  for (const { path, body, svc, type } of cases) {
+    spy(svc, "create", { id: "new" });
+    const remove = spy(svc, "delete", undefined);
+    expect((await call("POST", path, body)).status).toBe(500);
+    expect(remove).toHaveBeenCalledWith("new");
+    expect(revoke).toHaveBeenLastCalledWith(type, "new");
+  }
+  expect(grant).toHaveBeenCalledTimes(3);
+});

@@ -204,6 +204,7 @@ export function PermissionsDashboard() {
   const [frigateAvailable, setFrigateAvailable] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [grantsFailed, setGrantsFailed] = useState(false);
   const [tab, setTab] = useState<Tab>("resources");
   const [search, setSearch] = useState("");
   const [pending, setPending] = useState<Set<string>>(new Set());
@@ -215,13 +216,22 @@ export function PermissionsDashboard() {
       setGrants({ routes: [], resources: [] });
       return;
     }
+    const failMessage = "Falha ao carregar permissões do usuário";
     try {
-      const { data } = await getPermissionsEdenClient()
+      const { data, error } = await getPermissionsEdenClient()
         .api.permissions.users({ id: userId })
         .grants.get();
+      if (error) {
+        // Never show a stale or empty list as if it were this user's grants.
+        setGrantsFailed(true);
+        showToast(errorText(error, failMessage), "error");
+        return;
+      }
+      setGrantsFailed(false);
       if (data) setGrants(data as unknown as Grants);
     } catch {
-      showToast("Falha ao carregar permissões do usuário", "error");
+      setGrantsFailed(true);
+      showToast(failMessage, "error");
     }
   }, [showToast]);
 
@@ -534,7 +544,16 @@ export function PermissionsDashboard() {
         </label>
       </div>
 
-      {tab === "resources" ? (
+      {grantsFailed ? (
+        <div className="flex flex-col items-center gap-3 py-16 text-center">
+          <p className="text-mist-200">
+            Não foi possível carregar as permissões deste usuário
+          </p>
+          <Button onClick={() => void fetchGrants(selectedUserId)}>
+            Tentar novamente
+          </Button>
+        </div>
+      ) : tab === "resources" ? (
         <div className="flex flex-col gap-3">
           {!frigateAvailable && (
             <p className="text-xs text-yellow-300">

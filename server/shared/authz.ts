@@ -109,13 +109,21 @@ export function identityFromHeaders(headers: Headers): Identity | null {
 }
 
 /**
- * The development identity override: only active outside production, and only
- * when both variables are set. The header always wins over the override.
+ * The override must be opted into by an explicit development or test
+ * environment: any other value (production, staging, a typo) disables it.
+ */
+function allowsDevOverride(env: Record<string, string | undefined>): boolean {
+  return env.NODE_ENV === "development" || env.NODE_ENV === "test";
+}
+
+/**
+ * The development identity override: only active in development or test, and
+ * only when both variables are set. The header always wins over the override.
  */
 export function devOverrideIdentity(
   env: Record<string, string | undefined> = process.env,
 ): Identity | null {
-  if (env.NODE_ENV === "production") return null;
+  if (!allowsDevOverride(env)) return null;
   const uid = env.USER_UID?.trim();
   const username = env.USER_NAME?.trim();
   if (!uid || !username) return null;
@@ -129,7 +137,7 @@ export function devOverrideIdentity(
 export function warnDevOverrideConfig(
   env: Record<string, string | undefined> = process.env,
 ): string | null {
-  if (env.NODE_ENV === "production") return null;
+  if (!allowsDevOverride(env)) return null;
   const hasUid = Boolean(env.USER_UID?.trim());
   const hasName = Boolean(env.USER_NAME?.trim());
   if (hasUid === hasName) return null;

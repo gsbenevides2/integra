@@ -38,6 +38,7 @@ interface Cfg {
   failUsers?: boolean;
   malformedUsers?: boolean;
   malformedGrants?: boolean;
+  failGrants?: boolean;
   failRouteGrant?: boolean;
   malformedRouteGrant?: boolean;
   failRouteDelete?: boolean;
@@ -51,7 +52,11 @@ const calls = useApi({
   "GET /api/permissions/users": () =>
     cfg.failUsers ? fail(500) : cfg.malformedUsers ? malformed() : (cfg.users ?? users),
   "GET /api/permissions/users/:id/grants": () =>
-    cfg.malformedGrants ? malformed() : (cfg.grants ?? { routes: [], resources: [] }),
+    cfg.failGrants
+      ? fail(500, { error: "grants down" })
+      : cfg.malformedGrants
+        ? malformed()
+        : (cfg.grants ?? { routes: [], resources: [] }),
   "GET /api/permissions/routes": () => routeOptions,
   "GET /api/permissions/resources": () => ({
     resources: cfg.resources ?? resourceOptions,
@@ -180,6 +185,17 @@ test("toasts when a user's grants cannot be loaded", async () => {
   cfg.malformedGrants = true;
   renderWithMe(<PermissionsDashboard />);
   await screen.findByText("Falha ao carregar permissões do usuário");
+});
+
+test("hides the grant lists when they fail to load, and retries", async () => {
+  cfg.failGrants = true;
+  await renderLoaded();
+  await screen.findByText("grants down");
+  expect(screen.getByText("Não foi possível carregar as permissões deste usuário")).toBeTruthy();
+  expect(screen.queryByRole("region", { name: "Câmeras" })).toBeNull();
+  cfg.failGrants = false;
+  fireEvent.click(screen.getByText("Tentar novamente"));
+  await screen.findByRole("region", { name: "Câmeras" });
 });
 
 test("lists every camera and device with its grant state", async () => {

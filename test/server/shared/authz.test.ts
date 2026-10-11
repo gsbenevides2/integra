@@ -62,9 +62,18 @@ describe("identity headers", () => {
     expect(
       authz.devOverrideIdentity({ NODE_ENV: "production", USER_UID: "u", USER_NAME: "a" }),
     ).toBeNull();
-    expect(authz.devOverrideIdentity({ USER_UID: "u" })).toBeNull();
-    expect(authz.devOverrideIdentity({ USER_NAME: "a" })).toBeNull();
-    expect(authz.devOverrideIdentity({ USER_UID: " u ", USER_NAME: " a " })).toEqual({
+    // Only an explicit development or test environment enables the override.
+    for (const NODE_ENV of [undefined, "", "staging", "prod"]) {
+      expect(authz.devOverrideIdentity({ NODE_ENV, USER_UID: "u", USER_NAME: "a" })).toBeNull();
+    }
+    const dev = { NODE_ENV: "development" };
+    expect(authz.devOverrideIdentity({ ...dev, USER_UID: "u" })).toBeNull();
+    expect(authz.devOverrideIdentity({ ...dev, USER_NAME: "a" })).toBeNull();
+    expect(authz.devOverrideIdentity({ ...dev, USER_UID: " u ", USER_NAME: " a " })).toEqual({
+      uid: "u",
+      username: "a",
+    });
+    expect(authz.devOverrideIdentity({ NODE_ENV: "test", USER_UID: "u", USER_NAME: "a" })).toEqual({
       uid: "u",
       username: "a",
     });
@@ -72,10 +81,12 @@ describe("identity headers", () => {
 
   test("warnDevOverrideConfig names the missing variable", () => {
     expect(authz.warnDevOverrideConfig({ NODE_ENV: "production", USER_UID: "u" })).toBeNull();
-    expect(authz.warnDevOverrideConfig({ USER_UID: "u", USER_NAME: "a" })).toBeNull();
-    expect(authz.warnDevOverrideConfig({})).toBeNull();
-    expect(authz.warnDevOverrideConfig({ USER_UID: "u" })).toContain("USER_NAME");
-    expect(authz.warnDevOverrideConfig({ USER_NAME: "a" })).toContain("USER_UID");
+    expect(authz.warnDevOverrideConfig({ USER_UID: "u" })).toBeNull();
+    const dev = { NODE_ENV: "development" };
+    expect(authz.warnDevOverrideConfig({ ...dev, USER_UID: "u", USER_NAME: "a" })).toBeNull();
+    expect(authz.warnDevOverrideConfig(dev)).toBeNull();
+    expect(authz.warnDevOverrideConfig({ ...dev, USER_UID: "u" })).toContain("USER_NAME");
+    expect(authz.warnDevOverrideConfig({ ...dev, USER_NAME: "a" })).toContain("USER_UID");
   });
 
   test("isGuardedRoute covers api, openapi and excludes traces", () => {

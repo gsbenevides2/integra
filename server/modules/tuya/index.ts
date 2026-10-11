@@ -3,6 +3,7 @@ import {
   currentUser,
   grantAllValidActions,
   readableResourceIds,
+  type ResourceType,
   revokeResourceGrants,
 } from "@server/shared/authz";
 
@@ -33,6 +34,26 @@ const DEVICE_AS_SENSOR = {
 const SENSOR_AS_DEVICE = {
   error: "Tuya device ID already registered as a device",
 };
+
+/**
+ * Gives the creator every action on a resource it just created. If that fails,
+ * the resource is deleted and any partial grants revoked, so nothing is left
+ * behind that its own creator cannot access.
+ */
+async function grantCreatorOrRollback(
+  userId: string,
+  type: ResourceType,
+  id: string,
+  remove: (id: string) => Promise<unknown>,
+): Promise<void> {
+  try {
+    await grantAllValidActions(userId, type, id);
+  } catch (error) {
+    await remove(id);
+    await revokeResourceGrants(type, id);
+    throw error;
+  }
+}
 
 export const tuyaRoutes = new Elysia({
   prefix: "/api/tuya",
@@ -76,7 +97,9 @@ export const tuyaRoutes = new Elysia({
       const conflict = await SensorService.getByTuyaId(ctx.body.tuyaDeviceId);
       if (conflict) return status(400, DEVICE_AS_SENSOR);
       const created = await DeviceService.create(ctx.body);
-      await grantAllValidActions(user.id, "tuya_device", created.id);
+      await grantCreatorOrRollback(user.id, "tuya_device", created.id, (id) =>
+        DeviceService.delete(id),
+      );
       return created;
     },
     {
@@ -199,7 +222,9 @@ export const tuyaRoutes = new Elysia({
     async (ctx) => {
       const user = currentUser(ctx);
       const created = await PresetService.create(ctx.body);
-      await grantAllValidActions(user.id, "tuya_preset", created.id);
+      await grantCreatorOrRollback(user.id, "tuya_preset", created.id, (id) =>
+        PresetService.delete(id),
+      );
       return created;
     },
     {
@@ -298,7 +323,9 @@ export const tuyaRoutes = new Elysia({
       const conflict = await DeviceService.getByTuyaId(ctx.body.tuyaDeviceId);
       if (conflict) return status(400, SENSOR_AS_DEVICE);
       const created = await SensorService.create(ctx.body);
-      await grantAllValidActions(user.id, "tuya_sensor", created.id);
+      await grantCreatorOrRollback(user.id, "tuya_sensor", created.id, (id) =>
+        SensorService.delete(id),
+      );
       return created;
     },
     {
