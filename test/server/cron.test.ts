@@ -96,6 +96,6 @@ test("registerCrons schedules all jobs in production or when enabled", async () 
   registerCrons();
   expect(cron).toHaveBeenCalledTimes(24);
   // the scheduled callback is the traced wrapper
-  await (cron.mock.calls[0]![1] as () => Promise<void>)();
+  await (cron.mock.calls[0]![1] as unknown as () => Promise<void>)();
   cron.mockRestore();
 });
