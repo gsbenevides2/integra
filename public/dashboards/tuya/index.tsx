@@ -248,6 +248,7 @@ export function TuyaDashboard() {
                 className="
                   grid grid-cols-[repeat(auto-fill,minmax(min(100%,480px),1fr))]
                   gap-3
+                  max-lg:landscape:grid-cols-2
                 "
               >
                 {cameras.map((name) => (
