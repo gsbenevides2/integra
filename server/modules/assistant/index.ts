@@ -14,6 +14,7 @@ import {
   settingsBody,
   type StreamEvent,
   ttsBody,
+  voiceLabelBody,
   voiceProfileBody,
 } from "./model";
 import { AssistantAgent, type ChatRequest } from "./service/agent";
@@ -311,47 +312,62 @@ export const assistantRoutes = new Elysia({
     },
   )
   .get(
-    "/voice-profile",
-    (ctx) => VoiceProfileService.get(currentUser(ctx).id),
+    "/voice-profiles",
+    (ctx) => VoiceProfileService.list(currentUser(ctx).id),
     {
       detail: {
-        summary: "Get My Voice Profile",
+        summary: "List My Voices",
         description:
-          "Returns the current user's enrolled wake-word voice profile " +
-          "(embeddings), used by the client to verify it is their voice.",
+          "Returns the current user's enrolled wake-word voices (label and " +
+          "embeddings), used by the client to verify it is one of their voices.",
       },
     },
   )
-  .put(
-    "/voice-profile",
+  .post(
+    "/voice-profiles",
     (ctx) =>
-      VoiceProfileService.upsert(
+      VoiceProfileService.create(
         currentUser(ctx).id,
+        ctx.body.label,
         ctx.body.embeddings,
         ctx.body.modelId,
       ),
     {
       detail: {
-        summary: "Enrol My Voice",
+        summary: "Enrol A Voice",
         description:
-          "Stores the current user's wake-word voice profile: a few " +
+          "Adds a labelled wake-word voice for the current user: a few " +
           "client-extracted speaker embeddings of them saying 'Ei Integra'.",
       },
       body: voiceProfileBody,
     },
   )
-  .delete(
-    "/voice-profile",
+  .patch(
+    "/voice-profiles/:id",
     async (ctx) => {
-      await VoiceProfileService.delete(currentUser(ctx).id);
+      await VoiceProfileService.rename(currentUser(ctx).id, ctx.params.id, ctx.body.label);
       return { ok: true };
     },
     {
       detail: {
-        summary: "Remove My Voice",
+        summary: "Rename A Voice",
+        description: "Renames one of the current user's enrolled voices.",
+      },
+      body: voiceLabelBody,
+    },
+  )
+  .delete(
+    "/voice-profiles/:id",
+    async (ctx) => {
+      await VoiceProfileService.delete(currentUser(ctx).id, ctx.params.id);
+      return { ok: true };
+    },
+    {
+      detail: {
+        summary: "Remove A Voice",
         description:
-          "Deletes the current user's wake-word voice profile, so the wake " +
-          "word fires for any voice again.",
+          "Deletes one of the current user's enrolled voices. With no voices " +
+          "left, the wake word fires for any voice again.",
       },
     },
   )

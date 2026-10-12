@@ -21,6 +21,7 @@ const { AudioService } = await import("@server/modules/assistant/service/audio")
 const { ConversationService } = await import("@server/modules/assistant/service/conversation");
 const { ImageStorage, MAX_IMAGE_BYTES } = await import("@server/modules/assistant/service/images");
 const { AssistantSettingsService } = await import("@server/modules/assistant/service/settings");
+const { VoiceProfileService } = await import("@server/modules/assistant/service/voiceProfile");
 
 const spies: { mockRestore: () => void }[] = [];
 afterEach(() => spies.splice(0).forEach((s) => s.mockRestore()));
@@ -222,6 +223,46 @@ describe("assistant routes", () => {
       (await send("PUT", "/settings", { extraInstructions: "x".repeat(4001), voiceMatchThreshold: 0.7 }))
         .status,
     ).toBe(422);
+  });
+
+  test("lists, enrols, renames and removes voices", async () => {
+    const voice = { id: "v1", label: "Gui", embeddings: [[1, 2]], dims: 2, modelId: "m1" };
+    const list = spyOn(VoiceProfileService, "list").mockResolvedValue([voice]);
+    const create = spyOn(VoiceProfileService, "create").mockResolvedValue(voice);
+    const rename = spyOn(VoiceProfileService, "rename").mockResolvedValue();
+    const remove = spyOn(VoiceProfileService, "delete").mockResolvedValue();
+    spies.push(list, create, rename, remove);
+
+    expect(await (await call("/voice-profiles")).json()).toEqual([voice]);
+    expect(list).toHaveBeenCalledWith(TEST_USER.id);
+
+    expect(
+      await (await send("POST", "/voice-profiles", {
+        label: "Gui",
+        embeddings: [[1, 2]],
+        modelId: "m1",
+      })).json(),
+    ).toEqual(voice);
+    expect(create).toHaveBeenCalledWith(TEST_USER.id, "Gui", [[1, 2]], "m1");
+
+    expect(await (await send("PATCH", "/voice-profiles/v1", { label: "Celular" })).json()).toEqual({
+      ok: true,
+    });
+    expect(rename).toHaveBeenCalledWith(TEST_USER.id, "v1", "Celular");
+
+    expect(await (await send("DELETE", "/voice-profiles/v1", undefined)).json()).toEqual({
+      ok: true,
+    });
+    expect(remove).toHaveBeenCalledWith(TEST_USER.id, "v1");
+  });
+
+  test("rejects an enrolment with an empty label", async () => {
+    const status = (await send("POST", "/voice-profiles", {
+      label: "",
+      embeddings: [[1]],
+      modelId: "m1",
+    })).status;
+    expect(status).toBe(422);
   });
 
   test("tts streams the synthesised mp3", async () => {

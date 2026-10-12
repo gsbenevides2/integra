@@ -18,7 +18,7 @@ import { type AssistantImage, uploadImage } from "./imageUpload";
 import { resumeAudio } from "./microphone";
 import { playChime, speak, type Speaking } from "./speaker";
 import { type Listening, listenOnce } from "./transcriber";
-import { fetchVoiceProfile } from "./voiceProfile";
+import { fetchVoiceProfiles } from "./voiceProfile";
 import { buildSpeakerGate, startWakeWord, type WakeWordEngine } from "./wakeWord";
 
 export type AssistantState = "idle" | "listening" | "thinking" | "speaking";
@@ -540,12 +540,12 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
     void (async () => {
       let gate = null;
       if (voiceModel) {
-        const [profile, settings] = await Promise.all([
-          fetchVoiceProfile(),
+        const [profiles, settings] = await Promise.all([
+          fetchVoiceProfiles(),
           getAssistantEdenClient().api.assistant.settings.get(),
         ]);
         const threshold = settings.data?.voiceMatchThreshold ?? 0.6;
-        gate = await buildSpeakerGate(voiceModel.url, voiceModel.id, profile, threshold);
+        gate = await buildSpeakerGate(voiceModel.url, voiceModel.id, profiles, threshold);
       }
       if (!active) return;
       startWakeWord(() => {

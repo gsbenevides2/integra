@@ -36,31 +36,33 @@ export interface WakeWordEngine {
 /** The speaker check applied before a wake word fires, or null to skip it. */
 export interface SpeakerGate {
   model: SpeakerModel;
-  /** The enrolled user's L2-normalised embeddings. */
-  profile: VoiceProfile;
+  /** Every enrolled voice's L2-normalised embeddings, flattened together. */
+  embeddings: number[][];
   /** Minimum cosine similarity to accept the voice. */
   threshold: number;
 }
 
 /**
- * Loads the speaker model and the user's profile for a wake-word speaker gate,
- * or returns null when there is nothing to check against: no model deployed,
- * no profile enrolled, or the model id no longer matches the enrolment. When
- * null, the wake word fires for any voice (the pre-enrolment behaviour).
+ * Loads the speaker model and the union of the user's enrolled voices for a
+ * wake-word speaker gate, or returns null when there is nothing to check
+ * against: no model deployed, no voice enrolled for the current model, or the
+ * model fails to load. When null, the wake word fires for any voice (the
+ * pre-enrolment behaviour). A phrase fires if it matches ANY enrolled voice.
  */
 export async function buildSpeakerGate(
   voiceModelUrl: string | null,
   voiceModelId: string,
-  profile: VoiceProfile | null,
+  profiles: VoiceProfile[],
   threshold: number,
 ): Promise<SpeakerGate | null> {
-  if (!voiceModelUrl || !profile?.enrolled || profile.embeddings.length === 0) {
-    return null;
-  }
-  if (profile.modelId !== voiceModelId) return null;
+  if (!voiceModelUrl) return null;
+  const embeddings = profiles
+    .filter((profile) => profile.modelId === voiceModelId)
+    .flatMap((profile) => profile.embeddings);
+  if (embeddings.length === 0) return null;
   try {
     const model = await loadSpeakerModel(voiceModelUrl, voiceModelId);
-    return { model, profile, threshold };
+    return { model, embeddings, threshold };
   } catch {
     // If the model fails to load, fall back to firing for any voice.
     return null;
@@ -164,7 +166,7 @@ export async function startWakeWord(
     try {
       const candidate = await gate.model.embed(snapshot.samples, snapshot.sampleRate);
       let best = -Infinity;
-      for (const enrolled of gate.profile.embeddings) {
+      for (const enrolled of gate.embeddings) {
         best = Math.max(best, cosine(candidate, enrolled));
       }
       if (best >= gate.threshold) accept();

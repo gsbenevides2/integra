@@ -21,23 +21,34 @@ export const assistantUserSettings = assistant.table("user_settings", {
 });
 
 /**
- * Each user's enrolled voice profile for the wake-word speaker check. One row
- * per user; `embeddings` holds a few L2-normalised speaker embeddings (one per
- * enrolment sample) produced by the client-side model `modelId`. Nothing here
- * is shared between users, and the raw audio never leaves the client.
+ * A user's enrolled wake-word voices. A user may enrol several distinct voices
+ * (e.g. different people or devices), each a labelled row whose `embeddings`
+ * holds a few L2-normalised speaker embeddings (one per enrolment sample)
+ * produced by the client-side model `modelId`. The wake word fires when any of
+ * the user's voices matches. Nothing here is shared between users, and the raw
+ * audio never leaves the client.
  */
-export const assistantVoiceProfiles = assistant.table("voice_profiles", {
-  userId: text()
-    .primaryKey()
-    .references(() => authUsers.id, { onDelete: "cascade" }),
-  /** One L2-normalised embedding per enrolment sample. */
-  embeddings: jsonb().$type<number[][]>().notNull(),
-  /** Embedding dimensionality (e.g. 192), to reject a mismatched client model. */
-  dims: integer().notNull(),
-  /** Which embedding model produced these, so a model change can invalidate them. */
-  modelId: text().notNull(),
-  updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
-});
+export const assistantVoiceProfiles = assistant.table(
+  "voice_profiles",
+  {
+    id: text()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text()
+      .notNull()
+      .references(() => authUsers.id, { onDelete: "cascade" }),
+    /** The voice's display name, chosen by the user. */
+    label: text().notNull(),
+    /** One L2-normalised embedding per enrolment sample. */
+    embeddings: jsonb().$type<number[][]>().notNull(),
+    /** Embedding dimensionality (e.g. 192), to reject a mismatched client model. */
+    dims: integer().notNull(),
+    /** Which embedding model produced these, so a model change can invalidate them. */
+    modelId: text().notNull(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("assistant_voice_profiles_user_idx").on(table.userId)],
+);
 
 /** An image attached to a message, stored in the private S3 bucket. */
 export interface StoredImage {

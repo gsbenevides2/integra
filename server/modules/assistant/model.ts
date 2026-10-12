@@ -68,8 +68,19 @@ export const MIN_VOICE_SAMPLES = 1;
 export const MAX_VOICE_SAMPLES = 8;
 /** Guards against an oversized or absurd embedding dimensionality. */
 export const MAX_VOICE_DIMS = 2048;
+/** Longest voice label (display name). */
+export const MAX_VOICE_LABEL_LENGTH = 60;
+/** How many distinct voices one user may enrol. */
+export const MAX_VOICES_PER_USER = 10;
+
+const voiceLabel = z.string().trim().min(1).max(MAX_VOICE_LABEL_LENGTH).meta({
+  title: "Label",
+  description: "The voice's display name (e.g. a person or device).",
+  example: "Gui",
+});
 
 export const voiceProfileBody = z.object({
+  label: voiceLabel,
   embeddings: z
     .array(z.array(z.number()).min(1).max(MAX_VOICE_DIMS))
     .min(MIN_VOICE_SAMPLES)
@@ -88,9 +99,15 @@ export const voiceProfileBody = z.object({
 
 export type VoiceProfileBody = z.infer<typeof voiceProfileBody>;
 
-/** A user's enrolled wake-word voice profile (embeddings stay client-usable). */
+/** Rename an enrolled voice. */
+export const voiceLabelBody = z.object({ label: voiceLabel });
+
+export type VoiceLabelBody = z.infer<typeof voiceLabelBody>;
+
+/** One of a user's enrolled wake-word voices (embeddings stay client-usable). */
 export interface VoiceProfile {
-  enrolled: boolean;
+  id: string;
+  label: string;
   embeddings: number[][];
   dims: number;
   modelId: string;
