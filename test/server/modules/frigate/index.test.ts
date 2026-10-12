@@ -69,3 +69,14 @@ test("goToFrigate redirects; bad name rejected", async () => {
   expect(res.headers.get("location")).toBe("http://frigate.local/#cam1");
   expect((await get("/api/frigate/cameras/b@d/goToFrigate")).status).toBe(422);
 });
+
+test("cameraSnapshot fetches the latest frame at assistant size", async () => {
+  const { cameraSnapshot, SNAPSHOT_HEIGHT } = await import("@server/modules/frigate/service/frigate");
+  fetchSpy = spyOn(globalThis, "fetch").mockResolvedValue(new Response(new Uint8Array([1, 2, 3])));
+  expect([...(await cameraSnapshot("frente porta"))]).toEqual([1, 2, 3]);
+  const [url] = fetchSpy.mock.calls[0] as [URL];
+  expect(String(url)).toBe(`http://frigate.local/api/frente%20porta/latest.jpg?h=${SNAPSHOT_HEIGHT}`);
+
+  fetchSpy.mockResolvedValue(new Response("x", { status: 404 }));
+  await expect(cameraSnapshot("frente")).rejects.toThrow("Câmera frente indisponível");
+});

@@ -8,6 +8,7 @@ import { instrumentGaxios } from "./instrumentation/instrumentGaxios";
 import { elysiaOtel } from "./instrumentation/instrumentHttpServer";
 import { getLogger, logWarn,setupLoggerProvider } from "./instrumentation/instrumentLogger";
 import { flushTelemetryOnExit } from "./instrumentation/shutdown";
+import { assistantRoutes, voskAssetRoutes } from "./modules/assistant";
 import { authentikRoutes } from "./modules/authentik";
 import { cronsRoutes } from "./modules/crons";
 import { frigateRoutes } from "./modules/frigate";
@@ -53,6 +54,7 @@ export const app = new Elysia()
       },
     }),
   )
+  .use(voskAssetRoutes)
   .use(tuyaRoutes)
   .use(frigateRoutes)
   .use(googleRoutes)
@@ -61,6 +63,7 @@ export const app = new Elysia()
   .use(serverMetricsRoutes)
   .use(tplinkRoutes)
   .use(cronsRoutes)
+  .use(assistantRoutes)
   .use(authentikRoutes)
   .use(meRoutes)
   .use(permissionsRoutes);

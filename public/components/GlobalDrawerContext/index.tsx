@@ -13,6 +13,7 @@ import { statusPlatformDashboard } from "@public/dashboards/status-platform";
 import { tplinkDashboard } from "@public/dashboards/tplink";
 import { trainStatusDashboard } from "@public/dashboards/train-status";
 import { tuyaDashboard } from "@public/dashboards/tuya";
+import { voiceAssistantDashboard } from "@public/dashboards/voice-assistant";
 
 import { Drawer } from "../Drawer";
 import { Content } from "./Content";
@@ -39,6 +40,7 @@ interface GlobalDrawerContextValue {
 
 const DASHBOARD_LIST: DashboardData[] = [
   tuyaDashboard,
+  voiceAssistantDashboard,
   serverMetricsDashboard,
   tplinkDashboard,
   statusPlatformDashboard,

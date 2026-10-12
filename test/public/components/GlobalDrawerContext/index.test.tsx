@@ -83,5 +83,5 @@ test("default context value is inert outside the provider", () => {
   value!.setIsOpen(true);
   value!.setPage("x");
   expect(value!.page).toBe("");
-  expect(value!.dashboardList.length).toBe(8);
+  expect(value!.dashboardList.length).toBe(9);
 });

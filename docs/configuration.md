@@ -56,8 +56,12 @@ The HTTP port is hardcoded to `3000` in `server/index.ts` — unlike the old rep
 | `TUYA_DATA_CENTER` | Tuya data centre: `us`, `eu`, `cn` or `in` — defaults to `us` |
 | `TUYA_PULSAR_ENV` | `test` selects Tuya's Pulsar test environment; anything else is prod |
 | `GCP_OAUTH_CLIENT_ID`, `GCP_OAUTH_CLIENT_SECRET` | Google OAuth (`server/modules/google/service/accounts.ts`) |
-| `OPEN_ROUTER_API_KEY` | OpenRouter LLM calls (`server/modules/google/service/openrouter.ts`) |
-| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`, `S3_ENDPOINT` | Read implicitly by Bun's built-in `Bun.s3` client (`server/modules/google/service/s3.ts`) |
+| `OPEN_ROUTER_API_KEY` | OpenRouter LLM calls (`server/modules/google/service/openrouter.ts`), and everything in the voice assistant (`server/modules/assistant`): the agent, ElevenLabs speech-to-text, Microsoft MAI text-to-speech and image generation, all through OpenRouter |
+| `ASSISTANT_MODEL` | Optional OpenRouter model for the voice assistant's agent; defaults to `openai/gpt-5-mini` |
+| `ASSISTANT_IMAGE_MODEL` | Optional OpenRouter image model for the assistant's `gerar_imagem` tool; defaults to `google/gemini-3-pro-image` |
+| `ASSISTANT_TTS_MODEL` | Optional OpenRouter text-to-speech model for the assistant's replies; defaults to `microsoft/mai-voice-2.1-flash` (native pt-BR voices) |
+| `ASSISTANT_VOICE` | Optional voice for `ASSISTANT_TTS_MODEL`; voices are model-specific. Defaults to `pt-BR-Luana:MAI-Voice-2.1-Flash` (others: `pt-BR-Caio`, `pt-BR-Pedro`, `pt-BR-Rafael`, `pt-BR-Harper`, `pt-BR-Grant`, with the same `:MAI-Voice-2.1-Flash` suffix). Set it whenever you change the model |
+| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`, `S3_ENDPOINT` | Read implicitly by Bun's built-in `Bun.s3` client. The voice assistant keeps its images (uploads, generated images, camera snapshots) in this **private** bucket under `assistant/<userId>/`, and hands the browser presigned URLs (`server/modules/assistant/service/images.ts`) |
 | `DISCORD_DEFAULT_PUBLIC_KEY` | Discord bot token (`server/shared/discord.ts`) — the name is misleading, it's a bot token, not a public key |
 | `AUTHENTIK_URL`, `AUTHENTIK_USERNAME`, `AUTHENTIK_PASSWORD` | Authentik client-credentials login (`server/shared/authentik.ts`) |
 | `BIRTHDAY_SERVICE_CLIENT_ID`, `BIRTHDAY_SERVICE_ENDPOINT` | The birthday module's MCP call, authenticated via the above |

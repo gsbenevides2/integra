@@ -16,6 +16,12 @@ export const fail = (status = 500, body: unknown = { message: "boom" }) => ({
   body,
 });
 
+/** A 200 Server-Sent Events response, one `data:` frame per event. */
+export const sse = (events: unknown[]) => ({
+  __status: 200,
+  sse: events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(""),
+});
+
 /** A 200 JSON response whose body is not valid JSON (makes Eden itself reject). */
 export const malformed = () => ({ __status: 200, raw: "{not json" });
 
@@ -36,12 +42,13 @@ export function useApi(routes: Record<string, Handler>) {
   const fake = async (input: any, init?: any) => {
     const req = new Request(input, init);
     const url = new URL(req.url);
-    const text = await req.text();
+    const isJson = !/^(audio|image)\//.test(req.headers.get("content-type") ?? "");
+    const body = isJson ? await req.text() : new Uint8Array(await req.arrayBuffer());
     const call: ApiCall = {
       method: req.method,
       path: url.pathname,
       query: Object.fromEntries(url.searchParams),
-      body: text ? JSON.parse(text) : undefined,
+      body: typeof body === "string" ? (body ? JSON.parse(body) : undefined) : body,
     };
     calls.push(call);
     const route = compiled.find(
@@ -50,6 +57,12 @@ export function useApi(routes: Record<string, Handler>) {
     if (!route) throw new Error(`Unmocked ${call.method} ${call.path}`);
     const reply: any = await route.handler(call);
     const failed = reply && typeof reply === "object" && "__status" in reply;
+    if (failed && "sse" in reply) {
+      return new Response(reply.sse, {
+        status: reply.__status,
+        headers: { "content-type": "text/event-stream" },
+      });
+    }
     return new Response(
       failed && "raw" in reply
         ? reply.raw

@@ -3,6 +3,7 @@ import { SpanKind, trace } from "@opentelemetry/api";
 import { getLogger, logInfo } from "./instrumentation/instrumentLogger";
 import { cronDuration, cronRuns } from "./instrumentation/metrics";
 import { withSpan } from "./instrumentation/withSpan";
+import { sweepAssistantImages } from "./modules/assistant/jobs/sweepImages";
 import { sendBirthdayMessage } from "./modules/birthday/jobs/sendMessage";
 import { cleanAccessCodeEmails } from "./modules/google/jobs/accessCodeCleaner";
 import {
@@ -83,6 +84,12 @@ const jobDefinitions: Array<{
     label: "Podar histórico Tuya",
     schedule: "0 4 * * *",
     fn: () => HistoryService.pruneAll(),
+  },
+  {
+    name: "assistant.images.sweep",
+    label: "Limpar imagens órfãs do assistente",
+    schedule: "30 4 * * *",
+    fn: () => sweepAssistantImages(),
   },
   {
     name: "google.calendar.schedule",

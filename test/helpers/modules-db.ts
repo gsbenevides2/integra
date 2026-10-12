@@ -17,6 +17,11 @@ export function makeFakeDb(results: unknown[] = []) {
             }
             return (res: (v: unknown) => void) => res(value);
           }
+          // A transaction runs its callback against the same fake.
+          if (prop === "transaction") {
+            calls.push("transaction");
+            return (fn: (tx: unknown) => unknown) => fn(db);
+          }
           if (prop === "as") {
             return () => ({
               platformId: 1,
