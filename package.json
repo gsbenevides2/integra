@@ -17,11 +17,12 @@
   "license": "MIT",
   "scripts": {
     "dev": "bun run --watch server/index.ts",
-    "test": "bun test && bun test/check-coverage.ts",
+    "test": "bun --no-env-file test && bun test/check-coverage.ts",
     "lint": "bun --bun eslint .",
     "lint:fix": "bun --bun eslint . --fix",
     "db:sync": "bun --bun run drizzle-kit push --config server/db/drizzle.config.ts",
-    "db:studio": "bun --bun run drizzle-kit studio --config server/db/drizzle.config.ts"
+    "db:studio": "bun --bun run drizzle-kit studio --config server/db/drizzle.config.ts",
+    "assistant:model": "bun scripts/download-vosk-model.ts"
   },
   "dependencies": {
     "@elysia/eden": "^1.4.10",
@@ -29,9 +30,11 @@
     "@elysia/opentelemetry": "^1.4.12",
     "@elysia/static": "^1.4.11",
     "@heroicons/react": "^2.2.0",
+    "@lichess-org/vosk-browser": "0.0.3",
     "@modelcontextprotocol/sdk": "^1.30.1",
     "@openobserve/browser-logs": "^0.4.3",
     "@openobserve/browser-rum": "^0.4.3",
+    "@openrouter/agent": "^0.11.0",
     "@opentelemetry/api-logs": "^0.200.0",
     "@opentelemetry/exporter-logs-otlp-proto": "^0.200.0",
     "@opentelemetry/exporter-metrics-otlp-proto": "^0.200.0",
@@ -53,7 +56,9 @@
     "node-ssh": "^13.2.1",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "react-markdown": "^10.1.0",
     "recharts": "^3.10.1",
+    "remark-gfm": "^4.0.1",
     "tailwindcss": "^4.3.3",
     "ws": "^8.21.3",
     "zod": "^4.5.4"

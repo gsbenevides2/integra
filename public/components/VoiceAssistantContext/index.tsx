@@ -1,0 +1,535 @@
+import React, {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
+import { useMe } from "@public/components/MeContext";
+import { useToast } from "@public/components/Toast";
+import { getAssistantEdenClient } from "@public/dashboards/voice-assistant/client";
+
+import { streamChat } from "./chatStream";
+import { type AssistantImage, uploadImage } from "./imageUpload";
+import { resumeAudio } from "./microphone";
+import { playChime, speak, type Speaking } from "./speaker";
+import { type Listening, listenOnce } from "./transcriber";
+import { startWakeWord, type WakeWordEngine } from "./wakeWord";
+
+export type AssistantState = "idle" | "listening" | "thinking" | "speaking";
+
+export interface AssistantAction {
+  tool: string;
+  ok: boolean;
+  summary: string;
+}
+
+export type { AssistantImage } from "./imageUpload";
+
+export interface AssistantMessage {
+  id: number;
+  role: "user" | "assistant";
+  text: string;
+  actions?: AssistantAction[];
+  images?: AssistantImage[];
+  /** The reply is still being written (typing dots until the first words). */
+  pending?: boolean;
+  /** The tool running right now, e.g. "gerar_imagem" (shown as progress). */
+  activity?: string;
+  /** Received live in this session (typed in), not loaded from history. */
+  live?: boolean;
+}
+
+export interface VoiceAssistantValue {
+  /** The user holds the chat route grant. */
+  allowed: boolean;
+  state: AssistantState;
+  /** Speech is being heard right now (while listening). */
+  hearingSpeech: boolean;
+  messages: AssistantMessage[];
+  /** Wake word detection can run here (configured, secure context). */
+  wakeAvailable: boolean;
+  wakeEnabled: boolean;
+  setWakeEnabled: (enabled: boolean) => void;
+  /** Starts listening (as if the wake word had been said). */
+  start: () => void;
+  /** Sends typed text, skipping speech recognition. */
+  sendText: (text: string) => void;
+  /** Stops whatever is happening and goes back to idle. */
+  stop: () => void;
+  /** Stops and starts a new conversation (history is kept). */
+  reset: () => Promise<void>;
+  /** The conversation being continued, if any. */
+  conversationId: string | null;
+  /** Loads a past conversation so it can be read and continued. */
+  openConversation: (id: string) => Promise<void>;
+  /** Images waiting to go with the next message (typed or spoken). */
+  attachments: AssistantImage[];
+  uploading: boolean;
+  attachImage: (file: Blob) => Promise<void>;
+  removeAttachment: (key: string) => void;
+}
+
+/** The assistant dashboard's id in the drawer. */
+export const ASSISTANT_PAGE_ID = "voice-assistant";
+export const CHAT_ROUTE_KEY = "POST /api/assistant/chat";
+export const WAKE_PREFERENCE_KEY = "integra.assistant.wake";
+/** Mirrors the server: after this long idle, the next message starts a new conversation. */
+export const RESUME_WINDOW_MS = 10 * 60 * 1000;
+export const LISTEN_TIMEOUTS = {
+  /** How long to wait for the first words after the wake word. */
+  firstTurnMs: 8000,
+  /** After a reply, listen this long for a follow-up without the wake word. */
+  followUpMs: 6000,
+};
+
+const NOOP_VALUE: VoiceAssistantValue = {
+  allowed: false,
+  state: "idle",
+  hearingSpeech: false,
+  messages: [],
+  wakeAvailable: false,
+  wakeEnabled: false,
+  setWakeEnabled: () => {},
+  start: () => {},
+  sendText: () => {},
+  stop: () => {},
+  reset: async () => {},
+  conversationId: null,
+  openConversation: async () => {},
+  attachments: [],
+  uploading: false,
+  attachImage: async () => {},
+  removeAttachment: () => {},
+};
+
+const VoiceAssistantContext = createContext<VoiceAssistantValue>(NOOP_VALUE);
+
+export function useVoiceAssistant(): VoiceAssistantValue {
+  return useContext(VoiceAssistantContext);
+}
+
+function readWakePreference(): boolean {
+  try {
+    return localStorage.getItem(WAKE_PREFERENCE_KEY) !== "false";
+  } catch {
+    return true;
+  }
+}
+
+function writeWakePreference(enabled: boolean): void {
+  try {
+    localStorage.setItem(WAKE_PREFERENCE_KEY, String(enabled));
+  } catch {
+    // Storage blocked: the preference just won't survive a reload.
+  }
+}
+
+export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
+  const { me } = useMe();
+  const { showToast } = useToast();
+  const allowed = Boolean(me?.routes.includes(CHAT_ROUTE_KEY));
+
+  const [state, setState] = useState<AssistantState>("idle");
+  const [hearingSpeech, setHearingSpeech] = useState(false);
+  const [messages, setMessages] = useState<AssistantMessage[]>([]);
+  const [wakeModel, setWakeModel] = useState(false);
+  const [wakeEnabled, setWakeEnabledState] = useState(readWakePreference);
+  const [conversationId, setConversationIdState] = useState<string | null>(null);
+  const [attachments, setAttachmentsState] = useState<AssistantImage[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  const stateRef = useRef<AssistantState>("idle");
+  /** Bumped on every new session or stop; stale async steps check it and bail. */
+  const sessionRef = useRef(0);
+  const listeningRef = useRef<Listening | null>(null);
+  const speakingRef = useRef<Speaking | null>(null);
+  const nextIdRef = useRef(0);
+  /** The last conversation ended with a goodbye; the next one starts clean. */
+  const conversationEndedRef = useRef(false);
+  // Refs mirror state read inside long-running async sessions.
+  const conversationIdRef = useRef<string | null>(null);
+  const attachmentsRef = useRef<AssistantImage[]>([]);
+  const lastActivityRef = useRef(0);
+
+  const setConversationId = useCallback((id: string | null) => {
+    conversationIdRef.current = id;
+    setConversationIdState(id);
+  }, []);
+
+  const setAttachments = useCallback((next: AssistantImage[]) => {
+    attachmentsRef.current = next;
+    setAttachmentsState(next);
+  }, []);
+
+  const wakeAvailable = allowed && wakeModel && window.isSecureContext;
+
+  const updateState = useCallback((next: AssistantState) => {
+    stateRef.current = next;
+    setState(next);
+  }, []);
+
+  const addMessage = useCallback((message: Omit<AssistantMessage, "id">) => {
+    const id = nextIdRef.current++;
+    setMessages((prev) => [...prev, { ...message, id }]);
+    return id;
+  }, []);
+
+  const updateMessage = useCallback(
+    (id: number, update: (message: AssistantMessage) => AssistantMessage | null) =>
+      setMessages((prev) =>
+        prev.flatMap((message) => {
+          if (message.id !== id) return [message];
+          const next = update(message);
+          return next ? [next] : [];
+        }),
+      ),
+    [],
+  );
+
+  const halt = useCallback(() => {
+    sessionRef.current++;
+    if (conversationEndedRef.current) {
+      conversationEndedRef.current = false;
+      setMessages([]);
+    }
+    listeningRef.current?.cancel();
+    listeningRef.current = null;
+    speakingRef.current?.stop();
+    speakingRef.current = null;
+    setHearingSpeech(false);
+  }, []);
+
+  const stop = useCallback(() => {
+    halt();
+    updateState("idle");
+  }, [halt, updateState]);
+
+  const fail = useCallback(
+    (session: number, error: unknown) => {
+      if (session !== sessionRef.current) return;
+      showToast(
+        error instanceof Error ? error.message : "Falha no assistente",
+        "error",
+      );
+      stop();
+    },
+    [showToast, stop],
+  );
+
+  /** Listens for one utterance; resolves "" on silence or when superseded. */
+  const listen = useCallback(
+    async (session: number, timeoutMs: number): Promise<string> => {
+      updateState("listening");
+      const listening = listenOnce({
+        onPhase: (phase) => {
+          if (session !== sessionRef.current) return;
+          if (phase === "speech") setHearingSpeech(true);
+          else updateState("thinking");
+        },
+        silenceTimeoutMs: timeoutMs,
+      });
+      listeningRef.current = listening;
+      const text = await listening.result;
+      if (listeningRef.current === listening) listeningRef.current = null;
+      if (session !== sessionRef.current) return "";
+      setHearingSpeech(false);
+      return text;
+    },
+    [updateState],
+  );
+
+  /**
+   * Sends one utterance and speaks the reply. "ended" means the user said
+   * goodbye; "superseded" means another session took over meanwhile.
+   */
+  const answer = useCallback(
+    async (
+      session: number,
+      text: string,
+    ): Promise<"continue" | "ended" | "superseded"> => {
+      // An idle conversation is not resumed: start a new one, on screen too.
+      if (conversationIdRef.current && Date.now() - lastActivityRef.current > RESUME_WINDOW_MS) {
+        setConversationId(null);
+        setMessages([]);
+      }
+      // Pending attachments go with whatever is said or typed next.
+      const images = attachmentsRef.current;
+      setAttachments([]);
+      addMessage({ role: "user", text, ...(images.length > 0 && { images }) });
+      updateState("thinking");
+      // The reply is filled in as the stream arrives: typing, tools, images.
+      const replyId = addMessage({ role: "assistant", text: "", pending: true, live: true });
+      const live = () => session === sessionRef.current;
+      let data;
+      try {
+        data = await streamChat(
+          {
+            text,
+            ...(conversationIdRef.current && { conversationId: conversationIdRef.current }),
+            ...(images.length > 0 && { images: images.map((image) => image.key) }),
+          },
+          (event) => {
+            if (!live()) return;
+            if (event.type === "delta") {
+              updateMessage(replyId, (m) => ({ ...m, text: m.text + event.text, activity: undefined }));
+            } else if (event.type === "tool") {
+              updateMessage(replyId, (m) => ({ ...m, activity: event.tool }));
+            } else if (event.type === "action") {
+              updateMessage(replyId, (m) => ({
+                ...m,
+                activity: undefined,
+                actions: [...(m.actions ?? []), event.action],
+              }));
+            } else if (event.type === "image") {
+              updateMessage(replyId, (m) => ({
+                ...m,
+                images: [...(m.images ?? []), event.image as AssistantImage],
+              }));
+            }
+          },
+        );
+      } catch (error) {
+        updateMessage(replyId, () => null);
+        throw error;
+      }
+      if (!live()) {
+        // Keep whatever was written, but stop showing it as in progress.
+        updateMessage(replyId, (m) => (m.text ? { ...m, pending: false, activity: undefined } : null));
+        return "superseded";
+      }
+      setConversationId(data.endConversation ? null : data.conversationId);
+      lastActivityRef.current = Date.now();
+      updateMessage(replyId, () => ({
+        id: replyId,
+        role: "assistant",
+        live: true,
+        text: data.reply,
+        actions: data.actions,
+        ...(data.images.length > 0 && { images: data.images as AssistantImage[] }),
+      }));
+
+      updateState("speaking");
+      const speaking = speak(data.reply);
+      speakingRef.current = speaking;
+      await speaking.done;
+      if (speakingRef.current === speaking) speakingRef.current = null;
+      if (session !== sessionRef.current) return "superseded";
+      if (data.endConversation) {
+        conversationEndedRef.current = true;
+        return "ended";
+      }
+      return "continue";
+    },
+    [addMessage, setAttachments, setConversationId, updateMessage, updateState],
+  );
+
+  /** Answers, then keeps listening for follow-ups until the user goes quiet. */
+  const converse = useCallback(
+    async (session: number, firstText: string) => {
+      let text = firstText;
+      while (text) {
+        const outcome = await answer(session, text);
+        if (outcome === "superseded") return;
+        if (outcome === "ended") break;
+        text = await listen(session, LISTEN_TIMEOUTS.followUpMs);
+        if (session !== sessionRef.current) return;
+      }
+      updateState("idle");
+    },
+    [answer, listen, updateState],
+  );
+
+  const start = useCallback(() => {
+    if (!allowed) return;
+    halt();
+    const session = sessionRef.current;
+    playChime();
+    listen(session, LISTEN_TIMEOUTS.firstTurnMs)
+      .then((text) => {
+        if (session !== sessionRef.current) return;
+        return converse(session, text);
+      })
+      .catch((error: unknown) => fail(session, error));
+  }, [allowed, converse, fail, halt, listen]);
+
+  const sendText = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      if (!allowed || !trimmed) return;
+      halt();
+      const session = sessionRef.current;
+      converse(session, trimmed).catch((error: unknown) => fail(session, error));
+    },
+    [allowed, converse, fail, halt],
+  );
+
+  const reset = useCallback(async () => {
+    stop();
+    setMessages([]);
+    setConversationId(null);
+    await getAssistantEdenClient().api.assistant.conversation.delete();
+  }, [setConversationId, stop]);
+
+  const openConversation = useCallback(
+    async (id: string) => {
+      stop();
+      const { data, error } = await getAssistantEdenClient()
+        .api.assistant.conversations({ id })
+        .get();
+      if (error || !data) {
+        showToast("Falha ao abrir a conversa", "error");
+        return;
+      }
+      conversationEndedRef.current = false;
+      lastActivityRef.current = Date.now();
+      setConversationId(data.id);
+      setMessages(
+        data.messages.map((message) => ({
+          id: nextIdRef.current++,
+          role: message.role,
+          text: message.text,
+          actions: message.actions,
+          images: message.images as AssistantImage[],
+        })),
+      );
+    },
+    [setConversationId, showToast, stop],
+  );
+
+  const attachImage = useCallback(
+    async (file: Blob) => {
+      setUploading(true);
+      try {
+        const image = await uploadImage(file);
+        setAttachments([...attachmentsRef.current, image]);
+      } catch (error) {
+        showToast(
+          error instanceof Error ? error.message : "Falha ao enviar a imagem",
+          "error",
+        );
+      } finally {
+        setUploading(false);
+      }
+    },
+    [setAttachments, showToast],
+  );
+
+  const removeAttachment = useCallback(
+    (key: string) =>
+      setAttachments(attachmentsRef.current.filter((image) => image.key !== key)),
+    [setAttachments],
+  );
+
+  const setWakeEnabled = useCallback((enabled: boolean) => {
+    writeWakePreference(enabled);
+    setWakeEnabledState(enabled);
+  }, []);
+
+  // Whether the wake word model is deployed comes from the server.
+  useEffect(() => {
+    if (!allowed) return;
+    let active = true;
+    void getAssistantEdenClient()
+      .api.assistant.config.get()
+      .then(({ data }) => {
+        if (active && data?.wakeWordEnabled) setWakeModel(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [allowed]);
+
+  // The wake word only starts a session from idle: while a reply plays, the
+  // assistant's own voice could otherwise wake it up.
+  const startRef = useRef(start);
+  startRef.current = start;
+  useEffect(() => {
+    if (!wakeAvailable || !wakeEnabled) return;
+    let engine: WakeWordEngine | null = null;
+    let active = true;
+    let wakeLock: WakeLockSentinel | null = null;
+
+    startWakeWord(() => {
+      if (stateRef.current === "idle") startRef.current();
+    })
+      .then((started) => {
+        if (active) engine = started;
+        else void started.stop();
+      })
+      .catch(() => {
+        if (active) showToast("Não foi possível ativar o \"Ei Integra\"", "error");
+      });
+
+    // Keep the kiosk screen on while it is listening for the wake word.
+    navigator.wakeLock
+      ?.request("screen")
+      .then((lock) => {
+        if (active) wakeLock = lock;
+        else void lock.release();
+      })
+      .catch(() => {});
+
+    window.addEventListener("pointerdown", resumeAudio);
+    return () => {
+      active = false;
+      window.removeEventListener("pointerdown", resumeAudio);
+      void engine?.stop();
+      void wakeLock?.release();
+    };
+  }, [showToast, wakeAvailable, wakeEnabled]);
+
+  // Stop any session when the provider goes away.
+  useEffect(() => halt, [halt]);
+
+  const value = useMemo<VoiceAssistantValue>(
+    () => ({
+      allowed,
+      state,
+      hearingSpeech,
+      messages,
+      wakeAvailable,
+      wakeEnabled,
+      setWakeEnabled,
+      start,
+      sendText,
+      stop,
+      reset,
+      conversationId,
+      openConversation,
+      attachments,
+      uploading,
+      attachImage,
+      removeAttachment,
+    }),
+    [
+      allowed,
+      state,
+      hearingSpeech,
+      messages,
+      wakeAvailable,
+      wakeEnabled,
+      setWakeEnabled,
+      start,
+      sendText,
+      stop,
+      reset,
+      conversationId,
+      openConversation,
+      attachments,
+      uploading,
+      attachImage,
+      removeAttachment,
+    ],
+  );
+
+  return (
+    <VoiceAssistantContext.Provider value={value}>
+      {children}
+    </VoiceAssistantContext.Provider>
+  );
+}

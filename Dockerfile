@@ -9,6 +9,10 @@ RUN bun install --frozen-lockfile
 
 COPY . .
 
+# Offline Portuguese model for the assistant's "Hey Integra" wake word (~32 MB,
+# not committed). Skipped when the build context already has it.
+RUN bun run assistant:model
+
 # ponytail: bun build --compile fails ahead-of-time bundling the frontend's
 # @opentelemetry browser packages (resolves Node builtins instead of browser
 # exports). Running from source works today; revisit --compile if startup

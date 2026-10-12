@@ -6,6 +6,8 @@ import { createRoot } from "react-dom/client";
 import { ConfirmDialog, ConfirmProvider } from "@public/components/Confirm";
 import { MeProvider } from "@public/components/MeContext";
 import { ToastContainer, ToastProvider } from "@public/components/Toast";
+import { VoiceAssistantProvider } from "@public/components/VoiceAssistantContext";
+import { VoiceAssistantOverlay } from "@public/components/VoiceAssistantOverlay";
 
 import { GlobalDrawerProvider } from "./components/GlobalDrawerContext";
 import { instrumentFrontend } from "./instrumentFrontend";
@@ -18,10 +20,13 @@ function App() {
     <MeProvider>
       <ToastProvider>
         <ConfirmProvider>
-          <GlobalDrawerProvider>
-            <ConfirmDialog />
-            <ToastContainer />
-          </GlobalDrawerProvider>
+          <VoiceAssistantProvider>
+            <GlobalDrawerProvider>
+              <VoiceAssistantOverlay />
+              <ConfirmDialog />
+              <ToastContainer />
+            </GlobalDrawerProvider>
+          </VoiceAssistantProvider>
         </ConfirmProvider>
       </ToastProvider>
     </MeProvider>

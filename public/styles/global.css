@@ -8,3 +8,17 @@ html,
 body {
   overscroll-behavior-x: none;
 }
+
+/* The assistant's "thinking" dots: each grows and brightens in turn. */
+@keyframes typing-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.75);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

@@ -1,3 +1,4 @@
+export * from "./assistant";
 export * from "./auth";
 export * from "./google";
 export * from "./serverMetrics";

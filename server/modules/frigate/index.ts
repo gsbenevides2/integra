@@ -9,7 +9,7 @@ import { concatUrlAndResolveTrallingSlash } from "@server/utils/concatUrlAndReso
 import Elysia, { redirect, status, StatusMap } from "elysia";
 import { z } from "zod";
 
-import { frigateFetch } from "./service/frigate";
+import { frigateFetch, listEnabledCameras } from "./service/frigate";
 
 export const frigateRoutes = new Elysia({
   prefix: "/api/frigate",
@@ -20,16 +20,11 @@ export const frigateRoutes = new Elysia({
     "/cameras",
     async (ctx): Promise<string[]> => {
       const user = currentUser(ctx);
-      const res = await frigateFetch("/api/config");
-      if (!res.ok) throw status(502, { error: "Frigate indisponível" });
-      const config = (await res.json()) as {
-        cameras: Record<string, { enabled?: boolean }>;
-      };
+      const cameras = await listEnabledCameras().catch(() => {
+        throw status(502, { error: "Frigate indisponível" });
+      });
       const readable = await readableResourceIds(user.id, "frigate_camera");
-      return Object.entries(config.cameras)
-        .filter(([, camera]) => camera.enabled !== false)
-        .map(([name]) => name)
-        .filter((name) => readable.has(name));
+      return cameras.filter((name) => readable.has(name));
     },
     {
       detail: {

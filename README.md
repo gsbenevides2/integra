@@ -41,6 +41,7 @@ See the [`docs/`](./docs/) folder for detailed documentation:
 - **[Modules](./docs/scripts.md)** — the module convention, and how to add a new one
 - **[Triggers](./docs/triggers.md)** — HTTP routes, cron jobs, Tuya Pulsar
 - **[Instrumentation](./docs/instrumentation.md)** — OpenTelemetry tracing, backend and frontend
+- **[Voice assistant](./docs/assistant.md)** — the "Ei Integra" AI voice assistant, its tools and setup
 - **[Configuration](./docs/configuration.md)** — environment variable reference
 - **[Environment](./docs/environment.md)** — setup and code quality tools
 - **[Development](./docs/development.md)** — the checklist for adding or changing a feature
