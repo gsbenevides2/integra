@@ -1,7 +1,11 @@
 import {
   AudioService,
+  DEFAULT_ELEVENLABS_MODEL,
   DEFAULT_TTS_MODEL,
   DEFAULT_VOICE,
+  ELEVENLABS_API_URL,
+  ELEVENLABS_OUTPUT_FORMAT,
+  elevenLabsBody,
   STT_MODEL,
   TTS_INSTRUCTIONS,
 } from "@server/modules/assistant/service/audio";
@@ -20,11 +24,13 @@ function respond(response: Response) {
     return response;
   }) as typeof fetch;
 }
+const ELEVENLABS_ENV = ["ELEVENLABS_API_KEY", "ELEVENLABS_VOICE_ID", "ELEVENLABS_TTS_MODEL"];
 afterEach(() => {
   globalThis.fetch = realFetch;
   calls.length = 0;
   delete process.env.ASSISTANT_VOICE;
   delete process.env.ASSISTANT_TTS_MODEL;
+  for (const key of ELEVENLABS_ENV) delete process.env[key];
 });
 
 describe("AudioService", () => {
@@ -85,5 +91,64 @@ describe("AudioService", () => {
       model: "elevenlabs/eleven-flash-v2.5",
       voice: "george",
     });
+  });
+});
+
+describe("AudioService with ElevenLabs", () => {
+  const useElevenLabs = (model?: string) => {
+    process.env.ELEVENLABS_API_KEY = "sk_test";
+    process.env.ELEVENLABS_VOICE_ID = "GM2UA3fbsIaLHcswCDX9";
+    if (model) process.env.ELEVENLABS_TTS_MODEL = model;
+  };
+
+  test("speaks with the configured voice, as plain sentences, in mp3", async () => {
+    useElevenLabs();
+    respond(new Response("mp3"));
+    const response = await AudioService.speech("Liguei a **luz**.");
+    expect(await response.text()).toBe("mp3");
+    expect(calls[0]?.url).toBe(
+      `${ELEVENLABS_API_URL}/text-to-speech/GM2UA3fbsIaLHcswCDX9/stream` +
+        `?output_format=${ELEVENLABS_OUTPUT_FORMAT}`,
+    );
+    expect(calls[0]?.init.headers).toEqual({
+      "xi-api-key": "sk_test",
+      "Content-Type": "application/json",
+      Accept: "audio/mpeg",
+    });
+    // multilingual_v2 takes no language_code: it detects Portuguese itself.
+    expect(JSON.parse(calls[0]!.init.body as string)).toEqual({
+      text: "Liguei a luz.",
+      model_id: DEFAULT_ELEVENLABS_MODEL,
+    });
+  });
+
+  test("pins Portuguese for the models that take a language code", async () => {
+    useElevenLabs("eleven_flash_v2_5");
+    respond(new Response("mp3"));
+    await AudioService.speech("Oi");
+    expect(JSON.parse(calls[0]!.init.body as string)).toEqual({
+      text: "Oi",
+      model_id: "eleven_flash_v2_5",
+      language_code: "pt",
+    });
+    expect(elevenLabsBody("Oi", "eleven_multilingual_v2")).toEqual({
+      text: "Oi",
+      model_id: "eleven_multilingual_v2",
+    });
+  });
+
+  test("keeps the OpenRouter voice until a voice is chosen too", async () => {
+    process.env.ELEVENLABS_API_KEY = "sk_test";
+    respond(new Response("mp3"));
+    await AudioService.speech("Oi");
+    expect(calls[0]?.url).toBe("https://openrouter.ai/api/v1/audio/speech");
+  });
+
+  test("failures name ElevenLabs and carry its status and body", async () => {
+    useElevenLabs();
+    respond(new Response("missing permission", { status: 401 }));
+    await expect(AudioService.speech("oi")).rejects.toThrow(
+      "ElevenLabs audio request failed: 401 missing permission",
+    );
   });
 });

@@ -6,8 +6,10 @@ can control Tuya devices. It is built for the always-on tablet kiosk, but works
 in any browser.
 
 Everything except the wake word goes through OpenRouter with the single
-`OPEN_ROUTER_API_KEY`: the agent's LLM, ElevenLabs speech-to-text,
-Microsoft MAI text-to-speech and image generation.
+`OPEN_ROUTER_API_KEY`: the agent's LLM, ElevenLabs speech-to-text and image
+generation. Text to speech uses ElevenLabs' own API when `ELEVENLABS_API_KEY`
+and `ELEVENLABS_VOICE_ID` are set, and Microsoft MAI through OpenRouter
+otherwise.
 
 ## Flow
 
@@ -18,7 +20,8 @@ Microsoft MAI text-to-speech and image generation.
         |                     POST /api/assistant/stt   -> OpenRouter elevenlabs/scribe-v2
         |                     POST /api/assistant/chat/stream (SSE) -> agent + tools, as the user
         |                                        |
-        +-- back to wake word <-- Web Audio <-- POST /api/assistant/tts -> microsoft/mai-voice-2.1-flash (pt-BR)
+        +-- back to wake word <-- Web Audio <-- POST /api/assistant/tts -> ElevenLabs (pt-BR voice)
+                                                                            or microsoft/mai-voice-2.1-flash
 ```
 
 ### Wake word
@@ -172,16 +175,33 @@ In the chat:
 
 ### Text to speech
 
-- The default is `microsoft/mai-voice-2.1-flash` with the voice
+- **ElevenLabs (preferred):** with `ELEVENLABS_API_KEY` and
+  `ELEVENLABS_VOICE_ID` set, replies are spoken through ElevenLabs' own API
+  (`POST /v1/text-to-speech/{voice}/stream`, mp3 44.1 kHz/128 kbps), not
+  OpenRouter's. That reaches the Voice Library's native **Brazilian** voices,
+  which OpenRouter's ElevenLabs (English voices only) cannot.
+  - The model is `eleven_multilingual_v2` (most natural; it detects the
+    language itself, and the API documents `language_code` as unsupported
+    for it). Set
+    `ELEVENLABS_TTS_MODEL=eleven_flash_v2_5` for faster replies; models other
+    than multilingual_v2 are sent `language_code: "pt"`.
+  - The whole reply is synthesised before it plays, so total generation time is
+    what counts: ~1.8 s for a 4 s sentence with multilingual_v2.
+  - Pick a voice with `bun run assistant:voices` (Brazilian voices of the
+    Voice Library and the account's voices, with previews), add a library voice
+    with `bun run assistant:voices -- add <public_owner_id> <voice_id>`, and set
+    `ELEVENLABS_VOICE_ID`. The key needs `voices_read`/`voices_write` for that
+    script; speaking only needs text to speech.
+  - The voice's stability, similarity and style come from its settings on
+    ElevenLabs; tune them there.
+- **OpenRouter (fallback):** without ElevenLabs configured, it is
+  `microsoft/mai-voice-2.1-flash` with the voice
   `pt-BR-Luana:MAI-Voice-2.1-Flash` (`service/audio.ts`). Change them with
-  `ASSISTANT_TTS_MODEL` and `ASSISTANT_VOICE`.
-- OpenRouter's ElevenLabs voices are English voices, and OpenRouter has no
-  language parameter for speech. They sound European when speaking
-  Portuguese. The MAI voices are native Brazilian voices, and in tests were
-  also faster: ~0.9 s against ~1.2 s.
-- An `instructions` hint asking for a Brazilian accent is always sent. Models
-  that support it (OpenAI, Gemini) follow it, and the rest ignore it.
-- The server proxies the mp3 from `POST /api/assistant/tts`.
+  `ASSISTANT_TTS_MODEL` and `ASSISTANT_VOICE`. An `instructions` hint asking
+  for a Brazilian accent is always sent; models that support it (OpenAI,
+  Gemini) follow it, and the rest ignore it.
+- The server proxies the mp3 from `POST /api/assistant/tts`, for the web and
+  the Android app alike.
 - The browser plays it through the **Web Audio API** (`speaker.ts`), not an
   `<audio>` element. With the microphone open, browsers (notably Chrome on
   Android) pause media elements as they start ("The play() request was

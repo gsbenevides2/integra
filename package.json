@@ -23,7 +23,8 @@
     "db:sync": "bun --bun run drizzle-kit push --config server/db/drizzle.config.ts",
     "db:studio": "bun --bun run drizzle-kit studio --config server/db/drizzle.config.ts",
     "assistant:model": "bun scripts/download-vosk-model.ts",
-    "assistant:speaker-model": "bun scripts/download-speaker-model.ts"
+    "assistant:speaker-model": "bun scripts/download-speaker-model.ts",
+    "assistant:voices": "bun scripts/elevenlabs-voices.ts"
   },
   "dependencies": {
     "@elysia/eden": "^1.4.10",
