@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { index, integer, jsonb, pgSchema, real, text, timestamp } from "drizzle-orm/pg-core";
 
 import { authUsers } from "./auth";
@@ -31,14 +32,18 @@ export const assistantUserSettings = assistant.table("user_settings", {
 export const assistantVoiceProfiles = assistant.table(
   "voice_profiles",
   {
+    // Database-side defaults (not just $defaultFn) so `db:sync` can add these
+    // columns to rows enrolled before voices became 1:N: each existing voice
+    // gets its own id and the label below, and keeps working without re-enrolling.
     id: text()
       .primaryKey()
+      .default(sql`gen_random_uuid()::text`)
       .$defaultFn(() => crypto.randomUUID()),
     userId: text()
       .notNull()
       .references(() => authUsers.id, { onDelete: "cascade" }),
     /** The voice's display name, chosen by the user. */
-    label: text().notNull(),
+    label: text().notNull().default("Minha voz"),
     /** One L2-normalised embedding per enrolment sample. */
     embeddings: jsonb().$type<number[][]>().notNull(),
     /** Embedding dimensionality (e.g. 192), to reject a mismatched client model. */
