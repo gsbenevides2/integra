@@ -22,6 +22,13 @@ export const assistantUserSettings = assistant.table("user_settings", {
 });
 
 /**
+ * The label of voices enrolled before voices became 1:N, and of the one voice
+ * the legacy single-profile routes (`/voice-profile`, used by the Android app)
+ * read and write.
+ */
+export const DEFAULT_VOICE_LABEL = "Minha voz";
+
+/**
  * A user's enrolled wake-word voices. A user may enrol several distinct voices
  * (e.g. different people or devices), each a labelled row whose `embeddings`
  * holds a few L2-normalised speaker embeddings (one per enrolment sample)
@@ -43,7 +50,7 @@ export const assistantVoiceProfiles = assistant.table(
       .notNull()
       .references(() => authUsers.id, { onDelete: "cascade" }),
     /** The voice's display name, chosen by the user. */
-    label: text().notNull().default("Minha voz"),
+    label: text().notNull().default(DEFAULT_VOICE_LABEL),
     /** One L2-normalised embedding per enrolment sample. */
     embeddings: jsonb().$type<number[][]>().notNull(),
     /** Embedding dimensionality (e.g. 192), to reject a mismatched client model. */

@@ -256,6 +256,27 @@ describe("assistant routes", () => {
     expect(remove).toHaveBeenCalledWith(TEST_USER.id, "v1");
   });
 
+  test("keeps the legacy single-profile routes for the Android app", async () => {
+    const profile = { enrolled: true, embeddings: [[1, 0], [0, 1]], dims: 2, modelId: "m1" };
+    const get = spyOn(VoiceProfileService, "legacyProfile").mockResolvedValue(profile);
+    const save = spyOn(VoiceProfileService, "saveDefault").mockResolvedValue(profile);
+    const remove = spyOn(VoiceProfileService, "deleteDefault").mockResolvedValue();
+    spies.push(get, save, remove);
+
+    expect(await (await call("/voice-profile")).json()).toEqual(profile);
+    expect(get).toHaveBeenCalledWith(TEST_USER.id);
+
+    const enrol = await send("PUT", "/voice-profile", { embeddings: [[1, 0]], modelId: "m1" });
+    expect(await enrol.json()).toEqual(profile);
+    expect(save).toHaveBeenCalledWith(TEST_USER.id, [[1, 0]], "m1");
+
+    expect(await (await send("DELETE", "/voice-profile", undefined)).json()).toEqual({ ok: true });
+    expect(remove).toHaveBeenCalledWith(TEST_USER.id);
+
+    // The legacy enrolment has no label, but still needs embeddings.
+    expect((await send("PUT", "/voice-profile", { embeddings: [], modelId: "m1" })).status).toBe(422);
+  });
+
   test("rejects an enrolment with an empty label", async () => {
     const status = (await send("POST", "/voice-profiles", {
       label: "",

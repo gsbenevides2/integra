@@ -69,3 +69,66 @@ describe("VoiceProfileService", () => {
     expect(fake.calls).toEqual(["delete", "where"]);
   });
 });
+
+describe("VoiceProfileService legacy single profile (Android)", () => {
+  const voice = (id: string, modelId: string, embeddings: number[][]) => ({
+    id,
+    label: id,
+    embeddings,
+    dims: embeddings[0]!.length,
+    modelId,
+  });
+  // list() is oldest first: the last voice holds the most recently used model.
+  const voices = [
+    voice("old", "m0", [[9, 9]]),
+    voice("gui", "m1", [[1, 0], [0.9, 0.1]]),
+    voice("ana", "m1", [[0, 1]]),
+  ];
+  const combined = {
+    enrolled: true,
+    embeddings: [[1, 0], [0.9, 0.1], [0, 1]],
+    dims: 2,
+    modelId: "m1",
+  };
+
+  test("reports no profile when no voice is enrolled", async () => {
+    fake.push([]);
+    expect(await VoiceProfileService.legacyProfile("u1")).toEqual({
+      enrolled: false,
+      embeddings: [],
+      dims: 0,
+      modelId: "",
+    });
+  });
+
+  test("combines every voice of the latest model into one profile", async () => {
+    fake.push(voices);
+    expect(await VoiceProfileService.legacyProfile("u1")).toEqual(combined);
+  });
+
+  test("re-records the default voice when it exists", async () => {
+    fake.calls.length = 0;
+    fake.push([{ id: "v1" }], undefined, voices);
+    expect(await VoiceProfileService.saveDefault("u1", [[1, 0]], "m1")).toEqual(combined);
+    expect(fake.calls).toEqual([
+      "select", "from", "where", "limit",
+      "update", "set", "where",
+      "select", "from", "where", "orderBy",
+    ]);
+  });
+
+  test("creates the default voice when it is missing", async () => {
+    fake.calls.length = 0;
+    // Lookup finds nothing; create() checks the limit, then inserts.
+    fake.push([], [], [{ id: "v9" }], voices);
+    expect(await VoiceProfileService.saveDefault("u1", [[1, 0]], "m1")).toEqual(combined);
+    expect(fake.calls).toContain("insert");
+  });
+
+  test("removes only the default voice", async () => {
+    fake.calls.length = 0;
+    fake.push(undefined);
+    await VoiceProfileService.deleteDefault("u1");
+    expect(fake.calls).toEqual(["delete", "where"]);
+  });
+});

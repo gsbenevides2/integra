@@ -3,7 +3,7 @@ import type { VoiceProfile } from "@public/components/VoiceAssistantContext/voic
 
 import { afterAll, afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 
-import { installVoiceFakes, voice } from "../../../helpers/voice";
+import { FAKE_SAMPLE_RATE, installVoiceFakes, voice } from "../../../helpers/voice";
 
 // No mock.module for the speaker model: Bun keeps module mocks for every later
 // test file. Only loadSpeakerModel is spied, and restored after each test.
@@ -12,6 +12,7 @@ afterAll(installVoiceFakes());
 const { buildSpeakerGate, SPEAKER_BUFFER_MS, startWakeWord, WAKE_COOLDOWN_MS } = await import(
   "@public/components/VoiceAssistantContext/wakeWord"
 );
+const { SPEECH_TRIM } = await import("@public/components/VoiceAssistantContext/speechTrim");
 
 const profile = (id: string, modelId: string, embeddings: number[][]): VoiceProfile => ({
   id,
@@ -118,6 +119,25 @@ describe("startWakeWord with a speaker gate", () => {
 
     await engine.stop();
     expect(recognizer.removed).toBe(true);
+  });
+
+  test("embeds only the phrase just heard, not the silence around it", async () => {
+    const lengths: number[] = [];
+    const embed = async (samples: Float32Array) => {
+      lengths.push(samples.length);
+      return new Float32Array([1, 0]);
+    };
+    const { engine, recognizer, detections } = await start(gateHearing(embed));
+    // Silence, the phrase, then the silence Vosk waits for before its result.
+    voice.feed(0, 1000);
+    voice.feed(0.3, 800);
+    voice.feed(0, 600);
+    recognizer.result("ei integra");
+    await settle();
+    expect(detections()).toBe(1);
+    const padMs = SPEECH_TRIM.padMs;
+    expect(lengths).toEqual([Math.round(((800 + 2 * padMs) / 1000) * FAKE_SAMPLE_RATE)]);
+    await engine.stop();
   });
 
   test("fires without a check when no audio was buffered yet", async () => {

@@ -84,6 +84,12 @@ export interface VoiceAssistantValue {
   voiceModel: { url: string; id: string } | null;
   /** Re-arms the wake word after the voice profile changed (enrol / remove). */
   reloadVoiceProfile: () => void;
+  /**
+   * Turns the wake word off until the returned function is called, e.g. while
+   * a voice is enrolled (saying "Ei Integra" must not start a session then).
+   * Pauses nest: it comes back once every pause has been released.
+   */
+  pauseWakeWord: () => () => void;
 }
 
 /** The assistant dashboard's id in the drawer. */
@@ -121,6 +127,7 @@ const NOOP_VALUE: VoiceAssistantValue = {
   removeAttachment: () => {},
   voiceModel: null,
   reloadVoiceProfile: () => {},
+  pauseWakeWord: () => () => {},
 };
 
 const VoiceAssistantContext = createContext<VoiceAssistantValue>(NOOP_VALUE);
@@ -164,6 +171,9 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
   );
   /** Bumped after enrolling/removing a voice, to re-arm the wake word gate. */
   const [voiceProfileVersion, setVoiceProfileVersion] = useState(0);
+  /** Open pauseWakeWord() calls; the wake word only runs while there are none. */
+  const [wakePauses, setWakePauses] = useState(0);
+  const wakePaused = wakePauses > 0;
   const [wakeEnabled, setWakeEnabledState] = useState(readWakePreference);
   const [conversationId, setConversationIdState] = useState<string | null>(null);
   const [attachments, setAttachmentsState] = useState<AssistantImage[]>([]);
@@ -530,7 +540,7 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
   const startRef = useRef(start);
   startRef.current = start;
   useEffect(() => {
-    if (!wakeAvailable || !wakeEnabled) return;
+    if (!wakeAvailable || !wakeEnabled || wakePaused) return;
     let engine: WakeWordEngine | null = null;
     let active = true;
     let wakeLock: WakeLockSentinel | null = null;
@@ -549,6 +559,9 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
       }
       if (!active) return;
       startWakeWord(() => {
+        // The engine stops asynchronously: a check still running when it was
+        // turned off (e.g. paused for enrolment) must not start a session.
+        if (!active) return;
         if (stateRef.current === "idle" || stateRef.current === "speaking") {
           startRef.current();
         }
@@ -578,7 +591,7 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
       void engine?.stop();
       void wakeLock?.release();
     };
-  }, [showToast, wakeAvailable, wakeEnabled, voiceModel, voiceProfileVersion]);
+  }, [showToast, wakeAvailable, wakeEnabled, wakePaused, voiceModel, voiceProfileVersion]);
 
   // Stop any session when the provider goes away.
   useEffect(() => halt, [halt]);
@@ -587,6 +600,16 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
     () => setVoiceProfileVersion((version) => version + 1),
     [],
   );
+
+  const pauseWakeWord = useCallback(() => {
+    setWakePauses((pauses) => pauses + 1);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      setWakePauses((pauses) => pauses - 1);
+    };
+  }, []);
 
   const value = useMemo<VoiceAssistantValue>(
     () => ({
@@ -611,6 +634,7 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
       removeAttachment,
       voiceModel,
       reloadVoiceProfile,
+      pauseWakeWord,
     }),
     [
       allowed,
@@ -634,6 +658,7 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
       removeAttachment,
       voiceModel,
       reloadVoiceProfile,
+      pauseWakeWord,
     ],
   );
 

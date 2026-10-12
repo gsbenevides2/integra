@@ -2,6 +2,7 @@ import { type KaldiRecognizer, VoskClient } from "@lichess-org/vosk-browser";
 
 import { type Microphone, openMicrophone } from "./microphone";
 import { cosine, loadSpeakerModel, type SpeakerModel } from "./speakerModel";
+import { lastSpeech } from "./speechTrim";
 import type { VoiceProfile } from "./voiceProfile";
 
 export const MODEL_URL = "/vosk/vosk-model-small-pt.tar.gz";
@@ -17,8 +18,13 @@ export const WAKE_PHRASES = ["ei integra", "integra"];
 /** Ignore repeated detections of the same utterance. */
 export const WAKE_COOLDOWN_MS = 3000;
 
-/** How much recent audio to keep for the speaker check (covers the wake phrase). */
-export const SPEAKER_BUFFER_MS = 1500;
+/**
+ * How much recent audio to keep for the speaker check. Vosk only reports the
+ * final result after its end-of-speech silence and the worker's latency, so a
+ * short buffer often held more silence than phrase; the check embeds just the
+ * phrase, cut out of this window by lastSpeech.
+ */
+export const SPEAKER_BUFFER_MS = 4000;
 
 /**
  * Only a final result that is exactly a wake phrase counts. Partial results
@@ -164,7 +170,13 @@ export async function startWakeWord(
     }
     verifying = true;
     try {
-      const candidate = await gate.model.embed(snapshot.samples, snapshot.sampleRate);
+      // Embed only the phrase just heard, as enrolment does; if nothing stands
+      // out from the noise (a very quiet voice), use the whole window.
+      const speech = lastSpeech(snapshot.samples, snapshot.sampleRate);
+      const candidate = await gate.model.embed(
+        speech?.samples ?? snapshot.samples,
+        snapshot.sampleRate,
+      );
       let best = -Infinity;
       for (const enrolled of gate.embeddings) {
         best = Math.max(best, cosine(candidate, enrolled));

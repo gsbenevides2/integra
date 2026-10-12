@@ -9,6 +9,7 @@ import {
   chatBody,
   type ConversationDetail,
   type ConversationSummary,
+  legacyVoiceProfileBody,
   MAX_AUDIO_BYTES,
   type MessageView,
   settingsBody,
@@ -368,6 +369,53 @@ export const assistantRoutes = new Elysia({
         description:
           "Deletes one of the current user's enrolled voices. With no voices " +
           "left, the wake word fires for any voice again.",
+      },
+    },
+  )
+  // Legacy single-profile routes, still used by the Android app.
+  .get(
+    "/voice-profile",
+    (ctx) => VoiceProfileService.legacyProfile(currentUser(ctx).id),
+    {
+      detail: {
+        summary: "Get My Voice Profile (legacy)",
+        description:
+          "Every enrolled voice of the most recently used model as one " +
+          "profile, so a client that checks against a single profile accepts " +
+          "any of them. Prefer GET /voice-profiles.",
+      },
+    },
+  )
+  .put(
+    "/voice-profile",
+    (ctx) =>
+      VoiceProfileService.saveDefault(
+        currentUser(ctx).id,
+        ctx.body.embeddings,
+        ctx.body.modelId,
+      ),
+    {
+      detail: {
+        summary: "Enrol My Voice (legacy)",
+        description:
+          "Re-records the default voice (\"Minha voz\"), creating it if " +
+          "missing, and returns the combined profile. Prefer POST /voice-profiles.",
+      },
+      body: legacyVoiceProfileBody,
+    },
+  )
+  .delete(
+    "/voice-profile",
+    async (ctx) => {
+      await VoiceProfileService.deleteDefault(currentUser(ctx).id);
+      return { ok: true };
+    },
+    {
+      detail: {
+        summary: "Remove My Voice (legacy)",
+        description:
+          "Deletes the default voice (\"Minha voz\") only; other voices stay. " +
+          "Prefer DELETE /voice-profiles/:id.",
       },
     },
   )

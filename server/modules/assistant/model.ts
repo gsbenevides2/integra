@@ -104,6 +104,21 @@ export const voiceLabelBody = z.object({ label: voiceLabel });
 
 export type VoiceLabelBody = z.infer<typeof voiceLabelBody>;
 
+/** The legacy single-profile enrolment (no label): it writes the default voice. */
+export const legacyVoiceProfileBody = voiceProfileBody.omit({ label: true });
+
+/**
+ * The single voice profile of the legacy `/voice-profile` routes, still used
+ * by the Android app: every enrolled voice of the most recently used model,
+ * flattened, so a client that checks against it accepts any of them.
+ */
+export interface LegacyVoiceProfile {
+  enrolled: boolean;
+  embeddings: number[][];
+  dims: number;
+  modelId: string;
+}
+
 /** One of a user's enrolled wake-word voices (embeddings stay client-usable). */
 export interface VoiceProfile {
   id: string;

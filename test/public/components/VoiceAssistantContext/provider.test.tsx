@@ -680,6 +680,36 @@ describe("wake word", () => {
     }
   });
 
+  test("pausing turns the wake word off until every pause is released", async () => {
+    config = { wakeWordEnabled: true };
+    renderProvider();
+    await until(() => voice.recognizers.length === 1);
+    const first = voice.recognizers[0]!;
+
+    let resumeEnrolment: () => void = () => {};
+    let resumeOther: () => void = () => {};
+    act(() => {
+      resumeEnrolment = value.pauseWakeWord();
+      resumeOther = value.pauseWakeWord();
+    });
+    await until(() => first.removed);
+    // A phrase still being checked when it stopped does not start a session.
+    await act(async () => first.result("ei integra"));
+    await flush();
+    expect(value.state).toBe("idle");
+
+    act(() => {
+      resumeEnrolment();
+      resumeEnrolment(); // releasing the same pause twice counts once
+    });
+    await flush();
+    expect(voice.recognizers).toHaveLength(1);
+
+    act(() => resumeOther());
+    await until(() => voice.recognizers.length === 2);
+    expect(voice.recognizers[1]!.removed).toBe(false);
+  });
+
   test("the preference is remembered and turning it off stops the engine", async () => {
     config = { wakeWordEnabled: true };
     renderProvider();

@@ -1,9 +1,9 @@
 import { db } from "@server/db";
-import { assistantVoiceProfiles } from "@server/db/schema";
+import { assistantVoiceProfiles, DEFAULT_VOICE_LABEL } from "@server/db/schema";
 
 import { and, eq } from "drizzle-orm";
 
-import { MAX_VOICES_PER_USER, type VoiceProfile } from "../model";
+import { type LegacyVoiceProfile, MAX_VOICES_PER_USER, type VoiceProfile } from "../model";
 
 /**
  * A user's enrolled wake-word voices. A user may enrol several distinct voices;
@@ -70,4 +70,60 @@ export abstract class VoiceProfileService {
         ),
       );
   }
+
+  // Legacy single-profile API (`/voice-profile`), kept for the Android app,
+  // which still enrols one voice and checks against one profile.
+
+  /**
+   * Every voice of the most recently enrolled model, flattened into one
+   * profile: a client checking against it accepts any of the user's voices.
+   */
+  static async legacyProfile(userId: string): Promise<LegacyVoiceProfile> {
+    const voices = await VoiceProfileService.list(userId);
+    const latest = voices.at(-1);
+    if (!latest) return { enrolled: false, embeddings: [], dims: 0, modelId: "" };
+    return {
+      enrolled: true,
+      embeddings: voices
+        .filter((voice) => voice.modelId === latest.modelId)
+        .flatMap((voice) => voice.embeddings),
+      dims: latest.dims,
+      modelId: latest.modelId,
+    };
+  }
+
+  /** Re-records the default voice ("Minha voz"), creating it if missing. */
+  static async saveDefault(
+    userId: string,
+    embeddings: number[][],
+    modelId: string,
+  ): Promise<LegacyVoiceProfile> {
+    const [existing] = await db
+      .select({ id: assistantVoiceProfiles.id })
+      .from(assistantVoiceProfiles)
+      .where(defaultVoiceOf(userId))
+      .limit(1);
+    if (existing) {
+      const dims = embeddings[0]?.length ?? 0;
+      await db
+        .update(assistantVoiceProfiles)
+        .set({ embeddings, dims, modelId, updatedAt: new Date() })
+        .where(eq(assistantVoiceProfiles.id, existing.id));
+    } else {
+      await VoiceProfileService.create(userId, DEFAULT_VOICE_LABEL, embeddings, modelId);
+    }
+    return VoiceProfileService.legacyProfile(userId);
+  }
+
+  /** Removes the default voice only; voices added on the web stay. */
+  static async deleteDefault(userId: string): Promise<void> {
+    await db.delete(assistantVoiceProfiles).where(defaultVoiceOf(userId));
+  }
+}
+
+function defaultVoiceOf(userId: string) {
+  return and(
+    eq(assistantVoiceProfiles.userId, userId),
+    eq(assistantVoiceProfiles.label, DEFAULT_VOICE_LABEL),
+  );
 }

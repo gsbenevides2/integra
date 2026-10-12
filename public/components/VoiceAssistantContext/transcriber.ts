@@ -116,10 +116,18 @@ export interface Captured {
   sampleRate: number;
 }
 
+/** Nobody spoke before the timeout: the caller may simply ask again. */
+export class NoSpeechError extends Error {
+  constructor() {
+    super("Não ouvi você dizer \"Ei Integra\"");
+    this.name = "NoSpeechError";
+  }
+}
+
 /**
  * Records one short utterance (ending on silence) and resolves with the raw
  * mono samples, for voice enrolment (the speaker-embedding model, not STT).
- * Rejects if no speech is heard within `silenceTimeoutMs`.
+ * Rejects with NoSpeechError if no speech is heard within `silenceTimeoutMs`.
  */
 export function captureUtterance(silenceTimeoutMs: number): Promise<Captured> {
   return new Promise<Captured>((resolve, reject) => {
@@ -137,7 +145,7 @@ export function captureUtterance(silenceTimeoutMs: number): Promise<Captured> {
       if (finished) return;
       finished = true;
       void microphone?.stop();
-      if (!ok) return reject(new Error("Não ouvi você dizer \"Ei Integra\""));
+      if (!ok) return reject(new NoSpeechError());
       const total = chunks.reduce((n, c) => n + c.length, 0);
       const samples = new Float32Array(total);
       let offset = 0;

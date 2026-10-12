@@ -6,18 +6,23 @@ import * as speakerModel from "@public/components/VoiceAssistantContext/speakerM
 import * as transcriber from "@public/components/VoiceAssistantContext/transcriber";
 
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 
 import { type ApiCall, fail, useApi } from "../../../helpers/dash-api";
 import { ME_FIXTURE, renderWithMe } from "../../../helpers/me";
+import { installVoiceFakes, voice as fakeAudio } from "../../../helpers/voice";
 
 // No mock.module here: Bun keeps module mocks for every later test file, so the
 // real provider, toasts and voice client run, the API is faked at fetch level,
-// and only the browser-audio helpers are spied (and restored) per test.
+// and only the browser-audio helpers are spied (and restored) per test. The
+// shared voice fakes (Vosk, Web Audio) only matter for the wake word test.
+afterAll(installVoiceFakes());
+
 const { CHAT_ROUTE_KEY, VoiceAssistantProvider } = await import(
   "@public/components/VoiceAssistantContext"
 );
-const { ENROLL_SAMPLES, SettingsModal } = await import(
+const { ENROLLMENT } = await import("@public/components/VoiceAssistantContext/enrollment");
+const { describeEnrollmentStep, SettingsModal } = await import(
   "@public/dashboards/voice-assistant/SettingsModal"
 );
 
@@ -70,7 +75,17 @@ const calls = useApi({
   },
 });
 
+/** One spoken "Ei Integra": silence, 600 ms of voice, silence. */
+function spoken() {
+  const rate = 16000;
+  const samples = new Float32Array(rate * 1.2);
+  samples.fill(0.3, rate * 0.3, rate * 0.9);
+  return { samples, sampleRate: rate };
+}
+
 let promptReply: string | null = "Gui";
+/** The embedding the fake model hears for every sample. */
+let heard = [1, 0];
 const realPrompt = window.prompt;
 const spies: { mockRestore: () => void }[] = [];
 let loadModel: ReturnType<typeof spyOn>;
@@ -83,14 +98,13 @@ beforeEach(() => {
   voices = [];
   writeReply = null;
   promptReply = "Gui";
+  heard = [1, 0];
+  fakeAudio.reset();
   window.prompt = () => promptReply;
   loadModel = spyOn(speakerModel, "loadSpeakerModel").mockResolvedValue({
-    embed: async () => new Float32Array([0.5, 0.5]),
+    embed: async () => Float32Array.from(heard),
   });
-  capture = spyOn(transcriber, "captureUtterance").mockResolvedValue({
-    samples: new Float32Array([1]),
-    sampleRate: 16000,
-  } as never);
+  capture = spyOn(transcriber, "captureUtterance").mockImplementation(async () => spoken());
   spies.push(loadModel, capture, spyOn(microphone, "resumeAudio").mockImplementation(() => {}));
 });
 afterEach(() => {
@@ -172,15 +186,42 @@ describe("SettingsModal voices", () => {
   test("enrolls a labelled voice from the recorded samples", async () => {
     open();
     fireEvent.click(await screen.findByText("Adicionar voz"));
-    expect(await screen.findByText("Voz cadastrada")).toBeTruthy();
+    expect(await screen.findByText("Voz cadastrada (consistência de 100%)")).toBeTruthy();
     expect(await screen.findByText("Gui")).toBeTruthy();
-    expect(capture).toHaveBeenCalledTimes(ENROLL_SAMPLES);
+    expect(capture).toHaveBeenCalledTimes(ENROLLMENT.samples);
     expect(loadModel).toHaveBeenCalledWith(MODEL.voiceModelUrl, MODEL.voiceModelId);
     expect(calls.find((c) => c.method === "POST")?.body).toEqual({
       label: "Gui",
-      embeddings: Array.from({ length: ENROLL_SAMPLES }, () => [0.5, 0.5]),
+      embeddings: Array.from({ length: ENROLLMENT.samples }, () => [1, 0]),
       modelId: "m1",
     });
+  });
+
+  test("warns when the new voice is less consistent than the threshold demands", async () => {
+    heard = [0.5, 0.5]; // samples agree at 50%, under the 60% strictness
+    open();
+    fireEvent.click(await screen.findByText("Adicionar voz"));
+    expect(
+      await screen.findByText(/consistência de 50%, abaixo da rigidez de 60%/),
+    ).toBeTruthy();
+    expect(calls.some((c) => c.method === "POST")).toBe(true);
+  });
+
+  test("shows each step while recording, and that the wake word is off", async () => {
+    let speak: () => void = () => {};
+    capture.mockImplementationOnce(
+      () => new Promise((resolve) => (speak = () => resolve(spoken()))),
+    );
+    open();
+    fireEvent.click(await screen.findByText("Adicionar voz"));
+    expect(
+      await screen.findByText(`Diga "Ei Integra" (1/${ENROLLMENT.samples})…`),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("O “Ei Integra” fica desligado até o cadastro terminar."),
+    ).toBeTruthy();
+    speak();
+    expect(await screen.findByText("Voz cadastrada (consistência de 100%)")).toBeTruthy();
   });
 
   test("does nothing when the label prompt is cancelled or blank", async () => {
@@ -252,5 +293,57 @@ describe("SettingsModal voices", () => {
     open();
     fireEvent.click(await screen.findByText("Remover"));
     expect(await screen.findByText("Falha ao remover a voz")).toBeTruthy();
+  });
+
+  test("describes every enrolment step", () => {
+    expect(describeEnrollmentStep({ kind: "record", sample: 2, total: 4 })).toBe(
+      'Diga "Ei Integra" (2/4)…',
+    );
+    expect(describeEnrollmentStep({ kind: "retry" })).toBe(
+      'Não deu para ouvir direito. Diga "Ei Integra" de novo…',
+    );
+    expect(describeEnrollmentStep({ kind: "redo" })).toBe(
+      'Uma gravação destoou das outras. Diga "Ei Integra" mais uma vez…',
+    );
+  });
+});
+
+describe("SettingsModal and the wake word", () => {
+  const secure = Object.getOwnPropertyDescriptor(window, "isSecureContext");
+  beforeEach(() =>
+    Object.defineProperty(window, "isSecureContext", { value: true, configurable: true }),
+  );
+  afterEach(() => {
+    if (secure) Object.defineProperty(window, "isSecureContext", secure);
+    else delete (window as { isSecureContext?: boolean }).isSecureContext;
+  });
+
+  const listening = () => fakeAudio.recognizers.filter((recognizer) => !recognizer.removed);
+
+  test("is off while a voice is enrolled, and back on after, even on failure", async () => {
+    config = { wakeWordEnabled: true, ...MODEL };
+    let speak: () => void = () => {};
+    capture.mockImplementationOnce(
+      () => new Promise((resolve) => (speak = () => resolve(spoken()))),
+    );
+    open();
+    await waitFor(() => expect(listening()).toHaveLength(1));
+    const before = listening()[0]!;
+
+    fireEvent.click(await screen.findByText("Adicionar voz"));
+    // Recording "Ei Integra": the wake word must not be listening.
+    await waitFor(() => expect(before.removed).toBe(true));
+    expect(listening()).toHaveLength(0);
+    speak();
+    expect(await screen.findByText("Voz cadastrada (consistência de 100%)")).toBeTruthy();
+    await waitFor(() => expect(listening()).toHaveLength(1));
+
+    // A failed enrolment turns it back on as well.
+    writeReply = fail(500);
+    const running = listening()[0]!;
+    fireEvent.click(screen.getByText("Adicionar voz"));
+    expect(await screen.findByText("Falha ao salvar a voz")).toBeTruthy();
+    expect(running.removed).toBe(true);
+    await waitFor(() => expect(listening()).toHaveLength(1));
   });
 });
