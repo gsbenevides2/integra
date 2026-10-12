@@ -10,6 +10,7 @@ import { getLogger, logWarn,setupLoggerProvider } from "./instrumentation/instru
 import { flushTelemetryOnExit } from "./instrumentation/shutdown";
 import { assistantRoutes, voskAssetRoutes } from "./modules/assistant";
 import { authentikRoutes } from "./modules/authentik";
+import { clientConfigRoutes } from "./modules/client-config";
 import { cronsRoutes } from "./modules/crons";
 import { frigateRoutes } from "./modules/frigate";
 import { googleRoutes } from "./modules/google";
@@ -55,6 +56,7 @@ export const app = new Elysia()
     }),
   )
   .use(voskAssetRoutes)
+  .use(clientConfigRoutes)
   .use(tuyaRoutes)
   .use(frigateRoutes)
   .use(googleRoutes)

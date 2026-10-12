@@ -43,7 +43,7 @@ The app trusts the headers the Authentik proxy outpost injects. It never validat
 | `OTEL_EXPORTER_OTLP_HEADERS` | Auth headers for the above, `key=value` pairs |
 | `OTEL_SERVICE_NAME` | Service name shared by traces, logs and metrics (`server/instrumentation/resource.ts`); defaults to `integra` |
 | `OTEL_TRACES_SAMPLER`, `OTEL_TRACES_SAMPLER_ARG` | Standard SDK sampling vars, read by the SDK. (`OTEL_SAMPLE_RATE` is **not** a real OTel var and is not read.) Unset = 100% sampling |
-| `PUBLIC_RUM_TOKEN`, `PUBLIC_RUM_SITE`, `PUBLIC_OTEL_ORGANIZATION` | Frontend OpenObserve RUM/logs config (`public/instrumentFrontend.ts`) |
+| `PUBLIC_RUM_TOKEN`, `PUBLIC_RUM_SITE`, `PUBLIC_OTEL_ORGANIZATION` | Frontend OpenObserve RUM/logs config (`public/instrumentFrontend.ts`). Also served to the Android app by the public `GET /client-config` (`server/modules/client-config`), so they must be set at runtime too, not only at build time. That route is outside `/api/`, so the authz guard skips it; bypass it in Authentik and Cloudflare as well. |
 | `TZ` | Process timezone |
 
 The HTTP port is hardcoded to `3000` in `server/index.ts` — unlike the old repo, there is no `PORT` env var override.
