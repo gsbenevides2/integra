@@ -6,8 +6,15 @@ import { provideEnv, TUYA_ENV } from "./helpers";
 afterAll(provideEnv(TUYA_ENV));
 afterAll(installTestAuthz());
 
-const { assistantRoutes, VOSK_MODEL_FILE, VOICE_MODEL_FILE, VOICE_MODEL_ID, VOICE_MODEL_URL, voskAssetRoutes } =
-  await import("@server/modules/assistant");
+const {
+  assistantRoutes,
+  VOSK_MODEL_FILE,
+  VOICE_MODEL_FILE,
+  VOICE_MODEL_ID,
+  VOICE_MODEL_URL,
+  voskAssetRoutes,
+  ortAssetRoutes,
+} = await import("@server/modules/assistant");
 const { MAX_AUDIO_BYTES } = await import("@server/modules/assistant/model");
 const { AssistantAgent } = await import("@server/modules/assistant/service/agent");
 const { AudioService } = await import("@server/modules/assistant/service/audio");
@@ -236,5 +243,20 @@ describe("vosk asset routes", () => {
     expect(worker.headers.get("content-type")).toBe("text/javascript");
     const wasm = await voskAssetRoutes.handle(new Request("http://localhost/vosk/vosk.wasm"));
     expect(wasm.headers.get("content-type")).toBe("application/wasm");
+  });
+});
+
+describe("onnxruntime-web asset routes", () => {
+  test("serve the speaker-model runtime from the installed package", async () => {
+    const wasm = await ortAssetRoutes.handle(
+      new Request("http://localhost/ort/ort-wasm-simd-threaded.jsep.wasm"),
+    );
+    expect(wasm.status).toBe(200);
+    expect(wasm.headers.get("content-type")).toBe("application/wasm");
+    const mjs = await ortAssetRoutes.handle(
+      new Request("http://localhost/ort/ort-wasm-simd-threaded.jsep.mjs"),
+    );
+    expect(mjs.status).toBe(200);
+    expect(mjs.headers.get("content-type")).toBe("text/javascript");
   });
 });

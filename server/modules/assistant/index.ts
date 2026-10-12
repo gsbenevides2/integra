@@ -400,3 +400,36 @@ export const voskAssetRoutes = new Elysia({
         headers: { "content-type": "application/wasm" },
       }),
   );
+
+const ORT_DIST = "node_modules/onnxruntime-web/dist";
+
+/** The onnxruntime-web runtime files the WASM backend loads at run time. */
+const ORT_FILES = [
+  "ort-wasm-simd-threaded.jsep.wasm",
+  "ort-wasm-simd-threaded.jsep.mjs",
+  "ort-wasm-simd-threaded.wasm",
+  "ort-wasm-simd-threaded.mjs",
+] as const;
+
+/**
+ * The onnxruntime-web runtime, served from the installed package so the files
+ * always match its version. `speakerModel.ts` points
+ * `ort.env.wasm.wasmPaths` at `/ort/`, where the backend fetches these at run
+ * time (otherwise they 404 against the page root). Public library code,
+ * outside /api. Registered as explicit static routes, like the Vosk assets.
+ */
+export const ortAssetRoutes = ORT_FILES.reduce(
+  (app, name) =>
+    app.get(
+      `/ort/${name}`,
+      () =>
+        new Response(Bun.file(`${ORT_DIST}/${name}`), {
+          headers: {
+            "content-type": name.endsWith(".wasm")
+              ? "application/wasm"
+              : "text/javascript",
+          },
+        }),
+    ),
+  new Elysia({ detail: { tags: ["FrontEnd"], hide: true } }),
+);

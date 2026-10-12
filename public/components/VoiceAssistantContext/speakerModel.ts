@@ -1,6 +1,10 @@
 import * as ort from "onnxruntime-web";
 
 import { computeFbank } from "./fbank";
+
+// onnxruntime-web fetches its .wasm/.mjs runtime at load time; serve it from
+// our own origin (see ortAssetRoutes) instead of the page root, where it 404s.
+ort.env.wasm.wasmPaths = "/ort/";
 import { downsample, WAV_SAMPLE_RATE } from "./wav";
 
 /**
