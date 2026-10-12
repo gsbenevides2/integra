@@ -9,11 +9,13 @@ import {
   chatBody,
   type ConversationDetail,
   type ConversationSummary,
+  legacyVoiceProfileBody,
   MAX_AUDIO_BYTES,
   type MessageView,
   settingsBody,
   type StreamEvent,
   ttsBody,
+  voiceLabelBody,
   voiceProfileBody,
 } from "./model";
 import { AssistantAgent, type ChatRequest } from "./service/agent";
@@ -311,47 +313,109 @@ export const assistantRoutes = new Elysia({
     },
   )
   .get(
-    "/voice-profile",
-    (ctx) => VoiceProfileService.get(currentUser(ctx).id),
+    "/voice-profiles",
+    (ctx) => VoiceProfileService.list(currentUser(ctx).id),
     {
       detail: {
-        summary: "Get My Voice Profile",
+        summary: "List My Voices",
         description:
-          "Returns the current user's enrolled wake-word voice profile " +
-          "(embeddings), used by the client to verify it is their voice.",
+          "Returns the current user's enrolled wake-word voices (label and " +
+          "embeddings), used by the client to verify it is one of their voices.",
+      },
+    },
+  )
+  .post(
+    "/voice-profiles",
+    (ctx) =>
+      VoiceProfileService.create(
+        currentUser(ctx).id,
+        ctx.body.label,
+        ctx.body.embeddings,
+        ctx.body.modelId,
+      ),
+    {
+      detail: {
+        summary: "Enrol A Voice",
+        description:
+          "Adds a labelled wake-word voice for the current user: a few " +
+          "client-extracted speaker embeddings of them saying 'Ei Integra'.",
+      },
+      body: voiceProfileBody,
+    },
+  )
+  .patch(
+    "/voice-profiles/:id",
+    async (ctx) => {
+      await VoiceProfileService.rename(currentUser(ctx).id, ctx.params.id, ctx.body.label);
+      return { ok: true };
+    },
+    {
+      detail: {
+        summary: "Rename A Voice",
+        description: "Renames one of the current user's enrolled voices.",
+      },
+      body: voiceLabelBody,
+    },
+  )
+  .delete(
+    "/voice-profiles/:id",
+    async (ctx) => {
+      await VoiceProfileService.delete(currentUser(ctx).id, ctx.params.id);
+      return { ok: true };
+    },
+    {
+      detail: {
+        summary: "Remove A Voice",
+        description:
+          "Deletes one of the current user's enrolled voices. With no voices " +
+          "left, the wake word fires for any voice again.",
+      },
+    },
+  )
+  // Legacy single-profile routes, still used by the Android app.
+  .get(
+    "/voice-profile",
+    (ctx) => VoiceProfileService.legacyProfile(currentUser(ctx).id),
+    {
+      detail: {
+        summary: "Get My Voice Profile (legacy)",
+        description:
+          "Every enrolled voice of the most recently used model as one " +
+          "profile, so a client that checks against a single profile accepts " +
+          "any of them. Prefer GET /voice-profiles.",
       },
     },
   )
   .put(
     "/voice-profile",
     (ctx) =>
-      VoiceProfileService.upsert(
+      VoiceProfileService.saveDefault(
         currentUser(ctx).id,
         ctx.body.embeddings,
         ctx.body.modelId,
       ),
     {
       detail: {
-        summary: "Enrol My Voice",
+        summary: "Enrol My Voice (legacy)",
         description:
-          "Stores the current user's wake-word voice profile: a few " +
-          "client-extracted speaker embeddings of them saying 'Ei Integra'.",
+          "Re-records the default voice (\"Minha voz\"), creating it if " +
+          "missing, and returns the combined profile. Prefer POST /voice-profiles.",
       },
-      body: voiceProfileBody,
+      body: legacyVoiceProfileBody,
     },
   )
   .delete(
     "/voice-profile",
     async (ctx) => {
-      await VoiceProfileService.delete(currentUser(ctx).id);
+      await VoiceProfileService.deleteDefault(currentUser(ctx).id);
       return { ok: true };
     },
     {
       detail: {
-        summary: "Remove My Voice",
+        summary: "Remove My Voice (legacy)",
         description:
-          "Deletes the current user's wake-word voice profile, so the wake " +
-          "word fires for any voice again.",
+          "Deletes the default voice (\"Minha voz\") only; other voices stay. " +
+          "Prefer DELETE /voice-profiles/:id.",
       },
     },
   )

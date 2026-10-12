@@ -1,37 +1,47 @@
 import { getAssistantEdenClient } from "@public/dashboards/voice-assistant/client";
 
-/** The user's enrolled wake-word voice profile, as returned by the server. */
+/** One of the current user's enrolled wake-word voices, as returned by the server. */
 export interface VoiceProfile {
-  enrolled: boolean;
+  id: string;
+  label: string;
   embeddings: number[][];
   dims: number;
   modelId: string;
 }
 
-/** Fetches the current user's voice profile; null if the route is forbidden. */
-export async function fetchVoiceProfile(): Promise<VoiceProfile | null> {
+/** Fetches the current user's enrolled voices; empty if the route is forbidden. */
+export async function fetchVoiceProfiles(): Promise<VoiceProfile[]> {
   const { data, error } = await getAssistantEdenClient().api.assistant[
-    "voice-profile"
+    "voice-profiles"
   ].get();
-  if (error) return null;
+  if (error || !data) return [];
   return data;
 }
 
-/** Stores the current user's enrolled embeddings. */
-export async function saveVoiceProfile(
+/** Enrols a new labelled voice from its client-extracted embeddings. */
+export async function createVoiceProfile(
+  label: string,
   embeddings: number[][],
   modelId: string,
 ): Promise<void> {
   const { error } = await getAssistantEdenClient().api.assistant[
-    "voice-profile"
-  ].put({ embeddings, modelId });
-  if (error) throw new Error("Falha ao salvar a sua voz");
+    "voice-profiles"
+  ].post({ label, embeddings, modelId });
+  if (error) throw new Error("Falha ao salvar a voz");
 }
 
-/** Removes the current user's voice profile (wake word fires for any voice). */
-export async function deleteVoiceProfile(): Promise<void> {
-  const { error } = await getAssistantEdenClient().api.assistant[
-    "voice-profile"
-  ].delete();
-  if (error) throw new Error("Falha ao remover a sua voz");
+/** Renames one of the current user's enrolled voices. */
+export async function renameVoiceProfile(id: string, label: string): Promise<void> {
+  const { error } = await getAssistantEdenClient()
+    .api.assistant["voice-profiles"]({ id })
+    .patch({ label });
+  if (error) throw new Error("Falha ao renomear a voz");
+}
+
+/** Removes one of the current user's enrolled voices. */
+export async function deleteVoiceProfile(id: string): Promise<void> {
+  const { error } = await getAssistantEdenClient()
+    .api.assistant["voice-profiles"]({ id })
+    .delete();
+  if (error) throw new Error("Falha ao remover a voz");
 }

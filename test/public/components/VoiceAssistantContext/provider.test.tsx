@@ -36,13 +36,16 @@ const REPLY = {
 };
 const IMAGE = { key: "assistant/u/upload/a.jpg", url: "https://signed/a", mediaType: "image/jpeg", source: "upload" };
 
-let config = { wakeWordEnabled: false };
+let config: Record<string, unknown> = { wakeWordEnabled: false };
+let voiceProfiles: unknown[] = [];
 let chatReply: unknown = REPLY;
 /** Extra stream events sent before the reply text (tools, actions, images). */
 let chatEvents: unknown[] = [];
 let transcripts: string[] = [];
 const calls = useApi({
   "GET /api/assistant/config": () => config,
+  "GET /api/assistant/voice-profiles": () => voiceProfiles,
+  "GET /api/assistant/settings": () => ({ extraInstructions: "", voiceMatchThreshold: 0.6 }),
   "POST /api/assistant/stt": () => ({ text: transcripts.shift() ?? "" }),
   "POST /api/assistant/chat/stream": () =>
     chatReply && typeof chatReply === "object" && "__status" in chatReply
@@ -79,6 +82,7 @@ let wakeLockRequest: () => Promise<{ release: () => Promise<void> }>;
 beforeEach(() => {
   voice.reset();
   config = { wakeWordEnabled: false };
+  voiceProfiles = [];
   chatReply = REPLY;
   chatEvents = [];
   uploadReply = IMAGE;
@@ -654,6 +658,56 @@ describe("wake word", () => {
     await flush();
     expect(recognizer.removed).toBe(true);
     expect(wakeLockReleased).toBe(1);
+  });
+
+  test("builds the speaker gate from the deployed voice model and enrolled voices", async () => {
+    config = { wakeWordEnabled: true, voiceModelUrl: "/voice/model.onnx", voiceModelId: "m1" };
+    // Enrolled for a different model → buildSpeakerGate finds no usable embeddings
+    // and returns null, so the wake word still fires for any voice here.
+    voiceProfiles = [{ id: "v1", label: "Gui", embeddings: [[1, 2]], dims: 2, modelId: "old" }];
+    renderProvider();
+    await until(() => voice.recognizers.length === 1);
+    await waitFor(() => expect(value.voiceModel).toEqual({ url: "/voice/model.onnx", id: "m1" }));
+    expect(calls.some((c) => c.path === "/api/assistant/voice-profiles")).toBe(true);
+
+    const recognizer = voice.recognizers[0]!;
+    const now = spyOn(performance, "now").mockImplementation(() => 10_000);
+    try {
+      await act(async () => recognizer.result("ei integra"));
+      await stateIs("listening");
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  test("pausing turns the wake word off until every pause is released", async () => {
+    config = { wakeWordEnabled: true };
+    renderProvider();
+    await until(() => voice.recognizers.length === 1);
+    const first = voice.recognizers[0]!;
+
+    let resumeEnrolment: () => void = () => {};
+    let resumeOther: () => void = () => {};
+    act(() => {
+      resumeEnrolment = value.pauseWakeWord();
+      resumeOther = value.pauseWakeWord();
+    });
+    await until(() => first.removed);
+    // A phrase still being checked when it stopped does not start a session.
+    await act(async () => first.result("ei integra"));
+    await flush();
+    expect(value.state).toBe("idle");
+
+    act(() => {
+      resumeEnrolment();
+      resumeEnrolment(); // releasing the same pause twice counts once
+    });
+    await flush();
+    expect(voice.recognizers).toHaveLength(1);
+
+    act(() => resumeOther());
+    await until(() => voice.recognizers.length === 2);
+    expect(voice.recognizers[1]!.removed).toBe(false);
   });
 
   test("the preference is remembered and turning it off stops the engine", async () => {

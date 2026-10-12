@@ -2,6 +2,7 @@ import { type KaldiRecognizer, VoskClient } from "@lichess-org/vosk-browser";
 
 import { type Microphone, openMicrophone } from "./microphone";
 import { cosine, loadSpeakerModel, type SpeakerModel } from "./speakerModel";
+import { lastSpeech } from "./speechTrim";
 import type { VoiceProfile } from "./voiceProfile";
 
 export const MODEL_URL = "/vosk/vosk-model-small-pt.tar.gz";
@@ -17,8 +18,13 @@ export const WAKE_PHRASES = ["ei integra", "integra"];
 /** Ignore repeated detections of the same utterance. */
 export const WAKE_COOLDOWN_MS = 3000;
 
-/** How much recent audio to keep for the speaker check (covers the wake phrase). */
-export const SPEAKER_BUFFER_MS = 1500;
+/**
+ * How much recent audio to keep for the speaker check. Vosk only reports the
+ * final result after its end-of-speech silence and the worker's latency, so a
+ * short buffer often held more silence than phrase; the check embeds just the
+ * phrase, cut out of this window by lastSpeech.
+ */
+export const SPEAKER_BUFFER_MS = 4000;
 
 /**
  * Only a final result that is exactly a wake phrase counts. Partial results
@@ -36,31 +42,33 @@ export interface WakeWordEngine {
 /** The speaker check applied before a wake word fires, or null to skip it. */
 export interface SpeakerGate {
   model: SpeakerModel;
-  /** The enrolled user's L2-normalised embeddings. */
-  profile: VoiceProfile;
+  /** Every enrolled voice's L2-normalised embeddings, flattened together. */
+  embeddings: number[][];
   /** Minimum cosine similarity to accept the voice. */
   threshold: number;
 }
 
 /**
- * Loads the speaker model and the user's profile for a wake-word speaker gate,
- * or returns null when there is nothing to check against: no model deployed,
- * no profile enrolled, or the model id no longer matches the enrolment. When
- * null, the wake word fires for any voice (the pre-enrolment behaviour).
+ * Loads the speaker model and the union of the user's enrolled voices for a
+ * wake-word speaker gate, or returns null when there is nothing to check
+ * against: no model deployed, no voice enrolled for the current model, or the
+ * model fails to load. When null, the wake word fires for any voice (the
+ * pre-enrolment behaviour). A phrase fires if it matches ANY enrolled voice.
  */
 export async function buildSpeakerGate(
   voiceModelUrl: string | null,
   voiceModelId: string,
-  profile: VoiceProfile | null,
+  profiles: VoiceProfile[],
   threshold: number,
 ): Promise<SpeakerGate | null> {
-  if (!voiceModelUrl || !profile?.enrolled || profile.embeddings.length === 0) {
-    return null;
-  }
-  if (profile.modelId !== voiceModelId) return null;
+  if (!voiceModelUrl) return null;
+  const embeddings = profiles
+    .filter((profile) => profile.modelId === voiceModelId)
+    .flatMap((profile) => profile.embeddings);
+  if (embeddings.length === 0) return null;
   try {
     const model = await loadSpeakerModel(voiceModelUrl, voiceModelId);
-    return { model, profile, threshold };
+    return { model, embeddings, threshold };
   } catch {
     // If the model fails to load, fall back to firing for any voice.
     return null;
@@ -162,9 +170,15 @@ export async function startWakeWord(
     }
     verifying = true;
     try {
-      const candidate = await gate.model.embed(snapshot.samples, snapshot.sampleRate);
+      // Embed only the phrase just heard, as enrolment does; if nothing stands
+      // out from the noise (a very quiet voice), use the whole window.
+      const speech = lastSpeech(snapshot.samples, snapshot.sampleRate);
+      const candidate = await gate.model.embed(
+        speech?.samples ?? snapshot.samples,
+        snapshot.sampleRate,
+      );
       let best = -Infinity;
-      for (const enrolled of gate.profile.embeddings) {
+      for (const enrolled of gate.embeddings) {
         best = Math.max(best, cosine(candidate, enrolled));
       }
       if (best >= gate.threshold) accept();

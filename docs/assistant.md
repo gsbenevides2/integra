@@ -6,8 +6,10 @@ can control Tuya devices. It is built for the always-on tablet kiosk, but works
 in any browser.
 
 Everything except the wake word goes through OpenRouter with the single
-`OPEN_ROUTER_API_KEY`: the agent's LLM, ElevenLabs speech-to-text,
-Microsoft MAI text-to-speech and image generation.
+`OPEN_ROUTER_API_KEY`: the agent's LLM, ElevenLabs speech-to-text and image
+generation. Text to speech uses ElevenLabs' own API when `ELEVENLABS_API_KEY`
+and `ELEVENLABS_VOICE_ID` are set, and Microsoft MAI through OpenRouter
+otherwise.
 
 ## Flow
 
@@ -18,7 +20,8 @@ Microsoft MAI text-to-speech and image generation.
         |                     POST /api/assistant/stt   -> OpenRouter elevenlabs/scribe-v2
         |                     POST /api/assistant/chat/stream (SSE) -> agent + tools, as the user
         |                                        |
-        +-- back to wake word <-- Web Audio <-- POST /api/assistant/tts -> microsoft/mai-voice-2.1-flash (pt-BR)
+        +-- back to wake word <-- Web Audio <-- POST /api/assistant/tts -> ElevenLabs (pt-BR voice)
+                                                                            or microsoft/mai-voice-2.1-flash
 ```
 
 ### Wake word
@@ -43,13 +46,21 @@ Microsoft MAI text-to-speech and image generation.
 ### Speaker check ("is it my voice?")
 
 To stop other people and the TV from triggering "Ei Integra", a detected wake
-phrase is gated by a speaker check: only the enrolled user's voice fires it.
+phrase is gated by a speaker check: only a voice the user enrolled fires it.
 
 - It runs **offline on the client**, like the wake word. A small WeSpeaker
   embedding model (ONNX, VoxCeleb-trained ResNet34 — speaker identity is
-  language-independent) extracts an embedding from the ~1.5 s of buffered audio
-  around the phrase and compares it (cosine) to the user's enrolled embeddings.
+  language-independent) extracts an embedding of the phrase and compares it
+  (cosine) to the enrolled embeddings; the best match must reach the threshold.
   The audio never leaves the device.
+- **Only the phrase is embedded.** The last 4 s of audio are buffered
+  (`SPEAKER_BUFFER_MS`): Vosk reports the final result only after its
+  end-of-speech silence and the worker's latency, so the old 1.5 s window often
+  held more silence than phrase. `speechTrim.ts` (`lastSpeech`) then cuts out
+  the last stretch of speech (merging the pause in "Ei … Integra", with a
+  little padding) using the frames' energy against the background noise.
+  Enrolment samples go through the same trim, so both sides compare voice to
+  voice; silence also skewed the fbank's mean normalisation toward the room.
 - The model is served by Integra at `/voice/speaker-ecapa.onnx` (run
   `bun run assistant:speaker-model`, ~26 MB, gitignored, downloaded in the
   Docker build). `GET /api/assistant/config` reports `voiceModelUrl` and
@@ -59,18 +70,41 @@ phrase is gated by a speaker check: only the enrolled user's voice fires it.
 - **Feature parity is critical:** both clients compute the same kaldi-style
   fbank80 features — `public/components/VoiceAssistantContext/fbank.ts` on the
   web and `voice/Fbank.kt` on Android — so a voice enrolled on one device
-  verifies on the other. Keep the two in lockstep.
-- **Enrolment** lives in each user's settings ("Minha voz" in the web
-  preferences modal, and the Android settings screen): it records a few
-  "Ei Integra" samples, embeds each locally, and `PUT`s the embeddings to
-  `/api/assistant/voice-profile` (stored per user in `assistant.voice_profiles`;
-  the raw audio is never sent). `GET`/`DELETE` read and remove the profile.
+  verifies on the other. Keep the two in lockstep. The speech trim is not part
+  of the features (it only picks which audio is embedded), but Android should
+  apply the same `lastSpeech` cut to match the web's accuracy.
+- **Several voices per user** (people or devices), each a labelled row of
+  `assistant.voice_profiles` with a few embeddings. The phrase fires when it
+  matches **any** voice enrolled with the current model.
+  `GET`/`POST /api/assistant/voice-profiles` list and enrol,
+  `PATCH`/`DELETE /api/assistant/voice-profiles/:id` rename and remove (at most
+  10 voices per user). The raw audio is never sent.
+- **Enrolment** (web preferences modal, `enrollment.ts`): it asks for a label,
+  then records `ENROLLMENT.samples` "Ei Integra", each trimmed to its speech
+  and embedded locally.
+  - A recording with nothing heard, or less than 300 ms of voice, is asked for
+    again (up to `maxRetries`).
+  - A sample whose average similarity to the others is under `minConsistency`
+    (likely noise, another voice) is recorded again (up to `maxRedos`).
+  - The voice's **consistency** (average similarity between its samples) is
+    shown when it is saved. It is roughly what that voice scores at the wake
+    word, so the modal warns when it is under the strictness threshold.
+  - **The wake word is off while enrolling** (`pauseWakeWord()` from the
+    provider), so saying "Ei Integra" to record it never starts a session; it
+    comes back when enrolment ends, failed or not.
+- **Legacy single-profile routes** for the Android app, which still enrols one
+  voice: `GET /api/assistant/voice-profile` returns every voice of the most
+  recently used model flattened into one profile (so its check accepts any of
+  them); `PUT` re-records the default voice "Minha voz" (creating it if
+  missing); `DELETE` removes only that voice. Voices enrolled before voices
+  became 1:N are "Minha voz" too.
 - **Strictness** is the per-user `voiceMatchThreshold` (cosine cutoff, default
-  `0.6`, stored in `assistant.user_settings`): higher rejects more, lower fires
-  more easily. It is exposed as a slider next to enrolment.
-- **Fallback:** with no profile enrolled (or the model not deployed, or the
-  model id no longer matching), the wake word fires for **any** voice, exactly
-  as before. The check only narrows things once the user enrols.
+  `0.6`, stored in `assistant.user_settings`, shared by all of the user's
+  voices): higher rejects more, lower fires more easily. It is exposed as a
+  slider next to the voices.
+- **Fallback:** with no voice enrolled (or the model not deployed, or no voice
+  enrolled with the current model id), the wake word fires for **any** voice,
+  exactly as before. The check only narrows things once the user enrols.
 
 ### Recording and speech to text
 
@@ -141,16 +175,33 @@ In the chat:
 
 ### Text to speech
 
-- The default is `microsoft/mai-voice-2.1-flash` with the voice
+- **ElevenLabs (preferred):** with `ELEVENLABS_API_KEY` and
+  `ELEVENLABS_VOICE_ID` set, replies are spoken through ElevenLabs' own API
+  (`POST /v1/text-to-speech/{voice}/stream`, mp3 44.1 kHz/128 kbps), not
+  OpenRouter's. That reaches the Voice Library's native **Brazilian** voices,
+  which OpenRouter's ElevenLabs (English voices only) cannot.
+  - The model is `eleven_multilingual_v2` (most natural; it detects the
+    language itself, and the API documents `language_code` as unsupported
+    for it). Set
+    `ELEVENLABS_TTS_MODEL=eleven_flash_v2_5` for faster replies; models other
+    than multilingual_v2 are sent `language_code: "pt"`.
+  - The whole reply is synthesised before it plays, so total generation time is
+    what counts: ~1.8 s for a 4 s sentence with multilingual_v2.
+  - Pick a voice with `bun run assistant:voices` (Brazilian voices of the
+    Voice Library and the account's voices, with previews), add a library voice
+    with `bun run assistant:voices -- add <public_owner_id> <voice_id>`, and set
+    `ELEVENLABS_VOICE_ID`. The key needs `voices_read`/`voices_write` for that
+    script; speaking only needs text to speech.
+  - The voice's stability, similarity and style come from its settings on
+    ElevenLabs; tune them there.
+- **OpenRouter (fallback):** without ElevenLabs configured, it is
+  `microsoft/mai-voice-2.1-flash` with the voice
   `pt-BR-Luana:MAI-Voice-2.1-Flash` (`service/audio.ts`). Change them with
-  `ASSISTANT_TTS_MODEL` and `ASSISTANT_VOICE`.
-- OpenRouter's ElevenLabs voices are English voices, and OpenRouter has no
-  language parameter for speech. They sound European when speaking
-  Portuguese. The MAI voices are native Brazilian voices, and in tests were
-  also faster: ~0.9 s against ~1.2 s.
-- An `instructions` hint asking for a Brazilian accent is always sent. Models
-  that support it (OpenAI, Gemini) follow it, and the rest ignore it.
-- The server proxies the mp3 from `POST /api/assistant/tts`.
+  `ASSISTANT_TTS_MODEL` and `ASSISTANT_VOICE`. An `instructions` hint asking
+  for a Brazilian accent is always sent; models that support it (OpenAI,
+  Gemini) follow it, and the rest ignore it.
+- The server proxies the mp3 from `POST /api/assistant/tts`, for the web and
+  the Android app alike.
 - The browser plays it through the **Web Audio API** (`speaker.ts`), not an
   `<audio>` element. With the microphone open, browsers (notably Chrome on
   Android) pause media elements as they start ("The play() request was
