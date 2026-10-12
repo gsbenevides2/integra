@@ -1,4 +1,4 @@
-import { index, jsonb, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
+import { index, integer, jsonb, pgSchema, real, text, timestamp } from "drizzle-orm/pg-core";
 
 import { authUsers } from "./auth";
 
@@ -10,6 +10,32 @@ export const assistantUserSettings = assistant.table("user_settings", {
     .primaryKey()
     .references(() => authUsers.id, { onDelete: "cascade" }),
   extraInstructions: text().notNull().default(""),
+  /**
+   * Cosine-similarity cutoff for the wake-word speaker check: a spoken
+   * "Ei Integra" only fires when its voice matches this user's enrolled voice
+   * profile at least this much. Higher is stricter. Only used once a profile
+   * is enrolled; with no profile the wake word fires for any voice.
+   */
+  voiceMatchThreshold: real().notNull().default(0.6),
+  updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Each user's enrolled voice profile for the wake-word speaker check. One row
+ * per user; `embeddings` holds a few L2-normalised speaker embeddings (one per
+ * enrolment sample) produced by the client-side model `modelId`. Nothing here
+ * is shared between users, and the raw audio never leaves the client.
+ */
+export const assistantVoiceProfiles = assistant.table("voice_profiles", {
+  userId: text()
+    .primaryKey()
+    .references(() => authUsers.id, { onDelete: "cascade" }),
+  /** One L2-normalised embedding per enrolment sample. */
+  embeddings: jsonb().$type<number[][]>().notNull(),
+  /** Embedding dimensionality (e.g. 192), to reject a mismatched client model. */
+  dims: integer().notNull(),
+  /** Which embedding model produced these, so a model change can invalidate them. */
+  modelId: text().notNull(),
   updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
 });
 

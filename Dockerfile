@@ -13,6 +13,10 @@ COPY . .
 # not committed). Skipped when the build context already has it.
 RUN bun run assistant:model
 
+# Speaker-embedding model for the wake word's "is it my voice?" check (~26 MB,
+# not committed). Skipped when the build context already has it.
+RUN bun run assistant:speaker-model
+
 # ponytail: bun build --compile fails ahead-of-time bundling the frontend's
 # @opentelemetry browser packages (resolves Node builtins instead of browser
 # exports). Running from source works today; revisit --compile if startup

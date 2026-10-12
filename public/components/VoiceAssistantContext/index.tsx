@@ -18,7 +18,8 @@ import { type AssistantImage, uploadImage } from "./imageUpload";
 import { resumeAudio } from "./microphone";
 import { playChime, speak, type Speaking } from "./speaker";
 import { type Listening, listenOnce } from "./transcriber";
-import { startWakeWord, type WakeWordEngine } from "./wakeWord";
+import { fetchVoiceProfile } from "./voiceProfile";
+import { buildSpeakerGate, startWakeWord, type WakeWordEngine } from "./wakeWord";
 
 export type AssistantState = "idle" | "listening" | "thinking" | "speaking";
 
@@ -79,6 +80,10 @@ export interface VoiceAssistantValue {
   uploading: boolean;
   attachImage: (file: Blob) => Promise<void>;
   removeAttachment: (key: string) => void;
+  /** The speaker-check model to enrol against, or null when it is not deployed. */
+  voiceModel: { url: string; id: string } | null;
+  /** Re-arms the wake word after the voice profile changed (enrol / remove). */
+  reloadVoiceProfile: () => void;
 }
 
 /** The assistant dashboard's id in the drawer. */
@@ -114,6 +119,8 @@ const NOOP_VALUE: VoiceAssistantValue = {
   uploading: false,
   attachImage: async () => {},
   removeAttachment: () => {},
+  voiceModel: null,
+  reloadVoiceProfile: () => {},
 };
 
 const VoiceAssistantContext = createContext<VoiceAssistantValue>(NOOP_VALUE);
@@ -151,6 +158,12 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
   const [hearingSpeech, setHearingSpeech] = useState(false);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [wakeModel, setWakeModel] = useState(false);
+  /** The speaker-check model, from the server config; null until known or if off. */
+  const [voiceModel, setVoiceModel] = useState<{ url: string; id: string } | null>(
+    null,
+  );
+  /** Bumped after enrolling/removing a voice, to re-arm the wake word gate. */
+  const [voiceProfileVersion, setVoiceProfileVersion] = useState(0);
   const [wakeEnabled, setWakeEnabledState] = useState(readWakePreference);
   const [conversationId, setConversationIdState] = useState<string | null>(null);
   const [attachments, setAttachmentsState] = useState<AssistantImage[]>([]);
@@ -499,7 +512,11 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
     void getAssistantEdenClient()
       .api.assistant.config.get()
       .then(({ data }) => {
-        if (active && data?.wakeWordEnabled) setWakeModel(true);
+        if (!active || !data) return;
+        if (data.wakeWordEnabled) setWakeModel(true);
+        if (data.voiceModelUrl) {
+          setVoiceModel({ url: data.voiceModelUrl, id: data.voiceModelId });
+        }
       });
     return () => {
       active = false;
@@ -518,16 +535,32 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
     let active = true;
     let wakeLock: WakeLockSentinel | null = null;
 
-    startWakeWord(() => {
-      if (stateRef.current === "idle" || stateRef.current === "speaking") startRef.current();
-    })
-      .then((started) => {
-        if (active) engine = started;
-        else void started.stop();
-      })
-      .catch(() => {
-        if (active) showToast("Não foi possível ativar o \"Ei Integra\"", "error");
-      });
+    // Only fire for the enrolled voice, when a profile and model are present;
+    // otherwise the wake word fires for any voice (the pre-enrolment default).
+    void (async () => {
+      let gate = null;
+      if (voiceModel) {
+        const [profile, settings] = await Promise.all([
+          fetchVoiceProfile(),
+          getAssistantEdenClient().api.assistant.settings.get(),
+        ]);
+        const threshold = settings.data?.voiceMatchThreshold ?? 0.6;
+        gate = await buildSpeakerGate(voiceModel.url, voiceModel.id, profile, threshold);
+      }
+      if (!active) return;
+      startWakeWord(() => {
+        if (stateRef.current === "idle" || stateRef.current === "speaking") {
+          startRef.current();
+        }
+      }, gate)
+        .then((started) => {
+          if (active) engine = started;
+          else void started.stop();
+        })
+        .catch(() => {
+          if (active) showToast("Não foi possível ativar o \"Ei Integra\"", "error");
+        });
+    })();
 
     // Keep the kiosk screen on while it is listening for the wake word.
     navigator.wakeLock
@@ -545,10 +578,15 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
       void engine?.stop();
       void wakeLock?.release();
     };
-  }, [showToast, wakeAvailable, wakeEnabled]);
+  }, [showToast, wakeAvailable, wakeEnabled, voiceModel, voiceProfileVersion]);
 
   // Stop any session when the provider goes away.
   useEffect(() => halt, [halt]);
+
+  const reloadVoiceProfile = useCallback(
+    () => setVoiceProfileVersion((version) => version + 1),
+    [],
+  );
 
   const value = useMemo<VoiceAssistantValue>(
     () => ({
@@ -571,6 +609,8 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
       uploading,
       attachImage,
       removeAttachment,
+      voiceModel,
+      reloadVoiceProfile,
     }),
     [
       allowed,
@@ -592,6 +632,8 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
       uploading,
       attachImage,
       removeAttachment,
+      voiceModel,
+      reloadVoiceProfile,
     ],
   );
 

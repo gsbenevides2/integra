@@ -40,6 +40,38 @@ Microsoft MAI text-to-speech and image generation.
   assistant's own voice out, and only an utterance that is exactly the wake
   phrase counts. While listening or thinking it is ignored.
 
+### Speaker check ("is it my voice?")
+
+To stop other people and the TV from triggering "Ei Integra", a detected wake
+phrase is gated by a speaker check: only the enrolled user's voice fires it.
+
+- It runs **offline on the client**, like the wake word. A small WeSpeaker
+  embedding model (ONNX, VoxCeleb-trained ResNet34 — speaker identity is
+  language-independent) extracts an embedding from the ~1.5 s of buffered audio
+  around the phrase and compares it (cosine) to the user's enrolled embeddings.
+  The audio never leaves the device.
+- The model is served by Integra at `/voice/speaker-ecapa.onnx` (run
+  `bun run assistant:speaker-model`, ~26 MB, gitignored, downloaded in the
+  Docker build). `GET /api/assistant/config` reports `voiceModelUrl` and
+  `voiceModelId`; the browser caches the model in IndexedDB, Android in files.
+  Bump `VOICE_MODEL_ID` in `server/modules/assistant/index.ts` when the file
+  changes, to invalidate every enrolled profile.
+- **Feature parity is critical:** both clients compute the same kaldi-style
+  fbank80 features — `public/components/VoiceAssistantContext/fbank.ts` on the
+  web and `voice/Fbank.kt` on Android — so a voice enrolled on one device
+  verifies on the other. Keep the two in lockstep.
+- **Enrolment** lives in each user's settings ("Minha voz" in the web
+  preferences modal, and the Android settings screen): it records a few
+  "Ei Integra" samples, embeds each locally, and `PUT`s the embeddings to
+  `/api/assistant/voice-profile` (stored per user in `assistant.voice_profiles`;
+  the raw audio is never sent). `GET`/`DELETE` read and remove the profile.
+- **Strictness** is the per-user `voiceMatchThreshold` (cosine cutoff, default
+  `0.6`, stored in `assistant.user_settings`): higher rejects more, lower fires
+  more easily. It is exposed as a slider next to enrolment.
+- **Fallback:** with no profile enrolled (or the model not deployed, or the
+  model id no longer matching), the wake word fires for **any** voice, exactly
+  as before. The check only narrows things once the user enrols.
+
 ### Recording and speech to text
 
 - `transcriber.ts` records from the microphone (`microphone.ts`, an
@@ -286,6 +318,11 @@ tone or room names. Use the gear button ("Minhas preferências") on the
    - The browser downloads it once and keeps it in IndexedDB.
    - Without it, `GET /api/assistant/config` reports the wake word as off, and
      the assistant still works from the microphone button.
+3. **Speaker model:** run `bun run assistant:speaker-model`. It downloads the
+   WeSpeaker ONNX model (~26 MB) to `public/voice/speaker-ecapa.onnx` for the
+   "is it my voice?" check. Gitignored; the Docker build runs it too. Without
+   it, `GET /api/assistant/config` reports `voiceModelUrl: null` and the wake
+   word fires for any voice.
 3. **Permissions:** grant users the `/api/assistant/*` routes in the
    Permissions dashboard.
    - `POST /api/assistant/chat` enables the assistant in the UI.

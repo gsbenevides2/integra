@@ -110,3 +110,71 @@ export function listenOnce({ onPhase, silenceTimeoutMs }: ListenOptions): Listen
 
   return { result, cancel: () => settle?.("") };
 }
+
+export interface Captured {
+  samples: Float32Array;
+  sampleRate: number;
+}
+
+/**
+ * Records one short utterance (ending on silence) and resolves with the raw
+ * mono samples, for voice enrolment (the speaker-embedding model, not STT).
+ * Rejects if no speech is heard within `silenceTimeoutMs`.
+ */
+export function captureUtterance(silenceTimeoutMs: number): Promise<Captured> {
+  return new Promise<Captured>((resolve, reject) => {
+    let microphone: Microphone | null = null;
+    let finished = false;
+    const chunks: Float32Array[] = [];
+    let elapsedMs = 0;
+    let loudMs = 0;
+    let heardSpeech = false;
+    let lastVoiceMs = 0;
+    let noise = VAD.minThreshold / VAD.noiseFactor;
+    let sampleRate = 0;
+
+    const finish = (ok: boolean) => {
+      if (finished) return;
+      finished = true;
+      void microphone?.stop();
+      if (!ok) return reject(new Error("Não ouvi você dizer \"Ei Integra\""));
+      const total = chunks.reduce((n, c) => n + c.length, 0);
+      const samples = new Float32Array(total);
+      let offset = 0;
+      for (const chunk of chunks) {
+        samples.set(chunk, offset);
+        offset += chunk.length;
+      }
+      resolve({ samples, sampleRate });
+    };
+
+    openMicrophone((samples, rate) => {
+      if (finished) return;
+      sampleRate = rate;
+      chunks.push(samples);
+      const chunkMs = (samples.length / rate) * 1000;
+      elapsedMs += chunkMs;
+      const level = rms(samples);
+      const threshold = Math.max(VAD.minThreshold, noise * VAD.noiseFactor);
+      if (level > threshold) {
+        loudMs += chunkMs;
+        lastVoiceMs = elapsedMs;
+        if (!heardSpeech && loudMs >= VAD.speechStartMs) heardSpeech = true;
+      } else {
+        if (!heardSpeech) loudMs = 0;
+        noise = noise * 0.95 + level * 0.05;
+      }
+      if (heardSpeech && elapsedMs - lastVoiceMs >= VAD.speechEndMs) finish(true);
+      else if (!heardSpeech && elapsedMs >= silenceTimeoutMs) finish(false);
+      else if (elapsedMs >= VAD.maxUtteranceMs) finish(true);
+    })
+      .then((opened) => {
+        microphone = opened;
+        if (finished) void opened.stop();
+      })
+      .catch((error: unknown) => {
+        finished = true;
+        reject(error instanceof Error ? error : new Error(String(error)));
+      });
+  });
+}

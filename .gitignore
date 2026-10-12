@@ -44,3 +44,4 @@ package-lock.json
 # Playwright MCP screenshots/logs
 .playwright-mcp/
 public/vosk/
+public/voice/

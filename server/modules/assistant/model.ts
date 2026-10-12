@@ -41,6 +41,9 @@ export const ttsBody = z.object({
 /** Longest per-user addition to the system prompt. */
 export const MAX_EXTRA_INSTRUCTIONS_LENGTH = 4000;
 
+/** Default cosine cutoff for the wake-word speaker check: strict by default. */
+export const DEFAULT_VOICE_MATCH_THRESHOLD = 0.6;
+
 export const settingsBody = z.object({
   extraInstructions: z.string().trim().max(MAX_EXTRA_INSTRUCTIONS_LENGTH).meta({
     title: "Extra Instructions",
@@ -49,9 +52,49 @@ export const settingsBody = z.object({
       "when they talk to it (e.g. nickname, tone, room names). Empty to clear.",
     example: "A luz da sala é a 'Lâmpada Philips'. Chame o usuário de Gui.",
   }),
+  voiceMatchThreshold: z.number().min(0).max(1).meta({
+    title: "Voice Match Threshold",
+    description:
+      "Cosine-similarity cutoff for the wake-word speaker check. Higher is " +
+      "stricter. Only applies once the user has enrolled a voice profile.",
+    example: 0.6,
+  }),
 });
 
 export type AssistantSettings = z.infer<typeof settingsBody>;
+
+/** How many enrolment samples the client sends, and their embedding limits. */
+export const MIN_VOICE_SAMPLES = 1;
+export const MAX_VOICE_SAMPLES = 8;
+/** Guards against an oversized or absurd embedding dimensionality. */
+export const MAX_VOICE_DIMS = 2048;
+
+export const voiceProfileBody = z.object({
+  embeddings: z
+    .array(z.array(z.number()).min(1).max(MAX_VOICE_DIMS))
+    .min(MIN_VOICE_SAMPLES)
+    .max(MAX_VOICE_SAMPLES)
+    .meta({
+      title: "Embeddings",
+      description:
+        "One L2-normalised speaker embedding per enrolment sample, extracted " +
+        "by the client-side model. All must share the same length.",
+    }),
+  modelId: z.string().trim().min(1).max(200).meta({
+    title: "Model ID",
+    description: "Which client-side embedding model produced these embeddings.",
+  }),
+});
+
+export type VoiceProfileBody = z.infer<typeof voiceProfileBody>;
+
+/** A user's enrolled wake-word voice profile (embeddings stay client-usable). */
+export interface VoiceProfile {
+  enrolled: boolean;
+  embeddings: number[][];
+  dims: number;
+  modelId: string;
+}
 
 /** One tool call the agent made while answering, shown as a chip in the UI. */
 export interface AssistantAction {
@@ -110,4 +153,8 @@ export interface ConversationDetail extends ConversationSummary {
 
 export interface AssistantConfig {
   wakeWordEnabled: boolean;
+  /** URL of the client-side speaker-embedding model, or null if not deployed. */
+  voiceModelUrl: string | null;
+  /** Which speaker-embedding model is deployed (invalidates old enrolments). */
+  voiceModelId: string;
 }

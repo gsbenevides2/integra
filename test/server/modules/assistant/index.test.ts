@@ -6,7 +6,8 @@ import { provideEnv, TUYA_ENV } from "./helpers";
 afterAll(provideEnv(TUYA_ENV));
 afterAll(installTestAuthz());
 
-const { assistantRoutes, VOSK_MODEL_FILE, voskAssetRoutes } = await import("@server/modules/assistant");
+const { assistantRoutes, VOSK_MODEL_FILE, VOICE_MODEL_FILE, VOICE_MODEL_ID, VOICE_MODEL_URL, voskAssetRoutes } =
+  await import("@server/modules/assistant");
 const { MAX_AUDIO_BYTES } = await import("@server/modules/assistant/model");
 const { AssistantAgent } = await import("@server/modules/assistant/service/agent");
 const { AudioService } = await import("@server/modules/assistant/service/audio");
@@ -25,7 +26,12 @@ const send = (method: string, path: string, body: unknown) =>
 describe("assistant routes", () => {
   test("config reports whether the wake word model is deployed", async () => {
     const exists = await Bun.file(VOSK_MODEL_FILE).exists();
-    expect(await (await call("/config")).json()).toEqual({ wakeWordEnabled: exists });
+    const voiceExists = await Bun.file(VOICE_MODEL_FILE).exists();
+    expect(await (await call("/config")).json()).toEqual({
+      wakeWordEnabled: exists,
+      voiceModelUrl: voiceExists ? VOICE_MODEL_URL : null,
+      voiceModelId: VOICE_MODEL_ID,
+    });
   });
 
   test("stt transcribes a raw WAV body and rejects empty or huge ones", async () => {
@@ -185,16 +191,30 @@ describe("assistant routes", () => {
   });
 
   test("settings are read and updated for the current user only", async () => {
-    const get = spyOn(AssistantSettingsService, "get").mockResolvedValue({ extraInstructions: "a" });
+    const get = spyOn(AssistantSettingsService, "get").mockResolvedValue({
+      extraInstructions: "a",
+      voiceMatchThreshold: 0.6,
+    });
     const update = spyOn(AssistantSettingsService, "update").mockImplementation(async (_id, s) => s);
     spies.push(get, update);
-    expect(await (await call("/settings")).json()).toEqual({ extraInstructions: "a" });
-    expect(get).toHaveBeenCalledWith(TEST_USER.id);
-    expect(await (await send("PUT", "/settings", { extraInstructions: " b " })).json()).toEqual({
-      extraInstructions: "b",
+    expect(await (await call("/settings")).json()).toEqual({
+      extraInstructions: "a",
+      voiceMatchThreshold: 0.6,
     });
-    expect(update).toHaveBeenCalledWith(TEST_USER.id, { extraInstructions: "b" });
-    expect((await send("PUT", "/settings", { extraInstructions: "x".repeat(4001) })).status).toBe(422);
+    expect(get).toHaveBeenCalledWith(TEST_USER.id);
+    expect(
+      await (
+        await send("PUT", "/settings", { extraInstructions: " b ", voiceMatchThreshold: 0.7 })
+      ).json(),
+    ).toEqual({ extraInstructions: "b", voiceMatchThreshold: 0.7 });
+    expect(update).toHaveBeenCalledWith(TEST_USER.id, {
+      extraInstructions: "b",
+      voiceMatchThreshold: 0.7,
+    });
+    expect(
+      (await send("PUT", "/settings", { extraInstructions: "x".repeat(4001), voiceMatchThreshold: 0.7 }))
+        .status,
+    ).toBe(422);
   });
 
   test("tts streams the synthesised mp3", async () => {

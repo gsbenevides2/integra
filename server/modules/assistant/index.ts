@@ -14,15 +14,23 @@ import {
   settingsBody,
   type StreamEvent,
   ttsBody,
+  voiceProfileBody,
 } from "./model";
 import { AssistantAgent, type ChatRequest } from "./service/agent";
 import { AudioService } from "./service/audio";
 import { type Conversation, ConversationService } from "./service/conversation";
 import { IMAGE_EXTENSIONS, ImageStorage, MAX_IMAGE_BYTES } from "./service/images";
 import { AssistantSettingsService } from "./service/settings";
+import { VoiceProfileService } from "./service/voiceProfile";
 
 /** The Portuguese Vosk model; wake word detection is off until it is downloaded. */
 export const VOSK_MODEL_FILE = "public/vosk/vosk-model-small-pt.tar.gz";
+
+/** The client-side speaker-embedding model; the speaker check is off until it exists. */
+export const VOICE_MODEL_FILE = "public/voice/speaker-ecapa.onnx";
+export const VOICE_MODEL_URL = "/voice/speaker-ecapa.onnx";
+/** Bump when the model file changes, to invalidate every enrolled profile. */
+export const VOICE_MODEL_ID = "wespeaker-en-voxceleb-resnet34-LM-v1";
 
 const log = getLogger("assistant");
 
@@ -55,6 +63,10 @@ export const assistantRoutes = new Elysia({
     "/config",
     async (): Promise<AssistantConfig> => ({
       wakeWordEnabled: await Bun.file(VOSK_MODEL_FILE).exists(),
+      voiceModelUrl: (await Bun.file(VOICE_MODEL_FILE).exists())
+        ? VOICE_MODEL_URL
+        : null,
+      voiceModelId: VOICE_MODEL_ID,
     }),
     {
       detail: {
@@ -296,6 +308,51 @@ export const assistantRoutes = new Elysia({
           "assistant's system prompt only when they talk to it.",
       },
       body: settingsBody,
+    },
+  )
+  .get(
+    "/voice-profile",
+    (ctx) => VoiceProfileService.get(currentUser(ctx).id),
+    {
+      detail: {
+        summary: "Get My Voice Profile",
+        description:
+          "Returns the current user's enrolled wake-word voice profile " +
+          "(embeddings), used by the client to verify it is their voice.",
+      },
+    },
+  )
+  .put(
+    "/voice-profile",
+    (ctx) =>
+      VoiceProfileService.upsert(
+        currentUser(ctx).id,
+        ctx.body.embeddings,
+        ctx.body.modelId,
+      ),
+    {
+      detail: {
+        summary: "Enrol My Voice",
+        description:
+          "Stores the current user's wake-word voice profile: a few " +
+          "client-extracted speaker embeddings of them saying 'Ei Integra'.",
+      },
+      body: voiceProfileBody,
+    },
+  )
+  .delete(
+    "/voice-profile",
+    async (ctx) => {
+      await VoiceProfileService.delete(currentUser(ctx).id);
+      return { ok: true };
+    },
+    {
+      detail: {
+        summary: "Remove My Voice",
+        description:
+          "Deletes the current user's wake-word voice profile, so the wake " +
+          "word fires for any voice again.",
+      },
     },
   )
   .post(
