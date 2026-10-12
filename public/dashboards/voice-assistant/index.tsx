@@ -35,6 +35,7 @@ import {
 
 import { HistoryDrawer } from "./HistoryDrawer";
 import { SettingsModal } from "./SettingsModal";
+import { useStickToBottom } from "./useStickToBottom";
 
 /** Holders of this route grant can edit their own assistant instructions. */
 export const SETTINGS_ROUTE_KEY = "PUT /api/assistant/settings";
@@ -173,7 +174,7 @@ export function VoiceAssistantDashboard() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState("");
-  const endRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const { allowed, start } = assistant;
 
   // Opening the dashboard is the same as saying the wake word (once).
@@ -184,9 +185,7 @@ export function VoiceAssistantDashboard() {
     start();
   }, [allowed, start]);
 
-  useEffect(() => {
-    endRef.current?.scrollIntoView?.({ behavior: "smooth" });
-  }, [assistant.messages.length]);
+  useStickToBottom(listRef, assistant.messages.length);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -270,7 +269,7 @@ export function VoiceAssistantDashboard() {
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col gap-2">
-            <div className="
+            <div ref={listRef} className="
               flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-md
               bg-gray-900 p-3
             ">
@@ -308,7 +307,6 @@ export function VoiceAssistantDashboard() {
                   Ouvindo você...
                 </p>
               )}
-              <div ref={endRef} />
             </div>
             {assistant.attachments.length > 0 && (
               <div className="flex flex-wrap gap-2">
