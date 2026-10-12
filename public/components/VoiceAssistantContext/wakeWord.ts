@@ -57,8 +57,8 @@ export async function startWakeWord(onDetect: () => void): Promise<WakeWordEngin
   let recognizer: KaldiRecognizer | null = null;
   let microphone: Microphone;
   try {
-    microphone = await openMicrophone((samples) =>
-      recognizer?.acceptWaveformFloat(samples, microphone.sampleRate),
+    microphone = await openMicrophone((samples, sampleRate) =>
+      recognizer?.acceptWaveformFloat(samples, sampleRate),
     );
   } catch (error) {
     client.terminate();

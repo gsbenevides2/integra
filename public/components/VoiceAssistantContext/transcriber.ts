@@ -62,10 +62,11 @@ export function listenOnce({ onPhase, silenceTimeoutMs }: ListenOptions): Listen
     let lastVoiceMs = 0;
     let noise = VAD.minThreshold / VAD.noiseFactor;
 
+    let sampleRate = 0;
+
     const finish = (record: boolean) => {
       if (finished) return;
       finished = true;
-      const sampleRate = microphone?.sampleRate ?? 0;
       void microphone?.stop();
       if (!record) return resolve("");
       onPhase("transcribing");
@@ -73,14 +74,16 @@ export function listenOnce({ onPhase, silenceTimeoutMs }: ListenOptions): Listen
     };
     settle = () => finish(false);
 
-    openMicrophone((samples) => {
-      if (finished || !microphone) return;
+    openMicrophone((samples, rate) => {
+      if (finished) return;
+      sampleRate = rate;
       chunks.push(samples);
-      elapsedMs += (samples.length / microphone.sampleRate) * 1000;
+      const chunkMs = (samples.length / rate) * 1000;
+      elapsedMs += chunkMs;
       const level = rms(samples);
       const threshold = Math.max(VAD.minThreshold, noise * VAD.noiseFactor);
       if (level > threshold) {
-        loudMs += (samples.length / microphone.sampleRate) * 1000;
+        loudMs += chunkMs;
         lastVoiceMs = elapsedMs;
         if (!heardSpeech && loudMs >= VAD.speechStartMs) {
           heardSpeech = true;

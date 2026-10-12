@@ -37,13 +37,27 @@ export interface Microphone {
   stop: () => Promise<void>;
 }
 
+/** Receives each chunk with the capture sample rate. */
+export type ChunkListener = (samples: Float32Array, sampleRate: number) => void;
+
+interface Device {
+  context: AudioContext;
+  stream: MediaStream;
+  source: MediaStreamAudioSourceNode;
+  tap: AudioWorkletNode;
+}
+
+/**
+ * One microphone shared by everyone listening (wake word and transcriber).
+ * Opening a second one for each utterance took a few hundred milliseconds,
+ * long enough to lose the first syllables said right after the chime.
+ */
+let device: Promise<Device> | null = null;
+const listeners = new Set<ChunkListener>();
 /** Every open microphone's context, so a user gesture can resume them all. */
 const liveContexts = new Set<AudioContext>();
 
-/** Opens the microphone and streams mono Float32 chunks to `onChunk`. */
-export async function openMicrophone(
-  onChunk: (samples: Float32Array) => void,
-): Promise<Microphone> {
+async function openDevice(): Promise<Device> {
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
   });
@@ -60,24 +74,54 @@ export async function openMicrophone(
     const source = context.createMediaStreamSource(stream);
     const tap = new AudioWorkletNode(context, "integra-tap");
     tap.port.onmessage = (event: MessageEvent<Float32Array>) =>
-      onChunk(event.data);
+      listeners.forEach((listener) => listener(event.data, context.sampleRate));
     source.connect(tap);
     liveContexts.add(context);
-    return {
-      sampleRate: context.sampleRate,
-      stop: async () => {
-        liveContexts.delete(context);
-        tap.port.onmessage = null;
-        source.disconnect();
-        stream.getTracks().forEach((track) => track.stop());
-        await context.close();
-      },
-    };
+    return { context, stream, source, tap };
   } catch (error) {
     stream.getTracks().forEach((track) => track.stop());
     await context.close();
     throw error;
   }
+}
+
+async function closeDevice({ context, stream, source, tap }: Device): Promise<void> {
+  liveContexts.delete(context);
+  tap.port.onmessage = null;
+  source.disconnect();
+  stream.getTracks().forEach((track) => track.stop());
+  await context.close();
+}
+
+/**
+ * Streams mono Float32 chunks to `onChunk` from the shared microphone,
+ * opening it on first use; it closes when the last listener stops.
+ */
+export async function openMicrophone(onChunk: ChunkListener): Promise<Microphone> {
+  // A function of its own, so the same callback can subscribe twice.
+  const listener: ChunkListener = (samples, sampleRate) => onChunk(samples, sampleRate);
+  listeners.add(listener);
+  const opening = (device ??= openDevice());
+  let opened: Device;
+  try {
+    opened = await opening;
+  } catch (error) {
+    listeners.delete(listener);
+    if (device === opening) device = null;
+    throw error;
+  }
+  let stopped = false;
+  return {
+    sampleRate: opened.context.sampleRate,
+    stop: async () => {
+      if (stopped) return;
+      stopped = true;
+      listeners.delete(listener);
+      if (listeners.size > 0 || device !== opening) return;
+      device = null;
+      await closeDevice(opened);
+    },
+  };
 }
 
 /**

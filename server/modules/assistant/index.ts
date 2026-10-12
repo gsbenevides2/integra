@@ -1,4 +1,4 @@
-import { getLogger, logError } from "@server/instrumentation/instrumentLogger";
+import { getLogger, logError, logWarn } from "@server/instrumentation/instrumentLogger";
 import { authz, currentUser } from "@server/shared/authz";
 
 import Elysia, { status } from "elysia";
@@ -224,8 +224,8 @@ export const assistantRoutes = new Elysia({
       detail: {
         summary: "Get Conversation",
         description:
-          "One of the user's conversations with its messages; images come " +
-          "with presigned URLs valid for an hour.",
+          "One of the user's conversations with its messages; image URLs " +
+          "point at GET /api/assistant/images/*.",
       },
     },
   )
@@ -234,13 +234,43 @@ export const assistantRoutes = new Elysia({
     async (ctx) => {
       const images = await ConversationService.remove(currentUser(ctx).id, ctx.params.id);
       if (!images) return status(404, { error: "Conversation not found" });
-      await ImageStorage.remove(images);
+      // The conversation is gone either way; images left behind are swept daily.
+      await ImageStorage.remove(images).catch((error: unknown) =>
+        logWarn(log, "[assistant] could not delete conversation images", {
+          "error.message": error instanceof Error ? error.message : String(error),
+        }),
+      );
       return { ok: true };
     },
     {
       detail: {
         summary: "Delete Conversation",
         description: "Deletes one of the user's conversations and its images.",
+      },
+    },
+  )
+  .get(
+    "/images/*",
+    (ctx) => {
+      const key = ImageStorage.keyFromRoute(ctx.params["*"]);
+      if (!ImageStorage.owns(currentUser(ctx).id, key)) {
+        return status(404, { error: "Image not found" });
+      }
+      return new Response(null, {
+        status: 302,
+        headers: {
+          location: ImageStorage.signedUrl(key),
+          // Shorter than the signed URL's lifetime, so a cached hop still works.
+          "cache-control": "private, max-age=300",
+        },
+      });
+    },
+    {
+      detail: {
+        summary: "Get Assistant Image",
+        description:
+          "Redirects to a short-lived presigned URL for one of the user's " +
+          "assistant images (uploaded, generated or camera snapshots).",
       },
     },
   )

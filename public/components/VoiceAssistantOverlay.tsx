@@ -18,7 +18,7 @@ import { XMarkIcon } from "@heroicons/react/24/outline";
  * can watch (say) a lamp change instead of being taken away to the chat.
  */
 export function VoiceAssistantOverlay() {
-  const { state, hearingSpeech, messages, stop } = useVoiceAssistant();
+  const { state, hearingSpeech, messages, stop, markTyped } = useVoiceAssistant();
   const { page } = useGlobalDrawer();
   if (state === "idle" || page === ASSISTANT_PAGE_ID) return null;
 
@@ -32,7 +32,14 @@ export function VoiceAssistantOverlay() {
       : reply?.activity
         ? toolActivity(reply.activity)
         : reply?.text
-          ? <TypedText key={reply.id} text={reply.text} live={reply.live} />
+          ? (
+            <TypedText
+              key={reply.id}
+              text={reply.text}
+              live={reply.live}
+              onTyped={() => markTyped(reply.id)}
+            />
+          )
           : state === "thinking"
             ? <TypingDots />
             : "";

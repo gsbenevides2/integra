@@ -3,7 +3,7 @@ import React from "react";
 import type { Me } from "@public/components/MeContext";
 
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
-import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 
 import { fail, sse, useApi } from "../../../helpers/dash-api";
 import { ME_FIXTURE, renderWithMe } from "../../../helpers/me";
@@ -286,6 +286,32 @@ describe("VoiceAssistantProvider", () => {
     }
   });
 
+  test("a speech failure keeps the reply and carries on listening", async () => {
+    renderProvider();
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo, init?: RequestInit) => {
+      if (String(input).includes("/tts")) return new Response("", { status: 502 });
+      return realFetch(input, init);
+    }) as typeof fetch;
+    try {
+      act(() => value.sendText("oi"));
+      expect(await screen.findByText("Falha ao gerar a fala")).toBeTruthy();
+      await stateIs("listening");
+      expect(value.messages.at(-1)?.text).toBe("Pronto.");
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
+  test("a microphone error after a typed message is reported", async () => {
+    renderProvider();
+    act(() => value.sendText("oi"));
+    voice.micDenied = true;
+    await finishSpeaking();
+    expect(await screen.findByText("Permission denied")).toBeTruthy();
+    expect(value.state).toBe("idle");
+  });
+
   test("a microphone error during the first turn is reported", async () => {
     voice.micDenied = true;
     renderProvider();
@@ -409,8 +435,28 @@ describe("conversations and images", () => {
     expect(value.conversationId).toBeNull();
   });
 
+  test("a session started while a past conversation loads keeps the screen", async () => {
+    renderProvider();
+    let release!: () => void;
+    const held = detailReply;
+    detailReply = new Promise((resolve) => (release = () => resolve(held)));
+    try {
+      let opening!: Promise<void>;
+      act(() => void (opening = value.openConversation("old")));
+      act(() => value.sendText("nova"));
+      release();
+      await act(() => opening);
+      expect(value.messages[0]?.text).toBe("nova");
+      expect(value.conversationId).not.toBe("old");
+    } finally {
+      detailReply = held;
+    }
+  });
+
   test("the inert default exposes no-op history and attachments", async () => {
     render(<Probe />);
+    value.retry(1);
+    value.markTyped(1);
     await value.openConversation("x");
     await value.attachImage(new Blob());
     value.removeAttachment("x");
@@ -466,22 +512,64 @@ describe("streaming replies", () => {
     }
   });
 
-  test("a stream error removes the unfinished reply", async () => {
-    chatReply = undefined;
+  test("a failed reply stays as an error, and retry sends the same message again", async () => {
+    chatReply = fail(500);
+    renderProvider();
+    await act(() => value.attachImage(new Blob(["x"], { type: "image/gif" })));
+    act(() => value.sendText("oi"));
+    expect(await screen.findByText("O assistente não respondeu")).toBeTruthy();
+    await stateIs("idle");
+    const failed = reply()!;
+    expect(failed).toMatchObject({ error: "O assistente não respondeu", pending: false });
+    expect(failed.retry).toMatchObject({ text: "oi", images: [IMAGE] });
+
+    value.retry(-1); // unknown reply: nothing to resend
+    chatReply = REPLY;
+    act(() => value.retry(failed.id));
+    await stateIs("speaking");
+    expect(value.messages.map((m) => [m.role, m.text])).toEqual([
+      ["user", "oi"],
+      ["assistant", "Pronto."],
+    ]);
+    const sent = calls.filter((c) => c.path === "/api/assistant/chat/stream").at(-1);
+    expect(sent?.body).toMatchObject({ text: "oi", images: [IMAGE.key] });
+    expect(value.attachments).toEqual([]);
+
+    // A failure later in the retried session is reported as usual.
+    voice.micDenied = true;
+    await finishSpeaking();
+    expect(await screen.findByText("Permission denied")).toBeTruthy();
+  });
+
+  test("a stream error after a newer session started drops the reply", async () => {
     const chat = holdChat();
     try {
       renderProvider();
       act(() => value.sendText("oi"));
       await until(() => reply()?.pending === true);
+      act(() => value.start());
       await act(async () => {
         chat.push({ type: "error", message: "O assistente não respondeu" });
         chat.close();
       });
-      expect(await screen.findByText("O assistente não respondeu")).toBeTruthy();
-      expect(reply()).toBeUndefined();
+      await until(() => reply() === undefined);
+      expect(screen.queryByText("O assistente não respondeu")).toBeNull();
     } finally {
       chat.restore();
     }
+  });
+
+  test("markTyped stops a reply from typing in again", async () => {
+    renderProvider();
+    act(() => value.sendText("oi"));
+    await stateIs("speaking");
+    const id = reply()!.id;
+    expect(reply()?.live).toBe(true);
+    act(() => value.markTyped(id));
+    expect(reply()?.live).toBe(false);
+    const before = value.messages;
+    act(() => value.markTyped(id)); // already typed: no re-render
+    expect(value.messages).toBe(before);
   });
 
   test("a superseded reply keeps what was written, or disappears if empty", async () => {
@@ -541,16 +629,26 @@ describe("wake word", () => {
     act(() => window.dispatchEvent(new Event("pointerdown")));
     expect(voice.contexts.some((c) => c.resumed > 0)).toBe(true);
 
-    await act(async () => recognizer.result("ei integra"));
-    await stateIs("listening");
-    // The wake word is ignored while a session is running.
-    await new Promise((r) => setTimeout(r, 0));
-    await say("oi", 1);
-    await stateIs("speaking");
-    const before = voice.openTaps.length;
-    await act(async () => recognizer.result("integra"));
-    expect(value.state).toBe("speaking");
-    expect(voice.openTaps.length).toBe(before);
+    // Past the wake word's cooldown for every detection below.
+    let clock = 0;
+    const now = spyOn(performance, "now").mockImplementation(() => (clock += 10_000));
+    try {
+      await act(async () => recognizer.result("ei integra"));
+      await stateIs("listening");
+      // The microphone is shared: listening opens no second one.
+      expect(voice.openTaps).toHaveLength(1);
+      // Ignored while listening...
+      await act(async () => recognizer.result("integra"));
+      await say("oi");
+      await stateIs("speaking");
+      // ...but it interrupts a reply being spoken (barge-in).
+      const speaking = playing()[0]!;
+      await act(async () => recognizer.result("integra"));
+      await stateIs("listening");
+      expect(speaking.stopped).toBe(true);
+    } finally {
+      now.mockRestore();
+    }
 
     unmount();
     await flush();

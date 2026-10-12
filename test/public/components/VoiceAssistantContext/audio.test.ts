@@ -53,6 +53,31 @@ describe("microphone", () => {
     expect(voice.tracksStopped).toBe(1);
   });
 
+  test("listeners share one microphone, closed when the last one stops", async () => {
+    const first: number[] = [];
+    const second: number[] = [];
+    const [a, b] = await Promise.all([
+      openMicrophone((samples, rate) => first.push(rate)),
+      openMicrophone((samples, rate) => second.push(rate)),
+    ]);
+    expect(voice.contexts).toHaveLength(1);
+    voice.feed(0.1, 100);
+    expect([first, second]).toEqual([[FAKE_SAMPLE_RATE], [FAKE_SAMPLE_RATE]]);
+
+    await a.stop();
+    await a.stop(); // twice is harmless
+    expect(voice.contexts[0]?.closed).toBe(false);
+    voice.feed(0.1, 100);
+    expect([first.length, second.length]).toEqual([1, 2]);
+    await b.stop();
+    expect(voice.contexts[0]?.closed).toBe(true);
+
+    // The next listener opens a fresh one.
+    const c = await openMicrophone(() => {});
+    expect(voice.contexts).toHaveLength(2);
+    await c.stop();
+  });
+
   test("releases the stream when the worklet cannot load", async () => {
     voice.workletFails = true;
     await expect(openMicrophone(() => {})).rejects.toThrow("worklet blocked");

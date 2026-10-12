@@ -1,4 +1,4 @@
-import React, { type FormEvent, useEffect, useRef, useState } from "react";
+import React, { type FormEvent, memo, useEffect, useRef, useState } from "react";
 
 import { Button } from "@public/components/Button";
 import {
@@ -109,7 +109,14 @@ function Activity({ tool }: { tool: string }) {
   );
 }
 
-function Message({ message }: { message: AssistantMessage }) {
+interface MessageProps {
+  message: AssistantMessage;
+  onRetry: (replyId: number) => void;
+  onTyped: (replyId: number) => void;
+}
+
+/** Memoized: while a reply streams in, the other messages do not re-render. */
+const Message = memo(function Message({ message, onRetry, onTyped }: MessageProps) {
   const isUser = message.role === "user";
   const typing = message.pending && !message.text;
   return (
@@ -129,10 +136,33 @@ function Message({ message }: { message: AssistantMessage }) {
           message.text
         ) : typing ? (
           <TypingDots />
+        ) : message.error && !message.text ? (
+          <span className="flex items-center gap-1 text-red-300">
+            <ExclamationCircleIcon className="size-4 shrink-0" />
+            {message.error}
+          </span>
         ) : (
-          <TypedText text={message.text} live={message.live} />
+          <TypedText
+            text={message.text}
+            live={message.live}
+            onTyped={() => onTyped(message.id)}
+          />
         )}
       </div>
+      {message.retry && (
+        <button
+          type="button"
+          onClick={() => onRetry(message.id)}
+          className="
+            flex cursor-pointer items-center gap-1 rounded-full bg-gray-800 px-3
+            py-1 text-xs text-mist-200
+            hover:bg-gray-700
+          "
+        >
+          <ArrowPathIcon className="size-3" />
+          Tentar de novo
+        </button>
+      )}
       {message.activity && <Activity tool={message.activity} />}
       {message.images && message.images.length > 0 && (
         <MessageImages images={message.images} />
@@ -161,7 +191,7 @@ function Message({ message }: { message: AssistantMessage }) {
       )}
     </div>
   );
-}
+});
 
 export function VoiceAssistantDashboard() {
   const globalDrawer = useGlobalDrawer();
@@ -177,13 +207,15 @@ export function VoiceAssistantDashboard() {
   const listRef = useRef<HTMLDivElement>(null);
   const { allowed, start } = assistant;
 
-  // Opening the dashboard is the same as saying the wake word (once).
+  // Opening the dashboard is the same as saying the wake word (once), unless
+  // the assistant is already busy (arriving from the overlay mid-reply).
   const autoStarted = useRef(false);
+  const { state } = assistant;
   useEffect(() => {
     if (!allowed || autoStarted.current) return;
     autoStarted.current = true;
-    start();
-  }, [allowed, start]);
+    if (state === "idle") start();
+  }, [allowed, start, state]);
 
   useStickToBottom(listRef, assistant.messages.length);
 
@@ -299,7 +331,12 @@ export function VoiceAssistantDashboard() {
                 </div>
               ) : (
                 assistant.messages.map((message) => (
-                  <Message key={message.id} message={message} />
+                  <Message
+                    key={message.id}
+                    message={message}
+                    onRetry={assistant.retry}
+                    onTyped={assistant.markTyped}
+                  />
                 ))
               )}
               {assistant.state === "listening" && assistant.hearingSpeech && (

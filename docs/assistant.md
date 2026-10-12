@@ -35,13 +35,18 @@ Microsoft MAI text-to-speech and image generation.
   ("bom dia…", "a integração…").
 - `hey` is not in the Portuguese vocabulary. A spoken "hey integra" is
   recognised as "ei integra".
-- The wake word only starts a session when the assistant is idle, so its own
-  voice cannot wake it up.
+- The wake word starts a session when the assistant is idle, and
+  **interrupts a reply being spoken** (barge-in). Echo cancellation keeps the
+  assistant's own voice out, and only an utterance that is exactly the wake
+  phrase counts. While listening or thinking it is ignored.
 
 ### Recording and speech to text
 
 - `transcriber.ts` records from the microphone (`microphone.ts`, an
   AudioWorklet).
+- The wake word and the transcriber **share one microphone**: it opens on
+  first use and closes when the last listener stops. Opening a second one for
+  every utterance lost the first syllables said right after the chime.
 - It ends the utterance after 1.2 s of silence, using an energy-based VAD
   (`VAD` constants).
 - The audio is encoded as a 16 kHz WAV (`wav.ts`) and sent to
@@ -84,7 +89,10 @@ In the chat:
   Showing the deltas as they arrive would look like the text popping in: a
   short reply is generated in about half a second, often several deltas per
   network packet. Conversations opened from the history show complete
-  instantly.
+  instantly, and so does a reply already typed once (`markTyped`), so leaving
+  and coming back to the dashboard does not type everything again.
+- **Rendering:** messages are memoized and the chat follows new text at most
+  once per frame, so only the reply being typed re-renders.
 - **Markdown:** assistant replies render as markdown (`MessageMarkdown.tsx`:
   `react-markdown` with `remark-gfm`, compact Tailwind styles).
   - Raw HTML is never rendered.
@@ -124,8 +132,19 @@ In the chat:
   the session right after the farewell is spoken. The conversation history is
   cleared on both sides.
 - The model ends it by calling the `encerrar_conversa` tool. A deterministic
-  backstop, `service/farewell.ts`, also ends it when a short utterance is
-  clearly a goodbye, in case the model forgets the tool.
+  backstop, `service/farewell.ts`, also ends it when the utterance is made only
+  of goodbyes and fillers ("ok, tchau", "valeu, era só isso"), in case the
+  model forgets the tool. It never fires on a question, on anything with a
+  request in it ("valeu, apaga a luz", "fui no mercado"), or when a tool ran
+  in that turn.
+
+### Failures
+
+- If a reply fails, the error stays in the chat with a **"Tentar de novo"**
+  button that sends the same text and images again (plus a toast, which is
+  what shows over other dashboards).
+- If only the speech fails, the reply stays on screen and the assistant keeps
+  listening for a follow-up.
 
 ### Where it shows
 
@@ -178,7 +197,10 @@ deletes them.
 
 - **Resuming:** a message without a `conversationId` resumes the user's latest
   open conversation if it was active in the last 10 minutes; otherwise a new
-  one starts. A goodbye closes the conversation, and "Nova conversa"
+  one starts. A new conversation is only saved together with its first turn
+  (in one transaction), so a failed first message leaves no empty conversation
+  behind. A goodbye closes the conversation, continuing a closed one reopens
+  it, and "Nova conversa"
   (`DELETE /api/assistant/conversation`) closes it without deleting anything.
 - **Browser side:** the browser keeps the current `conversationId` and drops it
   after 10 minutes idle, so the wake word does not resume an old conversation.
@@ -197,8 +219,13 @@ deletes them.
 All images live in the **private** S3 bucket (`S3_*`, via `Bun.s3`) under
 `assistant/<userId>/<source>/` (`service/images.ts`):
 
-- **Browser:** gets presigned GET URLs valid for 1 hour, created fresh every
-  time a conversation is loaded.
+- **Browser:** loads images from `GET /api/assistant/images/*` (owner only),
+  which redirects to a presigned URL valid for 10 minutes. The page's URLs
+  never expire, so a kiosk left open for hours keeps showing its images.
+- **Cleanup:** the daily `assistant.images.sweep` cron deletes objects older
+  than a day that no message refers to: uploads never sent, images of a turn
+  that failed to save, or images left behind when a conversation delete could
+  not reach the bucket.
 - **Model:** gets the bytes inlined as data URLs, so the bucket never has to be
   reachable by the model provider.
 - **Ownership:** a key sent by a client must start with the user's own prefix,
@@ -266,6 +293,8 @@ tone or room names. Use the gear button ("Minhas preferências") on the
    - `GET`/`PUT /api/assistant/settings` let users edit their own instructions.
    - History needs `GET /api/assistant/conversations`, `GET` and `DELETE`
      `/api/assistant/conversations/:id`. Photos need `POST /api/assistant/uploads`.
+   - **Any image** in the chat (uploads, generated, cameras) needs
+     `GET /api/assistant/images/*`.
    - Cameras follow the user's existing Frigate grants
      (`GET /api/frigate/cameras` and per-camera read).
 

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo } from "react";
 
 import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -52,15 +52,17 @@ const COMPONENTS: Components = {
   td: ({ children }) => <td className="border-b border-gray-700 px-2 py-1">{children}</td>,
 };
 
+const REMARK_PLUGINS = [remarkGfm];
+
 /**
- * Renders a reply's markdown. Raw HTML is never rendered, and images are
+ * Renders a reply's markdown (memoized: only the reply being typed re-parses). Raw HTML is never rendered, and images are
  * dropped: the conversation's own images come from the bucket, while a URL
  * written by the model could load anything.
  */
-export function MessageMarkdown({ text }: { text: string }) {
+export const MessageMarkdown = memo(function MessageMarkdown({ text }: { text: string }) {
   return (
     <Markdown
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={REMARK_PLUGINS}
       components={COMPONENTS}
       disallowedElements={["img"]}
       unwrapDisallowed
@@ -68,4 +70,4 @@ export function MessageMarkdown({ text }: { text: string }) {
       {text}
     </Markdown>
   );
-}
+});

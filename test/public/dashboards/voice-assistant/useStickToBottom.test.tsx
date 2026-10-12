@@ -27,7 +27,8 @@ function layout(list: HTMLElement, content: { height: number }) {
   Object.defineProperty(list, "clientHeight", { configurable: true, value: 100 });
   Object.defineProperty(list, "scrollHeight", { configurable: true, get: () => content.height });
 }
-const flush = () => act(() => new Promise((r) => setTimeout(r, 0)));
+/** Past the next animation frame, when following scrolls happen. */
+const flush = () => act(() => new Promise((r) => setTimeout(r, 30)));
 const scrollTo = (list: HTMLElement, top: number) => {
   list.scrollTop = top;
   fireEvent.scroll(list);
@@ -48,6 +49,8 @@ describe("useStickToBottom", () => {
     // An image finishing loading.
     content.height = 800;
     list.querySelector("p")!.dispatchEvent(new Event("load"));
+    list.querySelector("p")!.dispatchEvent(new Event("load")); // same frame
+    await flush();
     expect(list.scrollTop).toBe(800);
 
     // Scrolled up to read: growth no longer pulls the view down.

@@ -77,7 +77,6 @@ describe("guardedTool", () => {
 
   test("streams the tool start, its action and any new images", async () => {
     grant(true);
-    const presign = spyOn(Bun.s3 as never, "presign" as never).mockReturnValue("https://signed" as never);
     const ctx = makeContext();
     const events: unknown[] = [];
     ctx.emit = (event) => events.push(event);
@@ -88,18 +87,25 @@ describe("guardedTool", () => {
         routeKeys: [],
         inputSchema: z.object({}),
         execute: async () => {
-          ctx.images.push({ key: "k", mediaType: "image/png", source: "generated" });
+          ctx.images.push({ key: "assistant/u/generated/g.png", mediaType: "image/png", source: "generated" });
           return { value: 1 };
         },
         summarize: () => "feito",
       }),
     ];
     await runTool(tools, "t");
-    presign.mockRestore();
     expect(events).toEqual([
       { type: "tool", tool: "t" },
       { type: "action", action: { tool: "t", ok: true, summary: "feito" } },
-      { type: "image", image: { key: "k", mediaType: "image/png", source: "generated", url: "https://signed" } },
+      {
+        type: "image",
+        image: {
+          key: "assistant/u/generated/g.png",
+          mediaType: "image/png",
+          source: "generated",
+          url: "/api/assistant/images/u/generated/g.png",
+        },
+      },
     ]);
   });
 

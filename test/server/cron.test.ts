@@ -12,6 +12,7 @@ process.env.TUYA_ACCESS_ID ??= "id";
 process.env.TUYA_ACCESS_SECRET ??= "secret";
 
 const mods = {
+  "@server/modules/assistant/jobs/sweepImages": ["sweepAssistantImages"],
   "@server/modules/birthday/jobs/sendMessage": ["sendBirthdayMessage"],
   "@server/modules/google/jobs/accessCodeCleaner": ["cleanAccessCodeEmails"],
   "@server/modules/google/jobs/calendarReminders": ["scheduleCalendarMessages", "sendScheduledMessages"],
@@ -58,7 +59,7 @@ afterAll(() => {
 });
 
 test("registry lists every job with label and schedule", () => {
-  expect(jobRegistry.size).toBe(13);
+  expect(jobRegistry.size).toBe(14);
   for (const e of jobRegistry.values()) {
     expect(e.label).toBeString();
     expect(e.schedule).toBeString();
@@ -91,11 +92,11 @@ test("registerCrons schedules all jobs in production or when enabled", async () 
   const cron = spyOn(Bun, "cron").mockImplementation((() => {}) as never);
   process.env.NODE_ENV = "production";
   registerCrons();
-  expect(cron).toHaveBeenCalledTimes(13);
+  expect(cron).toHaveBeenCalledTimes(14);
   process.env.NODE_ENV = "development";
   process.env.ENABLE_CRONS = "true";
   registerCrons();
-  expect(cron).toHaveBeenCalledTimes(26);
+  expect(cron).toHaveBeenCalledTimes(28);
   // the scheduled callback is the traced wrapper
   await (cron.mock.calls[0]![1] as unknown as () => Promise<void>)();
   cron.mockRestore();

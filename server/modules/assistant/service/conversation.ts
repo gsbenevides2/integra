@@ -6,7 +6,7 @@ import {
   type StoredImage,
 } from "@server/db/schema";
 
-import { and, desc, eq, gte, isNull } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, sql } from "drizzle-orm";
 
 /** Most recent messages sent back to the model as context. */
 export const MAX_HISTORY_MESSAGES = 12;
@@ -19,6 +19,11 @@ export const LIST_LIMIT = 100;
 
 export type Conversation = typeof assistantConversations.$inferSelect;
 export type StoredMessage = typeof assistantMessages.$inferSelect;
+
+/** The conversation a turn belongs to; a new one is only saved with its first turn. */
+export interface OpenConversation extends Conversation {
+  persisted: boolean;
+}
 
 export interface NewMessage {
   role: "user" | "assistant";
@@ -53,38 +58,42 @@ export abstract class ConversationService {
   /**
    * The conversation a new utterance belongs to: the requested one (if it is
    * the user's), else the latest one still open and active within the resume
-   * window, else a new one titled after `firstText`.
+   * window, else a new one titled after `firstText`. A new conversation is not
+   * saved yet: a failed first turn leaves no empty conversation behind.
    */
   static async open(
     userId: string,
     firstText: string,
     conversationId?: string,
     now = new Date(),
-  ): Promise<Conversation> {
+  ): Promise<OpenConversation> {
     if (conversationId) {
       const requested = await this.find(userId, conversationId);
-      if (requested) return requested;
+      if (requested) return { ...requested, persisted: true };
+    } else {
+      const [recent] = await db
+        .select()
+        .from(assistantConversations)
+        .where(
+          and(
+            eq(assistantConversations.userId, userId),
+            isNull(assistantConversations.endedAt),
+            gte(assistantConversations.updatedAt, new Date(now.getTime() - RESUME_WINDOW_MS)),
+          ),
+        )
+        .orderBy(desc(assistantConversations.updatedAt))
+        .limit(1);
+      if (recent) return { ...recent, persisted: true };
     }
-    const [recent] = await db
-      .select()
-      .from(assistantConversations)
-      .where(
-        and(
-          eq(assistantConversations.userId, userId),
-          isNull(assistantConversations.endedAt),
-          gte(assistantConversations.updatedAt, new Date(now.getTime() - RESUME_WINDOW_MS)),
-        ),
-      )
-      .orderBy(desc(assistantConversations.updatedAt))
-      .limit(1);
-    if (recent && !conversationId) return recent;
-
-    const [created] = await db
-      .insert(assistantConversations)
-      .values({ userId, title: titleFrom(firstText), createdAt: now, updatedAt: now })
-      .returning();
-    if (!created) throw new Error("Conversation not created");
-    return created;
+    return {
+      id: crypto.randomUUID(),
+      userId,
+      title: titleFrom(firstText),
+      endedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      persisted: false,
+    };
   }
 
   /** The latest messages of a conversation, oldest first. */
@@ -98,28 +107,41 @@ export abstract class ConversationService {
     return rows.reverse();
   }
 
-  /** Saves one exchange; a goodbye also closes the conversation. */
+  /**
+   * Saves one exchange atomically, creating the conversation on its first
+   * turn. A goodbye closes the conversation; any other turn (re)opens it.
+   */
   static async addTurn(
-    conversationId: string,
+    conversation: OpenConversation,
     messages: NewMessage[],
     ended: boolean,
     now = new Date(),
   ): Promise<void> {
-    await db.insert(assistantMessages).values(
-      messages.map((message, index) => ({
-        conversationId,
-        role: message.role,
-        text: message.text,
-        actions: message.actions ?? [],
-        images: message.images ?? [],
-        // Keep the user's message strictly before the reply.
-        createdAt: new Date(now.getTime() + index),
-      })),
-    );
-    await db
-      .update(assistantConversations)
-      .set({ updatedAt: now, ...(ended && { endedAt: now }) })
-      .where(eq(assistantConversations.id, conversationId));
+    const endedAt = ended ? now : null;
+    await db.transaction(async (tx) => {
+      if (!conversation.persisted) {
+        const { id, userId, title, createdAt } = conversation;
+        await tx
+          .insert(assistantConversations)
+          .values({ id, userId, title, createdAt, updatedAt: now, endedAt });
+      } else {
+        await tx
+          .update(assistantConversations)
+          .set({ updatedAt: now, endedAt })
+          .where(eq(assistantConversations.id, conversation.id));
+      }
+      await tx.insert(assistantMessages).values(
+        messages.map((message, index) => ({
+          conversationId: conversation.id,
+          role: message.role,
+          text: message.text,
+          actions: message.actions ?? [],
+          images: message.images ?? [],
+          // Keep the user's message strictly before the reply.
+          createdAt: new Date(now.getTime() + index),
+        })),
+      );
+    });
   }
 
   /** Closes the user's open conversations so the next one starts fresh. */
@@ -154,5 +176,13 @@ export abstract class ConversationService {
     const images = (await this.messages(id)).flatMap((message) => message.images);
     await db.delete(assistantConversations).where(eq(assistantConversations.id, id));
     return images;
+  }
+
+  /** Every image key some message still refers to (any user). */
+  static async referencedImageKeys(): Promise<Set<string>> {
+    const rows = await db
+      .select({ key: sql<string>`jsonb_array_elements(${assistantMessages.images})->>'key'` })
+      .from(assistantMessages);
+    return new Set(rows.map((row) => row.key));
   }
 }

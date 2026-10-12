@@ -1,6 +1,9 @@
 import {
+  IMAGE_ROUTE,
   IMAGE_URL_TTL_SECONDS,
   ImageStorage,
+  ORPHAN_GRACE_MS,
+  sweepOrphanImages,
   toDataUrl,
 } from "@server/modules/assistant/service/images";
 
@@ -47,11 +50,15 @@ describe("ImageStorage", () => {
     );
   });
 
-  test("view adds a presigned GET URL", () => {
+  test("view points at the image route, which signs a fresh URL for the key", () => {
+    const image = { key: "assistant/u1/upload/a.png", mediaType: "image/png", source: "upload" as const };
+    const view = ImageStorage.view(image);
+    expect(view).toEqual({ ...image, url: `${IMAGE_ROUTE}u1/upload/a.png` });
+    expect(ImageStorage.keyFromRoute(view.url.slice(IMAGE_ROUTE.length))).toBe(image.key);
+
     const presign = spy("presign").mockReturnValue("https://s3/signed");
-    const image = { key: "k", mediaType: "image/png", source: "upload" as const };
-    expect(ImageStorage.view(image)).toEqual({ ...image, url: "https://s3/signed" });
-    expect(presign).toHaveBeenCalledWith("k", { expiresIn: IMAGE_URL_TTL_SECONDS, method: "GET" });
+    expect(ImageStorage.signedUrl(image.key)).toBe("https://s3/signed");
+    expect(presign).toHaveBeenCalledWith(image.key, { expiresIn: IMAGE_URL_TTL_SECONDS, method: "GET" });
   });
 
   test("dataUrl inlines the object, and remove deletes every key", async () => {
@@ -65,6 +72,32 @@ describe("ImageStorage", () => {
       { key: "b", mediaType: "image/png", source: "upload" },
     ]);
     expect(remove.mock.calls).toEqual([["a"], ["b"]]);
+  });
+
+  test("sweepOrphanImages deletes old objects nothing refers to, across pages", async () => {
+    const now = new Date("2026-10-11T12:00:00Z");
+    const old = new Date(now.getTime() - ORPHAN_GRACE_MS - 1).toISOString();
+    const list = spy("list")
+      .mockResolvedValueOnce({
+        contents: [
+          { key: "assistant/u1/upload/orphan.jpg", lastModified: old },
+          { key: "assistant/u1/upload/kept.jpg", lastModified: old },
+        ],
+        isTruncated: true,
+        nextContinuationToken: "next",
+      })
+      .mockResolvedValueOnce({
+        contents: [
+          { key: "assistant/u1/upload/recent.jpg", lastModified: now.toISOString() },
+          { key: "assistant/u1/upload/undated.jpg" },
+        ],
+      })
+      .mockResolvedValueOnce({});
+    const remove = spy("delete").mockResolvedValue(undefined);
+    expect(await sweepOrphanImages(new Set(["assistant/u1/upload/kept.jpg"]), now)).toBe(1);
+    expect(remove.mock.calls).toEqual([["assistant/u1/upload/orphan.jpg"]]);
+    expect(list.mock.calls[1]![0]).toEqual({ prefix: "assistant/", continuationToken: "next" });
+    expect(await sweepOrphanImages(new Set())).toBe(0);
   });
 
   test("toDataUrl", () => {

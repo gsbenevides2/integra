@@ -14,8 +14,14 @@ export function useStickToBottom(ref: RefObject<HTMLElement | null>, messageCoun
   useEffect(() => {
     const list = ref.current;
     if (!list) return;
+    // At most once per frame: a reply being typed changes on every tick.
+    let frame = 0;
     const follow = () => {
-      if (following.current) list.scrollTop = list.scrollHeight;
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        if (following.current) list.scrollTop = list.scrollHeight;
+      });
     };
     const onScroll = () => {
       following.current =
@@ -27,6 +33,7 @@ export function useStickToBottom(ref: RefObject<HTMLElement | null>, messageCoun
     // Image load events do not bubble, so listen in the capture phase.
     list.addEventListener("load", follow, true);
     return () => {
+      cancelAnimationFrame(frame);
       observer.disconnect();
       list.removeEventListener("scroll", onScroll);
       list.removeEventListener("load", follow, true);

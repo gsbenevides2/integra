@@ -5,8 +5,13 @@ import { SpanKind, trace } from "@opentelemetry/api";
 
 const tracer = trace.getTracer("assistant");
 
-/** Presigned read URLs handed to the browser expire after this long. */
-export const IMAGE_URL_TTL_SECONDS = 60 * 60;
+/** Presigned read URLs (behind the image route's redirect) expire after this long. */
+export const IMAGE_URL_TTL_SECONDS = 10 * 60;
+/** The browser loads images through this route, which never expires. */
+export const IMAGE_ROUTE = "/api/assistant/images/";
+/** Objects nothing refers to are swept once they are older than this. */
+export const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000;
+const ROOT_PREFIX = "assistant/";
 /** Uploads are downscaled in the browser; this only stops abuse. */
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
@@ -18,7 +23,7 @@ export const IMAGE_EXTENSIONS: Record<string, string> = {
   "image/gif": "gif",
 };
 
-/** A stored image plus a short-lived presigned URL the browser can load. */
+/** A stored image plus the URL the browser loads it from. */
 export interface ImageView extends StoredImage {
   url: string;
 }
@@ -26,13 +31,14 @@ export interface ImageView extends StoredImage {
 const S3_ATTRS = { "peer.service": "s3" } as const;
 
 function prefixOf(userId: string): string {
-  return `assistant/${userId}/`;
+  return `${ROOT_PREFIX}${userId}/`;
 }
 
 /**
  * The assistant's images in the private bucket (Bun's S3 client, configured by
- * the S3_* variables). Nothing is public: the browser gets presigned URLs and
- * the model gets the bytes inlined as data URLs.
+ * the S3_* variables). Nothing is public: the browser goes through the image
+ * route (owner only), which redirects to a fresh presigned URL, so a page left
+ * open for hours never shows broken images; the model gets data URLs.
  */
 export abstract class ImageStorage {
   // explicit ctor: bun cannot count an implicit one as covered
@@ -71,10 +77,17 @@ export abstract class ImageStorage {
   }
 
   static view(image: StoredImage): ImageView {
-    return {
-      ...image,
-      url: Bun.s3.presign(image.key, { expiresIn: IMAGE_URL_TTL_SECONDS, method: "GET" }),
-    };
+    return { ...image, url: `${IMAGE_ROUTE}${image.key.slice(ROOT_PREFIX.length)}` };
+  }
+
+  /** The key behind an image route path (what follows IMAGE_ROUTE). */
+  static keyFromRoute(path: string): string {
+    return `${ROOT_PREFIX}${path}`;
+  }
+
+  /** A short-lived URL the browser can read the object from directly. */
+  static signedUrl(key: string): string {
+    return Bun.s3.presign(key, { expiresIn: IMAGE_URL_TTL_SECONDS, method: "GET" });
   }
 
   /** The image inlined as a data URL, for the model. */
@@ -96,6 +109,37 @@ export abstract class ImageStorage {
       () => Promise.all(images.map((image) => Bun.s3.delete(image.key))),
     );
   }
+}
+
+/**
+ * Deletes images no message refers to: uploads never sent, and images of a
+ * turn that failed to save. Recent objects are kept, as they may be about to
+ * be sent. Returns how many were deleted.
+ */
+export async function sweepOrphanImages(
+  referenced: Set<string>,
+  now = new Date(),
+): Promise<number> {
+  return withSpan(
+    tracer,
+    "assistant.image.sweep",
+    { kind: SpanKind.CLIENT, attributes: S3_ATTRS },
+    async (span) => {
+      const orphans: string[] = [];
+      let continuationToken: string | undefined;
+      do {
+        const page = await Bun.s3.list({ prefix: ROOT_PREFIX, continuationToken });
+        for (const object of page.contents ?? []) {
+          const age = now.getTime() - new Date(object.lastModified ?? now).getTime();
+          if (age > ORPHAN_GRACE_MS && !referenced.has(object.key)) orphans.push(object.key);
+        }
+        continuationToken = page.isTruncated ? page.nextContinuationToken : undefined;
+      } while (continuationToken);
+      await Promise.all(orphans.map((key) => Bun.s3.delete(key)));
+      span.setAttribute("assistant.image.count", orphans.length);
+      return orphans.length;
+    },
+  );
 }
 
 export function toDataUrl(bytes: Uint8Array, mediaType: string): string {

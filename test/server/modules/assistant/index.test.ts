@@ -165,6 +165,23 @@ describe("assistant routes", () => {
     expect(await (await call("/conversations/c1", { method: "DELETE" })).json()).toEqual({ ok: true });
     expect(removeImages).toHaveBeenCalledWith([stored]);
     expect((await call("/conversations/nope", { method: "DELETE" })).status).toBe(404);
+
+    // A bucket failure does not fail the delete: leftovers are swept later.
+    removeImages.mockRejectedValueOnce(new Error("s3 down"));
+    expect((await call("/conversations/c1", { method: "DELETE" })).status).toBe(200);
+    removeImages.mockRejectedValueOnce("raw");
+    expect((await call("/conversations/c1", { method: "DELETE" })).status).toBe(200);
+  });
+
+  test("images redirect the owner to a fresh signed URL", async () => {
+    const signed = spyOn(ImageStorage, "signedUrl").mockReturnValue("https://s3/signed");
+    spies.push(signed);
+    const own = await call(`/images/${TEST_USER.id}/upload/a.jpg`, { redirect: "manual" });
+    expect(own.status).toBe(302);
+    expect(own.headers.get("location")).toBe("https://s3/signed");
+    expect(own.headers.get("cache-control")).toContain("private");
+    expect(signed).toHaveBeenCalledWith(`assistant/${TEST_USER.id}/upload/a.jpg`);
+    expect((await call("/images/someone-else/upload/a.jpg")).status).toBe(404);
   });
 
   test("settings are read and updated for the current user only", async () => {

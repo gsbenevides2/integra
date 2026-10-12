@@ -40,8 +40,11 @@ export interface AssistantMessage {
   pending?: boolean;
   /** The tool running right now, e.g. "gerar_imagem" (shown as progress). */
   activity?: string;
-  /** Received live in this session (typed in), not loaded from history. */
+  /** Received live in this session and not typed in yet (see markTyped). */
   live?: boolean;
+  /** Why the reply failed; `retry` sends the same message again. */
+  error?: string;
+  retry?: { text: string; images: AssistantImage[]; userMessageId: number };
 }
 
 export interface VoiceAssistantValue {
@@ -67,6 +70,10 @@ export interface VoiceAssistantValue {
   conversationId: string | null;
   /** Loads a past conversation so it can be read and continued. */
   openConversation: (id: string) => Promise<void>;
+  /** Sends the message behind a failed reply again. */
+  retry: (replyId: number) => void;
+  /** A live reply finished typing: it shows complete from then on. */
+  markTyped: (replyId: number) => void;
   /** Images waiting to go with the next message (typed or spoken). */
   attachments: AssistantImage[];
   uploading: boolean;
@@ -101,6 +108,8 @@ const NOOP_VALUE: VoiceAssistantValue = {
   reset: async () => {},
   conversationId: null,
   openConversation: async () => {},
+  retry: () => {},
+  markTyped: () => {},
   attachments: [],
   uploading: false,
   attachImage: async () => {},
@@ -119,6 +128,10 @@ function readWakePreference(): boolean {
   } catch {
     return true;
   }
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }
 
 function writeWakePreference(enabled: boolean): void {
@@ -155,6 +168,8 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
   const conversationIdRef = useRef<string | null>(null);
   const attachmentsRef = useRef<AssistantImage[]>([]);
   const lastActivityRef = useRef(0);
+  const messagesRef = useRef<AssistantMessage[]>([]);
+  messagesRef.current = messages;
 
   const setConversationId = useCallback((id: string | null) => {
     conversationIdRef.current = id;
@@ -212,10 +227,7 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
   const fail = useCallback(
     (session: number, error: unknown) => {
       if (session !== sessionRef.current) return;
-      showToast(
-        error instanceof Error ? error.message : "Falha no assistente",
-        "error",
-      );
+      showToast(errorMessage(error, "Falha no assistente"), "error");
       stop();
     },
     [showToast, stop],
@@ -245,22 +257,24 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
 
   /**
    * Sends one utterance and speaks the reply. "ended" means the user said
-   * goodbye; "superseded" means another session took over meanwhile.
+   * goodbye; "superseded" means another session took over meanwhile;
+   * "failed" means the reply shows an error with a retry.
    */
   const answer = useCallback(
     async (
       session: number,
       text: string,
-    ): Promise<"continue" | "ended" | "superseded"> => {
+      retryImages?: AssistantImage[],
+    ): Promise<"continue" | "ended" | "superseded" | "failed"> => {
       // An idle conversation is not resumed: start a new one, on screen too.
       if (conversationIdRef.current && Date.now() - lastActivityRef.current > RESUME_WINDOW_MS) {
         setConversationId(null);
         setMessages([]);
       }
       // Pending attachments go with whatever is said or typed next.
-      const images = attachmentsRef.current;
-      setAttachments([]);
-      addMessage({ role: "user", text, ...(images.length > 0 && { images }) });
+      const images = retryImages ?? attachmentsRef.current;
+      if (!retryImages) setAttachments([]);
+      const userMessageId = addMessage({ role: "user", text, ...(images.length > 0 && { images }) });
       updateState("thinking");
       // The reply is filled in as the stream arrives: typing, tools, images.
       const replyId = addMessage({ role: "assistant", text: "", pending: true, live: true });
@@ -294,8 +308,22 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
           },
         );
       } catch (error) {
+        if (live()) {
+          // The failure stays in the chat, with a way to send it again (the
+          // toast is what shows over other dashboards).
+          const message = errorMessage(error, "O assistente não respondeu");
+          showToast(message, "error");
+          updateMessage(replyId, (m) => ({
+            ...m,
+            pending: false,
+            activity: undefined,
+            error: message,
+            retry: { text, images, userMessageId },
+          }));
+          return "failed";
+        }
         updateMessage(replyId, () => null);
-        throw error;
+        return "superseded";
       }
       if (!live()) {
         // Keep whatever was written, but stop showing it as in progress.
@@ -304,10 +332,10 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
       }
       setConversationId(data.endConversation ? null : data.conversationId);
       lastActivityRef.current = Date.now();
-      updateMessage(replyId, () => ({
+      updateMessage(replyId, (m) => ({
         id: replyId,
         role: "assistant",
-        live: true,
+        live: m.live,
         text: data.reply,
         actions: data.actions,
         ...(data.images.length > 0 && { images: data.images as AssistantImage[] }),
@@ -316,7 +344,12 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
       updateState("speaking");
       const speaking = speak(data.reply);
       speakingRef.current = speaking;
-      await speaking.done;
+      try {
+        await speaking.done;
+      } catch (error) {
+        // Without a voice the reply is still on screen: carry on listening.
+        if (live()) showToast(errorMessage(error, "Falha ao gerar a fala"), "error");
+      }
       if (speakingRef.current === speaking) speakingRef.current = null;
       if (session !== sessionRef.current) return "superseded";
       if (data.endConversation) {
@@ -325,17 +358,19 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
       }
       return "continue";
     },
-    [addMessage, setAttachments, setConversationId, updateMessage, updateState],
+    [addMessage, setAttachments, setConversationId, showToast, updateMessage, updateState],
   );
 
   /** Answers, then keeps listening for follow-ups until the user goes quiet. */
   const converse = useCallback(
-    async (session: number, firstText: string) => {
+    async (session: number, firstText: string, firstImages?: AssistantImage[]) => {
       let text = firstText;
+      let images = firstImages;
       while (text) {
-        const outcome = await answer(session, text);
+        const outcome = await answer(session, text, images);
+        images = undefined;
         if (outcome === "superseded") return;
-        if (outcome === "ended") break;
+        if (outcome === "ended" || outcome === "failed") break;
         text = await listen(session, LISTEN_TIMEOUTS.followUpMs);
         if (session !== sessionRef.current) return;
       }
@@ -368,6 +403,33 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
     [allowed, converse, fail, halt],
   );
 
+  const retry = useCallback(
+    (replyId: number) => {
+      const payload = messagesRef.current.find((m) => m.id === replyId)?.retry;
+      if (!allowed || !payload) return;
+      halt();
+      const session = sessionRef.current;
+      // The failed exchange is sent (and shown) again at the end of the chat.
+      setMessages((prev) =>
+        prev.filter((m) => m.id !== replyId && m.id !== payload.userMessageId),
+      );
+      converse(session, payload.text, payload.images).catch((error: unknown) =>
+        fail(session, error),
+      );
+    },
+    [allowed, converse, fail, halt],
+  );
+
+  const markTyped = useCallback(
+    (replyId: number) =>
+      setMessages((prev) =>
+        prev.some((m) => m.id === replyId && m.live)
+          ? prev.map((m) => (m.id === replyId ? { ...m, live: false } : m))
+          : prev,
+      ),
+    [],
+  );
+
   const reset = useCallback(async () => {
     stop();
     setMessages([]);
@@ -378,9 +440,12 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
   const openConversation = useCallback(
     async (id: string) => {
       stop();
+      const session = sessionRef.current;
       const { data, error } = await getAssistantEdenClient()
         .api.assistant.conversations({ id })
         .get();
+      // A session started meanwhile (wake word, typing) keeps the screen.
+      if (session !== sessionRef.current) return;
       if (error || !data) {
         showToast("Falha ao abrir a conversa", "error");
         return;
@@ -408,10 +473,7 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
         const image = await uploadImage(file);
         setAttachments([...attachmentsRef.current, image]);
       } catch (error) {
-        showToast(
-          error instanceof Error ? error.message : "Falha ao enviar a imagem",
-          "error",
-        );
+        showToast(errorMessage(error, "Falha ao enviar a imagem"), "error");
       } finally {
         setUploading(false);
       }
@@ -444,8 +506,10 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
     };
   }, [allowed]);
 
-  // The wake word only starts a session from idle: while a reply plays, the
-  // assistant's own voice could otherwise wake it up.
+  // The wake word starts a session from idle, and interrupts a reply being
+  // spoken (barge-in): echo cancellation keeps the assistant's own voice out,
+  // and only an utterance that is exactly the wake phrase counts. While
+  // listening or thinking it is ignored.
   const startRef = useRef(start);
   startRef.current = start;
   useEffect(() => {
@@ -455,7 +519,7 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
     let wakeLock: WakeLockSentinel | null = null;
 
     startWakeWord(() => {
-      if (stateRef.current === "idle") startRef.current();
+      if (stateRef.current === "idle" || stateRef.current === "speaking") startRef.current();
     })
       .then((started) => {
         if (active) engine = started;
@@ -501,6 +565,8 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
       reset,
       conversationId,
       openConversation,
+      retry,
+      markTyped,
       attachments,
       uploading,
       attachImage,
@@ -520,6 +586,8 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
       reset,
       conversationId,
       openConversation,
+      retry,
+      markTyped,
       attachments,
       uploading,
       attachImage,

@@ -71,7 +71,7 @@ beforeEach(() => {
   history = [];
   delete process.env.ASSISTANT_MODEL;
   settings = spy(AssistantSettingsService, "get").mockResolvedValue({ extraInstructions: "" });
-  spy(ConversationService, "open").mockResolvedValue({ id: "c1" });
+  spy(ConversationService, "open").mockResolvedValue({ id: "c1", persisted: true });
   spy(ConversationService, "context").mockImplementation(async () => history);
   addTurn = spy(ConversationService, "addTurn").mockResolvedValue(undefined);
   spy(ImageStorage, "dataUrl").mockImplementation(async (i: { key: string }) => `data:${i.key}`);
@@ -168,7 +168,7 @@ describe("AssistantAgent", () => {
     expect(requests[0]!.stopWhen).toHaveLength(1);
     expect(MAX_STEPS).toBeGreaterThan(1);
     expect(addTurn).toHaveBeenCalledWith(
-      "c1",
+      { id: "c1", persisted: true },
       [
         { role: "user", text: "E agora?", images: [] },
         { role: "assistant", text: "Pronto.", actions: [], images: [] },
@@ -230,6 +230,15 @@ describe("AssistantAgent", () => {
   test("a clear goodbye ends the conversation even if the model forgets the tool", async () => {
     replyText = "De nada!";
     expect((await AssistantAgent.run(TEST_USER, { text: "Valeu, era só isso" })).endConversation).toBe(true);
+  });
+
+  test("a goodbye that came with an action does not end the conversation by itself", async () => {
+    runTools = async (tools) => {
+      const denied = spy(authz, "hasRouteGrant").mockResolvedValue(false);
+      await tool(tools, "controlar_dispositivo").function.execute({});
+      denied.mockRestore();
+    };
+    expect((await AssistantAgent.run(TEST_USER, { text: "Valeu, tchau" })).endConversation).toBe(false);
   });
 
   test("streams the conversation, tool progress, images, text and the final reply", async () => {

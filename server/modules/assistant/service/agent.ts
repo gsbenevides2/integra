@@ -211,11 +211,12 @@ export abstract class AssistantAgent {
         }
         const reply = (await result.getText()).trim() || FALLBACK_REPLY;
 
-        // The model sometimes answers a goodbye without calling the tool.
-        if (isFarewell(text)) endConversation = true;
+        // The model sometimes answers a goodbye without calling the tool. Not
+        // when it acted on the request ("valeu, apaga a luz"): more may follow.
+        if (ctx.actions.length === 0 && isFarewell(text)) endConversation = true;
         // A goodbye closes the conversation: the next wake word starts fresh.
         await ConversationService.addTurn(
-          conversation.id,
+          conversation,
           [
             { role: "user", text, images: uploads },
             { role: "assistant", text: reply, actions: ctx.actions, images: ctx.images },

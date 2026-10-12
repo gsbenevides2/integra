@@ -195,6 +195,35 @@ describe("voice assistant dashboard", () => {
     expect(await screen.findByText("apaga tudo")).toBeTruthy();
   });
 
+  test("arriving mid-reply does not cut it off, and a failed reply offers a retry", async () => {
+    const chat = holdChat();
+    let show!: () => void;
+    function Later() {
+      const [on, setOn] = React.useState(false);
+      show = () => setOn(true);
+      return on ? <VoiceAssistantDashboard /> : null;
+    }
+    try {
+      renderApp(ALLOWED, <Later />);
+      act(() => assistant.sendText("oi"));
+      await until(() => assistant.state === "thinking");
+      act(() => show());
+      await flush();
+      expect(assistant.state).toBe("thinking");
+      await act(async () => {
+        chat.push({ type: "error", message: "O assistente não respondeu" });
+        chat.close();
+      });
+      expect((await screen.findAllByText("O assistente não respondeu")).length).toBeGreaterThan(0);
+    } finally {
+      chat.restore();
+    }
+    fireEvent.click(screen.getByText("Tentar de novo"));
+    expect(await screen.findByText("Pronto.")).toBeTruthy();
+    expect(screen.queryByText("Tentar de novo")).toBeNull();
+    expect(screen.getAllByText("oi")).toHaveLength(1);
+  });
+
   test("the wake word switch reflects availability", async () => {
     renderApp(ALLOWED, <VoiceAssistantDashboard />);
     expect(screen.getByText(/Wake word indisponível/)).toBeTruthy();
