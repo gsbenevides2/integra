@@ -26,6 +26,18 @@ export const chatBody = z.object({
     title: "Images",
     description: "Keys of images uploaded with POST /api/assistant/uploads",
   }),
+  source: z.enum(["voice", "text"]).optional().meta({
+    title: "Source",
+    description:
+      "Where the utterance came from. Voice turns that did not pass the " +
+      "speaker check on this device are read-only. Defaults to text.",
+  }),
+  speakerVerified: z.boolean().optional().meta({
+    title: "Speaker Verified",
+    description:
+      "For voice turns: true only if the speaker check passed on an enrolled " +
+      "device. Without it, the assistant cannot change anything in the house.",
+  }),
 });
 
 export type ChatBody = z.infer<typeof chatBody>;
@@ -143,6 +155,8 @@ export interface ChatReply {
   images: ImageView[];
   /** The user said goodbye: speak the reply, then stop listening. */
   endConversation: boolean;
+  /** The utterance was not for the assistant: no reply is spoken, only a chime. */
+  silent?: boolean;
 }
 
 /**

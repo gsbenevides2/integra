@@ -151,6 +151,7 @@ export function tuyaTools(ctx: ToolContext) {
       description:
         "Liga, desliga ou ajusta brilho/cor de UMA lâmpada ou interruptor pelo nome.",
       routeKeys: [LIST_DEVICES, COMMAND],
+      write: true,
       inputSchema: z.object({
         dispositivo: z.string().describe("Nome do dispositivo, como o usuário falou"),
         ...commandInput,
@@ -174,6 +175,7 @@ export function tuyaTools(ctx: ToolContext) {
       description:
         "Liga ou desliga vários dispositivos de uma vez. Sem lista de nomes, age em todos (ex.: 'apaga tudo').",
       routeKeys: [LIST_DEVICES, COMMAND],
+      write: true,
       inputSchema: z.object({
         dispositivos: z
           .array(z.string())
@@ -229,6 +231,7 @@ export function tuyaTools(ctx: ToolContext) {
       name: "aplicar_cena",
       description: "Aplica uma cena salva a um dispositivo.",
       routeKeys: [LIST_DEVICES, LIST_PRESETS, APPLY_PRESET],
+      write: true,
       inputSchema: z.object({
         cena: z.string().describe("Nome da cena"),
         dispositivo: z.string().describe("Nome do dispositivo"),

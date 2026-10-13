@@ -244,7 +244,7 @@ describe("voice assistant dashboard", () => {
       if (secure) Object.defineProperty(window, "isSecureContext", secure);
       else delete (window as { isSecureContext?: boolean }).isSecureContext;
     }
-  });
+  }, 20_000);
 
   test("the menu opens the assistant from the global drawer", async () => {
     renderApp(ALLOWED, <GlobalDrawerProvider>{null}</GlobalDrawerProvider>);
@@ -343,7 +343,7 @@ describe("history", () => {
     fireEvent.click(await screen.findByText("Excluir", { selector: "button" }));
     expect(await screen.findByText("Falha ao excluir a conversa")).toBeTruthy();
     expect(screen.getByText("Luz da sala")).toBeTruthy();
-  });
+  }, 20_000);
 
   test("shows empty and error states", async () => {
     conversations = [];

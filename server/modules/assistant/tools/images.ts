@@ -25,6 +25,7 @@ export function imageTools(ctx: ToolContext) {
         "usa a última imagem da conversa (enviada, gerada ou de câmera) como base para a edição.",
       // Runs inside a chat the user is already allowed to have.
       routeKeys: [],
+      write: true,
       inputSchema: z.object({
         descricao: z
           .string()

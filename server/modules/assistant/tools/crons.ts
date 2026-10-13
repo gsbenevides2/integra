@@ -30,6 +30,7 @@ export function cronTools(ctx: ToolContext) {
       description:
         "Executa agora uma rotina automática pelo nome (ex.: 'teste de velocidade', 'verificar plataformas').",
       routeKeys: ["GET /api/crons/list", "POST /api/crons/run/:jobName"],
+      write: true,
       inputSchema: z.object({ rotina: z.string().describe("Nome da rotina") }),
       execute: async ({ rotina }) => {
         const job = findByName(await readableJobs(), rotina, "rotina");

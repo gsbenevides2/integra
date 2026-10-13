@@ -65,7 +65,12 @@ describe("assistant routes", () => {
     });
     spies.push(run);
     expect(await (await send("POST", "/chat", { text: " Olá " })).json()).toMatchObject({ reply: "Oi!" });
-    expect(run).toHaveBeenCalledWith(TEST_USER, { text: "Olá", conversationId: undefined, uploads: [] });
+    expect(run).toHaveBeenCalledWith(TEST_USER, {
+      text: "Olá",
+      conversationId: undefined,
+      uploads: [],
+      writeAllowed: true,
+    });
 
     const key = `assistant/${TEST_USER.id}/upload/a.jpg`;
     const conversationId = crypto.randomUUID();
@@ -74,6 +79,16 @@ describe("assistant routes", () => {
       text: "isso?",
       conversationId,
       uploads: [{ key, mediaType: "image/jpeg", source: "upload" }],
+      writeAllowed: true,
+    });
+
+    // A voice turn whose speaker was not verified on this device is read-only.
+    await send("POST", "/chat", { text: "apaga", source: "voice", speakerVerified: false });
+    expect(run).toHaveBeenLastCalledWith(TEST_USER, {
+      text: "apaga",
+      conversationId: undefined,
+      uploads: [],
+      writeAllowed: false,
     });
 
     expect((await send("POST", "/chat", { text: "  " })).status).toBe(422);
@@ -99,7 +114,12 @@ describe("assistant routes", () => {
       "delta",
       "done",
     ]);
-    expect(run.mock.calls[0]?.[1]).toEqual({ text: "Olá", conversationId: undefined, uploads: [] });
+    expect(run.mock.calls[0]?.[1]).toEqual({
+      text: "Olá",
+      conversationId: undefined,
+      uploads: [],
+      writeAllowed: true,
+    });
 
     const foreign = await send("POST", "/chat/stream", { text: "x", images: ["assistant/other/upload/a.jpg"] });
     expect(foreign.status).toBe(403);

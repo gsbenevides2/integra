@@ -1,4 +1,5 @@
 import { type Microphone, openMicrophone } from "./microphone";
+import { cleanTranscript } from "./transcript";
 import { encodeWav } from "./wav";
 
 /** Energy-based end-of-utterance detection, tuned for a quiet room. */
@@ -15,9 +16,17 @@ export const VAD = {
   maxUtteranceMs: 20000,
 };
 
+/**
+ * Who spoke: "verified" when the speaker check passed, "rejected" when it
+ * failed (the utterance is dropped), "unknown" when there was no check to run.
+ */
+export type Speaker = "verified" | "rejected" | "unknown";
+
 export interface Listening {
-  /** The transcribed utterance, or "" when nobody spoke before the timeout. */
+  /** The transcribed utterance, or "" when nobody spoke, or when it was rejected. */
   result: Promise<string>;
+  /** Settles once the utterance is recorded and checked. */
+  speaker: Promise<Speaker>;
   cancel: () => void;
 }
 
@@ -26,12 +35,28 @@ interface ListenOptions {
   onPhase: (phase: "speech" | "transcribing") => void;
   /** Give up when no speech at all is heard within this window. */
   silenceTimeoutMs: number;
+  /**
+   * Checks the recorded utterance before it is transcribed. A false result
+   * drops it: nothing is sent to the server. Throwing counts as false.
+   */
+  verify?: (samples: Float32Array, sampleRate: number) => Promise<boolean>;
 }
 
 function rms(samples: Float32Array): number {
   let sum = 0;
   for (const sample of samples) sum += sample * sample;
   return Math.sqrt(sum / samples.length);
+}
+
+function joinChunks(chunks: Float32Array[]): Float32Array {
+  const total = chunks.reduce((n, c) => n + c.length, 0);
+  const out = new Float32Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
 }
 
 async function transcribe(wav: Uint8Array<ArrayBuffer>): Promise<string> {
@@ -42,17 +67,21 @@ async function transcribe(wav: Uint8Array<ArrayBuffer>): Promise<string> {
   });
   if (!response.ok) throw new Error("Falha na transcrição");
   const { text } = (await response.json()) as { text: string };
-  return text.trim();
+  return cleanTranscript(text);
 }
 
 /**
- * Records one utterance (ending on silence), transcribes it with Scribe on
- * the server and resolves with the text.
+ * Records one utterance (ending on silence), checks the speaker if asked to,
+ * transcribes it with Scribe on the server and resolves with the text.
  */
-export function listenOnce({ onPhase, silenceTimeoutMs }: ListenOptions): Listening {
+export function listenOnce({ onPhase, silenceTimeoutMs, verify }: ListenOptions): Listening {
   let finished = false;
   let microphone: Microphone | null = null;
   let settle: ((text: string) => void) | undefined;
+  let resolveSpeaker: (speaker: Speaker) => void = () => {};
+  const speaker = new Promise<Speaker>((resolve) => {
+    resolveSpeaker = resolve;
+  });
 
   const result = new Promise<string>((resolve, reject) => {
     const chunks: Float32Array[] = [];
@@ -64,13 +93,34 @@ export function listenOnce({ onPhase, silenceTimeoutMs }: ListenOptions): Listen
 
     let sampleRate = 0;
 
+    const transcribeChunks = () => {
+      onPhase("transcribing");
+      transcribe(encodeWav(chunks, sampleRate)).then(resolve, reject);
+    };
+
     const finish = (record: boolean) => {
       if (finished) return;
       finished = true;
       void microphone?.stop();
-      if (!record) return resolve("");
-      onPhase("transcribing");
-      transcribe(encodeWav(chunks, sampleRate)).then(resolve, reject);
+      if (!record) {
+        resolveSpeaker("unknown");
+        return resolve("");
+      }
+      if (!verify) {
+        resolveSpeaker("unknown");
+        return transcribeChunks();
+      }
+      verify(joinChunks(chunks), sampleRate).then(
+        (matches) => {
+          resolveSpeaker(matches ? "verified" : "rejected");
+          if (matches) transcribeChunks();
+          else resolve("");
+        },
+        () => {
+          resolveSpeaker("rejected");
+          resolve("");
+        },
+      );
     };
     settle = () => finish(false);
 
@@ -104,12 +154,14 @@ export function listenOnce({ onPhase, silenceTimeoutMs }: ListenOptions): Listen
       })
       .catch((error: unknown) => {
         finished = true;
+        resolveSpeaker("unknown");
         reject(error instanceof Error ? error : new Error(String(error)));
       });
   });
 
-  return { result, cancel: () => settle?.("") };
+  return { result, speaker, cancel: () => settle?.("") };
 }
+
 
 export interface Captured {
   samples: Float32Array;

@@ -37,3 +37,14 @@ describe("isFarewell", () => {
     expect(isFarewell(text)).toBe(false);
   });
 });
+
+describe("isFarewell with a request attached", () => {
+  test.each([
+    "Pode parar a música",
+    "Valeu, apaga a luz",
+    "Tchau, liga o ventilador",
+    "Fui no mercado",
+  ])("%s is not a goodbye", (text) => {
+    expect(isFarewell(text)).toBe(false);
+  });
+});

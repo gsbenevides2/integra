@@ -37,6 +37,7 @@ class FakeOpenRouter {
 mock.module("@openrouter/agent", () => ({ ...realAgent, OpenRouter: FakeOpenRouter }));
 afterAll(() => mock.module("@openrouter/agent", () => realAgent));
 
+const realAssistantAgent = await import("@server/modules/assistant/service/agent");
 const { AssistantAgent, buildInput, buildInstructions, DEFAULT_MODEL, MAX_CONTEXT_IMAGES, MAX_STEPS } =
   await import("@server/modules/assistant/service/agent");
 const { ConversationService } = await import("@server/modules/assistant/service/conversation");
@@ -275,5 +276,65 @@ describe("AssistantAgent", () => {
     settings.mockRejectedValue("raw");
     expect((await AssistantAgent.run(TEST_USER, { text: "Oi" })).reply).toBe("Pronto.");
     expect(requests[0]!.instructions).not.toContain("Preferências");
+  });
+});
+
+describe("voice safety", () => {
+  const { guardActionClaims } = realAssistantAgent;
+
+  test("stays silent when the model decides the speech was not for it", async () => {
+    replyText = "Não deveria falar isso";
+    runTools = async (tools) => {
+      await tool(tools, "ficar_em_silencio").function.execute({});
+    };
+    const reply = await AssistantAgent.run(TEST_USER, { text: "Desliga a luz do quarto do Gui" });
+    expect(reply).toMatchObject({ reply: "", silent: true, endConversation: false, actions: [] });
+    expect(addTurn).not.toHaveBeenCalled();
+  });
+
+  test("a voice turn without a verified speaker cannot change the house", async () => {
+    const denied = spy(authz, "hasRouteGrant").mockResolvedValue(true);
+    runTools = async (tools) => {
+      const result = await tool(tools, "controlar_dispositivo").function.execute({ dispositivo: "x" });
+      expect(result).toMatchObject({ error: expect.stringContaining("Não posso mudar nada") });
+    };
+    const reply = await AssistantAgent.run(TEST_USER, {
+      text: "Liga a luz",
+      writeAllowed: false,
+    });
+    expect(reply.actions).toEqual([
+      expect.objectContaining({ tool: "controlar_dispositivo", ok: false }),
+    ]);
+    denied.mockRestore();
+  });
+
+  test("a claimed change with no successful write action is replaced", async () => {
+    replyText = "Pronto — apliquei a cena Normal no Quarto do Gui.";
+    const reply = await AssistantAgent.run(TEST_USER, { text: "Coloca no normal" });
+    expect(reply.reply).toBe("Não consegui fazer isso agora.");
+    expect(addTurn.mock.calls[0]![1][1].text).toBe("Não consegui fazer isso agora.");
+  });
+
+  test("a goodbye with a successful action closes the session after the reply", async () => {
+    replyText = "Apaguei a luz. Até logo!";
+    runTools = async (tools) => {
+      const denied = spy(authz, "hasRouteGrant").mockResolvedValue(true);
+      await tool(tools, "encerrar_conversa").function.execute({});
+      denied.mockRestore();
+    };
+    const reply = await AssistantAgent.run(TEST_USER, { text: "Valeu, apaga a luz" });
+    expect(reply.endConversation).toBe(true);
+  });
+
+  test("guardActionClaims keeps replies backed by a successful write tool", () => {
+    const ok = [{ tool: "aplicar_cena", ok: true, summary: "Aplicou Normal" }];
+    expect(guardActionClaims("Apliquei a cena Normal.", ok)).toBe("Apliquei a cena Normal.");
+    expect(guardActionClaims("Apliquei a cena Normal.", [{ tool: "listar_cenas", ok: true, summary: "" }])).toBe(
+      "Não consegui fazer isso agora.",
+    );
+    expect(
+      guardActionClaims("Vou desligar a luz.", [{ tool: "controlar_dispositivo", ok: false, summary: "Sem permissão" }]),
+    ).toBe("Não consegui fazer isso: Sem permissão");
+    expect(guardActionClaims("A luz está ligada, com 24%.", [])).toBe("A luz está ligada, com 24%.");
   });
 });

@@ -44,6 +44,8 @@ function toChatRequest(userId: string, body: ChatBody): ChatRequest | null {
     text: body.text,
     conversationId: body.conversationId,
     uploads: keys.map((key) => ImageStorage.fromUploadKey(key)),
+    // Voice turns change the house only once the speaker check passed here.
+    writeAllowed: body.source !== "voice" || body.speakerVerified === true,
   };
 }
 

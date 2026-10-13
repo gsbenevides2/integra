@@ -17,9 +17,26 @@ import { streamChat } from "./chatStream";
 import { type AssistantImage, uploadImage } from "./imageUpload";
 import { resumeAudio } from "./microphone";
 import { playChime, speak, type Speaking } from "./speaker";
-import { type Listening, listenOnce } from "./transcriber";
+import { type Listening, listenOnce, type Speaker } from "./transcriber";
+import { matchesEnrolledVoice } from "./utterance";
 import { fetchVoiceProfiles } from "./voiceProfile";
-import { buildSpeakerGate, startWakeWord, type WakeWordEngine } from "./wakeWord";
+import { buildSpeakerGate, type SpeakerGate, startWakeWord, type WakeWordEngine } from "./wakeWord";
+
+/** One utterance heard by the microphone, after the speaker check. */
+interface Heard {
+  text: string;
+  speaker: Speaker;
+}
+
+/** How a spoken turn reaches the server: whether its speaker was verified. */
+interface VoiceTurn {
+  speakerVerified: boolean;
+}
+
+/** A spoken utterance from a verified speaker may change the house; others only read. */
+function voiceTurn(speaker: Speaker): VoiceTurn {
+  return { speakerVerified: speaker === "verified" };
+}
 
 export type AssistantState = "idle" | "listening" | "thinking" | "speaking";
 
@@ -45,7 +62,7 @@ export interface AssistantMessage {
   live?: boolean;
   /** Why the reply failed; `retry` sends the same message again. */
   error?: string;
-  retry?: { text: string; images: AssistantImage[]; userMessageId: number };
+  retry?: { text: string; images: AssistantImage[]; userMessageId: number; voice?: VoiceTurn };
 }
 
 export interface VoiceAssistantValue {
@@ -171,6 +188,12 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
   );
   /** Bumped after enrolling/removing a voice, to re-arm the wake word gate. */
   const [voiceProfileVersion, setVoiceProfileVersion] = useState(0);
+  /**
+   * The speaker check for the enrolled voices: undefined while loading, null
+   * when there is nothing to check against (no model, no profile on this device).
+   */
+  const [speakerGate, setSpeakerGate] = useState<SpeakerGate | null | undefined>(undefined);
+  const speakerGateRef = useRef<SpeakerGate | null>(null);
   /** Open pauseWakeWord() calls; the wake word only runs while there are none. */
   const [wakePauses, setWakePauses] = useState(0);
   const wakePaused = wakePauses > 0;
@@ -258,8 +281,9 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
 
   /** Listens for one utterance; resolves "" on silence or when superseded. */
   const listen = useCallback(
-    async (session: number, timeoutMs: number): Promise<string> => {
+    async (session: number, timeoutMs: number): Promise<Heard> => {
       updateState("listening");
+      const gate = speakerGateRef.current;
       const listening = listenOnce({
         onPhase: (phase) => {
           if (session !== sessionRef.current) return;
@@ -267,13 +291,17 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
           else updateState("thinking");
         },
         silenceTimeoutMs: timeoutMs,
+        ...(gate && {
+          verify: (samples: Float32Array, rate: number) =>
+            matchesEnrolledVoice(gate, samples, rate),
+        }),
       });
       listeningRef.current = listening;
-      const text = await listening.result;
+      const [text, speaker] = await Promise.all([listening.result, listening.speaker]);
       if (listeningRef.current === listening) listeningRef.current = null;
-      if (session !== sessionRef.current) return "";
+      if (session !== sessionRef.current) return { text: "", speaker: "unknown" };
       setHearingSpeech(false);
-      return text;
+      return { text, speaker };
     },
     [updateState],
   );
@@ -281,14 +309,16 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
   /**
    * Sends one utterance and speaks the reply. "ended" means the user said
    * goodbye; "superseded" means another session took over meanwhile;
-   * "failed" means the reply shows an error with a retry.
+   * "failed" means the reply shows an error with a retry; "silent" means the
+   * assistant decided the speech was not for it (nothing shown or spoken).
    */
   const answer = useCallback(
     async (
       session: number,
       text: string,
       retryImages?: AssistantImage[],
-    ): Promise<"continue" | "ended" | "superseded" | "failed"> => {
+      voice?: VoiceTurn,
+    ): Promise<"continue" | "ended" | "superseded" | "failed" | "silent"> => {
       // An idle conversation is not resumed: start a new one, on screen too.
       if (conversationIdRef.current && Date.now() - lastActivityRef.current > RESUME_WINDOW_MS) {
         setConversationId(null);
@@ -309,6 +339,7 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
             text,
             ...(conversationIdRef.current && { conversationId: conversationIdRef.current }),
             ...(images.length > 0 && { images: images.map((image) => image.key) }),
+            ...(voice && { source: "voice" as const, speakerVerified: voice.speakerVerified }),
           },
           (event) => {
             if (!live()) return;
@@ -341,7 +372,7 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
             pending: false,
             activity: undefined,
             error: message,
-            retry: { text, images, userMessageId },
+            retry: { text, images, userMessageId, ...(voice && { voice }) },
           }));
           return "failed";
         }
@@ -352,6 +383,11 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
         // Keep whatever was written, but stop showing it as in progress.
         updateMessage(replyId, (m) => (m.text ? { ...m, pending: false, activity: undefined } : null));
         return "superseded";
+      }
+      if (data.silent) {
+        // Not for the assistant: the exchange leaves no trace on screen.
+        setMessages((prev) => prev.filter((m) => m.id !== userMessageId && m.id !== replyId));
+        return "silent";
       }
       setConversationId(data.endConversation ? null : data.conversationId);
       lastActivityRef.current = Date.now();
@@ -384,18 +420,33 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
     [addMessage, setAttachments, setConversationId, showToast, updateMessage, updateState],
   );
 
-  /** Answers, then keeps listening for follow-ups until the user goes quiet. */
+  /**
+   * Answers, then keeps listening for follow-ups until the user goes quiet. A
+   * follow-up that is not the enrolled voice, or that the assistant chose to
+   * ignore, ends the session with a chime: it does not reply to what it heard.
+   */
   const converse = useCallback(
-    async (session: number, firstText: string, firstImages?: AssistantImage[]) => {
+    async (session: number, firstText: string, firstImages?: AssistantImage[], firstVoice?: VoiceTurn) => {
       let text = firstText;
       let images = firstImages;
+      let voice = firstVoice;
       while (text) {
-        const outcome = await answer(session, text, images);
+        const outcome = await answer(session, text, images, voice);
         images = undefined;
         if (outcome === "superseded") return;
+        if (outcome === "silent") {
+          playChime();
+          break;
+        }
         if (outcome === "ended" || outcome === "failed") break;
-        text = await listen(session, LISTEN_TIMEOUTS.followUpMs);
+        const heard = await listen(session, LISTEN_TIMEOUTS.followUpMs);
         if (session !== sessionRef.current) return;
+        if (heard.speaker === "rejected") {
+          playChime();
+          break;
+        }
+        text = heard.text;
+        voice = voiceTurn(heard.speaker);
       }
       updateState("idle");
     },
@@ -408,12 +459,17 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
     const session = sessionRef.current;
     playChime();
     listen(session, LISTEN_TIMEOUTS.firstTurnMs)
-      .then((text) => {
+      .then((heard) => {
         if (session !== sessionRef.current) return;
-        return converse(session, text);
+        if (heard.speaker === "rejected") {
+          playChime();
+          updateState("idle");
+          return;
+        }
+        return converse(session, heard.text, undefined, voiceTurn(heard.speaker));
       })
       .catch((error: unknown) => fail(session, error));
-  }, [allowed, converse, fail, halt, listen]);
+  }, [allowed, converse, fail, halt, listen, updateState]);
 
   const sendText = useCallback(
     (text: string) => {
@@ -436,7 +492,7 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
       setMessages((prev) =>
         prev.filter((m) => m.id !== replyId && m.id !== payload.userMessageId),
       );
-      converse(session, payload.text, payload.images).catch((error: unknown) =>
+      converse(session, payload.text, payload.images, payload.voice).catch((error: unknown) =>
         fail(session, error),
       );
     },
@@ -533,6 +589,35 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
     };
   }, [allowed]);
 
+  // The speaker check against the user's enrolled voices on this device. It is
+  // needed for every spoken turn (not only the wake word): a voice that does
+  // not match may not change the house. Null means nothing to check against.
+  useEffect(() => {
+    if (!allowed) return;
+    let active = true;
+    void (async () => {
+      let gate: SpeakerGate | null = null;
+      if (voiceModel) {
+        try {
+          const [profiles, settings] = await Promise.all([
+            fetchVoiceProfiles(),
+            getAssistantEdenClient().api.assistant.settings.get(),
+          ]);
+          const threshold = settings.data?.voiceMatchThreshold ?? 0.6;
+          gate = await buildSpeakerGate(voiceModel.url, voiceModel.id, profiles, threshold);
+        } catch {
+          gate = null;
+        }
+      }
+      if (!active) return;
+      speakerGateRef.current = gate;
+      setSpeakerGate(gate);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [allowed, voiceModel, voiceProfileVersion]);
+
   // The wake word starts a session from idle, and interrupts a reply being
   // spoken (barge-in): echo cancellation keeps the assistant's own voice out,
   // and only an utterance that is exactly the wake phrase counts. While
@@ -540,40 +625,26 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
   const startRef = useRef(start);
   startRef.current = start;
   useEffect(() => {
-    if (!wakeAvailable || !wakeEnabled || wakePaused) return;
+    if (!wakeAvailable || !wakeEnabled || wakePaused || speakerGate === undefined) return;
     let engine: WakeWordEngine | null = null;
     let active = true;
     let wakeLock: WakeLockSentinel | null = null;
 
-    // Only fire for the enrolled voice, when a profile and model are present;
-    // otherwise the wake word fires for any voice (the pre-enrolment default).
-    void (async () => {
-      let gate = null;
-      if (voiceModel) {
-        const [profiles, settings] = await Promise.all([
-          fetchVoiceProfiles(),
-          getAssistantEdenClient().api.assistant.settings.get(),
-        ]);
-        const threshold = settings.data?.voiceMatchThreshold ?? 0.6;
-        gate = await buildSpeakerGate(voiceModel.url, voiceModel.id, profiles, threshold);
-      }
+    startWakeWord(() => {
+      // The engine stops asynchronously: a check still running when it was
+      // turned off (e.g. paused for enrolment) must not start a session.
       if (!active) return;
-      startWakeWord(() => {
-        // The engine stops asynchronously: a check still running when it was
-        // turned off (e.g. paused for enrolment) must not start a session.
-        if (!active) return;
-        if (stateRef.current === "idle" || stateRef.current === "speaking") {
-          startRef.current();
-        }
-      }, gate)
-        .then((started) => {
-          if (active) engine = started;
-          else void started.stop();
-        })
-        .catch(() => {
-          if (active) showToast("Não foi possível ativar o \"Ei Integra\"", "error");
-        });
-    })();
+      if (stateRef.current === "idle" || stateRef.current === "speaking") {
+        startRef.current();
+      }
+    }, speakerGate)
+      .then((started) => {
+        if (active) engine = started;
+        else void started.stop();
+      })
+      .catch(() => {
+        if (active) showToast("Não foi possível ativar o \"Ei Integra\"", "error");
+      });
 
     // Keep the kiosk screen on while it is listening for the wake word.
     navigator.wakeLock
@@ -591,7 +662,7 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
       void engine?.stop();
       void wakeLock?.release();
     };
-  }, [showToast, wakeAvailable, wakeEnabled, wakePaused, voiceModel, voiceProfileVersion]);
+  }, [showToast, wakeAvailable, wakeEnabled, wakePaused, speakerGate]);
 
   // Stop any session when the provider goes away.
   useEffect(() => halt, [halt]);
