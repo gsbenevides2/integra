@@ -21,6 +21,7 @@ const transcriber = await import("@public/components/VoiceAssistantContext/trans
 const wakeWord = await import("@public/components/VoiceAssistantContext/wakeWord");
 const {
   CHAT_ROUTE_KEY,
+  CHIME_ECHO_MS,
   LISTEN_TIMEOUTS,
   useVoiceAssistant,
   VoiceAssistantProvider,
@@ -158,6 +159,8 @@ describe("VoiceAssistantProvider", () => {
     await stateIs("listening");
     expect(voice.tones).toBe(2);
     await until(() => voice.openTaps.length === 1);
+    // the start chime's echo, dropped by the first turn
+    voice.feed(0, CHIME_ECHO_MS + 50);
     await act(async () => voice.feed(0.3, 300));
     expect(value.hearingSpeech).toBe(true);
     transcripts.push("liga a luz");
@@ -190,6 +193,8 @@ describe("VoiceAssistantProvider", () => {
     act(() => value.start());
     await stateIs("listening");
     await until(() => voice.openTaps.length === 1);
+    // the start chime's echo, dropped by the first turn
+    voice.feed(0, CHIME_ECHO_MS + 50);
     await act(async () => voice.feed(0.3, 300));
     transcripts.push("[phone notification sound]");
     await act(async () => voice.feed(0, 1300));
@@ -203,6 +208,8 @@ describe("VoiceAssistantProvider", () => {
     act(() => value.start());
     await stateIs("listening");
     await until(() => voice.openTaps.length === 1);
+    // the start chime's echo, dropped by the first turn
+    voice.feed(0, CHIME_ECHO_MS + 50);
     await act(async () => voice.feed(0.3, 300));
     transcripts.push("Desliga a luz do quarto do Gui");
     chatReply = { ...REPLY, reply: "", actions: [], silent: true };
@@ -232,6 +239,8 @@ describe("VoiceAssistantProvider", () => {
     renderProvider();
     act(() => value.start());
     await until(() => voice.openTaps.length === 1);
+    // the start chime's echo, dropped by the first turn
+    voice.feed(0, CHIME_ECHO_MS + 50);
     await act(async () => voice.feed(0, 400));
     await stateIs("idle");
     expect(value.messages).toEqual([]);
@@ -362,6 +371,8 @@ describe("VoiceAssistantProvider", () => {
     renderProvider();
     act(() => value.start());
     await until(() => voice.openTaps.length === 1);
+    // the start chime's echo, dropped by the first turn
+    voice.feed(0, CHIME_ECHO_MS + 50);
     const tap = voice.openTaps[0]!;
     act(() => value.stop());
     await act(async () => tap.port.onmessage?.({ data: new Float32Array(1600).fill(0.3) }));
@@ -373,6 +384,8 @@ describe("VoiceAssistantProvider", () => {
     renderProvider();
     act(() => value.start());
     await until(() => voice.openTaps.length === 1);
+    // the start chime's echo, dropped by the first turn
+    voice.feed(0, CHIME_ECHO_MS + 50);
     const stale = voice.openTaps[0]!;
     act(() => value.sendText("oi")); // supersedes the listening session
     await act(async () => {
@@ -677,6 +690,8 @@ describe("wake word", () => {
       expect(voice.openTaps).toHaveLength(1);
       // Ignored while listening...
       await act(async () => recognizer.result("integra"));
+      // The start chime's echo first, then the command.
+      await act(async () => voice.feed(0, CHIME_ECHO_MS + 50));
       await say("oi");
       await stateIs("speaking");
       // ...but it interrupts a reply being spoken (barge-in).

@@ -247,6 +247,20 @@ describe("listenOnce", () => {
   });
 });
 
+describe("listenOnce after a chime", () => {
+  test("the chime's echo is dropped, so it does not end the utterance early", async () => {
+    const phases: string[] = [];
+    const listening = listenOnce({ onPhase: (p) => phases.push(p), silenceTimeoutMs: 3000, skipMs: 400 });
+    await until(() => voice.openTaps.length === 1);
+    voice.feed(0.3, 350); // the chime echo, still inside the skipped window
+    voice.feed(0, 600); // silence that used to end the utterance
+    expect(phases).toEqual([]);
+    voice.utter();
+    expect(await listening.result).toBe("liga a luz");
+    expect(phases).toEqual(["speech", "transcribing"]);
+  });
+});
+
 describe("wake word", () => {
   test("isWakePhrase only accepts an exact final phrase", () => {
     expect(isWakePhrase(" ei integra ")).toBe(true);

@@ -36,6 +36,11 @@ interface ListenOptions {
   /** Give up when no speech at all is heard within this window. */
   silenceTimeoutMs: number;
   /**
+   * The first audio of this length is dropped: the echo of a chime that just
+   * played would otherwise count as the user's speech and end the utterance.
+   */
+  skipMs?: number;
+  /**
    * Checks the recorded utterance before it is transcribed. A false result
    * drops it: nothing is sent to the server. Throwing counts as false.
    */
@@ -74,7 +79,7 @@ async function transcribe(wav: Uint8Array<ArrayBuffer>): Promise<string> {
  * Records one utterance (ending on silence), checks the speaker if asked to,
  * transcribes it with Scribe on the server and resolves with the text.
  */
-export function listenOnce({ onPhase, silenceTimeoutMs, verify }: ListenOptions): Listening {
+export function listenOnce({ onPhase, silenceTimeoutMs, verify, skipMs = 0 }: ListenOptions): Listening {
   let finished = false;
   let microphone: Microphone | null = null;
   let settle: ((text: string) => void) | undefined;
@@ -92,6 +97,7 @@ export function listenOnce({ onPhase, silenceTimeoutMs, verify }: ListenOptions)
     let noise = VAD.minThreshold / VAD.noiseFactor;
 
     let sampleRate = 0;
+    let skippedMs = 0;
 
     const transcribeChunks = () => {
       onPhase("transcribing");
@@ -126,6 +132,10 @@ export function listenOnce({ onPhase, silenceTimeoutMs, verify }: ListenOptions)
 
     openMicrophone((samples, rate) => {
       if (finished) return;
+      if (skippedMs < skipMs) {
+        skippedMs += (samples.length / rate) * 1000;
+        return;
+      }
       sampleRate = rate;
       chunks.push(samples);
       const chunkMs = (samples.length / rate) * 1000;

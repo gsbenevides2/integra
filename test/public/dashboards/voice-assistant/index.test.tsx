@@ -15,7 +15,7 @@ import { controlledStream, installVoiceFakes, replyEvents, voice } from "../../.
 
 afterAll(installVoiceFakes());
 
-const { CHAT_ROUTE_KEY, VoiceAssistantProvider, useVoiceAssistant } = await import(
+const { CHAT_ROUTE_KEY, CHIME_ECHO_MS, VoiceAssistantProvider, useVoiceAssistant } = await import(
   "@public/components/VoiceAssistantContext"
 );
 const { Orb } = await import("@public/components/VoiceAssistantContext/Orb");
@@ -160,6 +160,8 @@ describe("voice assistant dashboard", () => {
     expect(screen.getByText("Ouvindo...")).toBeTruthy();
     expect(screen.getByText("Experimente dizer:")).toBeTruthy();
 
+    // The start chime's echo, dropped before the command.
+    await act(async () => voice.feed(0, CHIME_ECHO_MS + 50));
     await act(async () => voice.feed(0.3, 300));
     expect(screen.getByText("Ouvindo você...")).toBeTruthy();
     transcripts.push("liga a luz");
@@ -452,6 +454,7 @@ describe("VoiceAssistantOverlay", () => {
     act(() => assistant.start());
     expect(await screen.findByText("Pode falar...")).toBeTruthy();
     await until(() => voice.openTaps.length === 1);
+    await act(async () => voice.feed(0, CHIME_ECHO_MS + 50));
     await act(async () => voice.feed(0.3, 300));
     expect(screen.getAllByText("Ouvindo você...").length).toBeGreaterThan(0);
     transcripts.push("apaga tudo");

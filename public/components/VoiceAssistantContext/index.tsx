@@ -115,6 +115,8 @@ export const CHAT_ROUTE_KEY = "POST /api/assistant/chat";
 export const WAKE_PREFERENCE_KEY = "integra.assistant.wake";
 /** Mirrors the server: after this long idle, the next message starts a new conversation. */
 export const RESUME_WINDOW_MS = 10 * 60 * 1000;
+/** The start chime lasts 300 ms; the first audio after it is its echo, not the command. */
+export const CHIME_ECHO_MS = 400;
 export const LISTEN_TIMEOUTS = {
   /** How long to wait for the first words after the wake word. */
   firstTurnMs: 8000,
@@ -281,7 +283,7 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
 
   /** Listens for one utterance; resolves "" on silence or when superseded. */
   const listen = useCallback(
-    async (session: number, timeoutMs: number): Promise<Heard> => {
+    async (session: number, timeoutMs: number, skipMs = 0): Promise<Heard> => {
       updateState("listening");
       const gate = speakerGateRef.current;
       const listening = listenOnce({
@@ -291,6 +293,7 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
           else updateState("thinking");
         },
         silenceTimeoutMs: timeoutMs,
+        skipMs,
         ...(gate && {
           verify: (samples: Float32Array, rate: number) =>
             matchesEnrolledVoice(gate, samples, rate),
@@ -458,7 +461,7 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
     halt();
     const session = sessionRef.current;
     playChime();
-    listen(session, LISTEN_TIMEOUTS.firstTurnMs)
+    listen(session, LISTEN_TIMEOUTS.firstTurnMs, CHIME_ECHO_MS)
       .then((heard) => {
         if (session !== sessionRef.current) return;
         if (heard.speaker === "rejected") {
