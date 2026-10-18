@@ -84,12 +84,14 @@ void runAuthzStartupChecks().catch((error: unknown) => {
   });
 });
 
+const serverDevelopmentMode = process.env.USE_DEV_HTTP_SERVER === "true";
+
 // The OTEL Plugin overrides native home response.
 export const server = Bun.serve({
   port: 3000,
   routes: { "/": indexHtml },
   fetch: app.fetch,
-  development: !(process.env.NODE_ENV === "production"),
+  development: serverDevelopmentMode ,
 });
 
 console.log(`🦊 Elysia is running at ${server.hostname}:${server.port}`);

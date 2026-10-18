@@ -9,6 +9,7 @@ const realFetch = globalThis.fetch;
 process.env.DATABASE_URL ??= "postgres://u:p@127.0.0.1:1/none";
 process.env.TUYA_ACCESS_ID ??= "id";
 process.env.TUYA_ACCESS_SECRET ??= "secret";
+process.env.USE_DEV_HTTP_SERVER ??= "true"
 process.env.NODE_ENV = "development"; // registerCrons becomes a no-op
 delete process.env.ENABLE_CRONS;
 // Half-configured dev override: startup must warn about the missing USER_NAME.

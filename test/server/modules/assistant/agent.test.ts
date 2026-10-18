@@ -320,5 +320,10 @@ describe("voice safety", () => {
       guardActionClaims("Vou desligar a luz.", [{ tool: "controlar_dispositivo", ok: false, summary: "Sem permissão" }]),
     ).toBe("Não consegui fazer isso: Sem permissão");
     expect(guardActionClaims("A luz está ligada, com 24%.", [])).toBe("A luz está ligada, com 24%.");
+    // status answers describe a state, they do not claim a change
+    for (const status of ["A lâmpada do quarto do Gui está desligada.", "A luz está apagada.", "A cena está aplicada."]) {
+      expect(guardActionClaims(status, [])).toBe(status);
+    }
+    expect(guardActionClaims("A luz foi desligada.", [])).toBe("Não consegui fazer isso agora.");
   });
 });

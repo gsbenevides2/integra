@@ -9,6 +9,7 @@ import React, {
   useState,
 } from "react";
 
+import { WRITE_TOOLS } from "@server/modules/assistant/service/claims";
 import { useMe } from "@public/components/MeContext";
 import { useToast } from "@public/components/Toast";
 import { getAssistantEdenClient } from "@public/dashboards/voice-assistant/client";
@@ -16,7 +17,8 @@ import { getAssistantEdenClient } from "@public/dashboards/voice-assistant/clien
 import { streamChat } from "./chatStream";
 import { type AssistantImage, uploadImage } from "./imageUpload";
 import { resumeAudio } from "./microphone";
-import { playChime, speak, type Speaking } from "./speaker";
+import { createSpeech, playChime, playWaiting, type Speaking,type Speech } from "./speaker";
+import { createSentencer } from "./speechStream";
 import { type Listening, listenOnce } from "./transcriber";
 import { startWakeWord, type WakeWordEngine } from "./wakeWord";
 
@@ -94,7 +96,11 @@ export const LISTEN_TIMEOUTS = {
   firstTurnMs: 8000,
   /** After a reply, listen this long for a follow-up without the wake word. */
   followUpMs: 6000,
+  /** The reply was a question: the answer is likely, so wait longer. */
+  questionMs: 12000,
 };
+/** A slow tool (image generation) blips this often so the silence does not feel like a hang. */
+export const WAITING_TICK_MS = 4000;
 
 const NOOP_VALUE: VoiceAssistantValue = {
   allowed: false,
@@ -170,6 +176,8 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
   const conversationIdRef = useRef<string | null>(null);
   const attachmentsRef = useRef<AssistantImage[]>([]);
   const lastActivityRef = useRef(0);
+  /** The last reply ended with a question (the follow-up window stretches). */
+  const askedRef = useRef(false);
   const messagesRef = useRef<AssistantMessage[]>([]);
   messagesRef.current = messages;
 
@@ -283,6 +291,32 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
       // The reply is filled in as the stream arrives: typing, tools, images.
       const replyId = addMessage({ role: "assistant", text: "", pending: true, live: true });
       const live = () => session === sessionRef.current;
+      // The voice starts on the first full sentence, while the model is still writing.
+      let speech = null as Speech | null;
+      let wroteSomething = false;
+      const startedAt = performance.now();
+      let firstDeltaAt = 0;
+      const sentencer = createSentencer(
+        (sentence) => {
+          if (!live()) return;
+          if (!speech) {
+            speech = createSpeech();
+            speakingRef.current = speech;
+            updateState("speaking");
+            console.debug("[assistant] first sentence sent to voice", {
+              firstDeltaMs: Math.round(firstDeltaAt - startedAt),
+              sentenceMs: Math.round(performance.now() - startedAt),
+            });
+          }
+          speech.say(sentence);
+        },
+        () => wroteSomething,
+      );
+      let waiting: ReturnType<typeof setInterval> | undefined;
+      const stopWaiting = () => {
+        clearInterval(waiting);
+        waiting = undefined;
+      };
       let data;
       try {
         data = await streamChat(
@@ -294,10 +328,15 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
           (event) => {
             if (!live()) return;
             if (event.type === "delta") {
+              firstDeltaAt ||= performance.now();
+              sentencer.push(event.text);
               updateMessage(replyId, (m) => ({ ...m, text: m.text + event.text, activity: undefined }));
             } else if (event.type === "tool") {
               updateMessage(replyId, (m) => ({ ...m, activity: event.tool }));
+              waiting ??= setInterval(playWaiting, WAITING_TICK_MS);
             } else if (event.type === "action") {
+              stopWaiting();
+              if (event.action.ok && WRITE_TOOLS.has(event.action.tool)) wroteSomething = true;
               updateMessage(replyId, (m) => ({
                 ...m,
                 activity: undefined,
@@ -312,6 +351,7 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
           },
         );
       } catch (error) {
+        speech?.stop();
         if (live()) {
           // The failure stays in the chat, with a way to send it again (the
           // toast is what shows over other dashboards).
@@ -328,6 +368,8 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
         }
         updateMessage(replyId, () => null);
         return "superseded";
+      } finally {
+        stopWaiting();
       }
       if (!live()) {
         // Keep whatever was written, but stop showing it as in progress.
@@ -335,6 +377,7 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
         return "superseded";
       }
       if (data.silent) {
+        speech?.stop();
         // Not for the assistant: the exchange leaves no trace on screen.
         setMessages((prev) => prev.filter((m) => m.id !== userMessageId && m.id !== replyId));
         return "silent";
@@ -350,9 +393,19 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
         ...(data.images.length > 0 && { images: data.images as AssistantImage[] }),
       }));
 
+      askedRef.current = data.reply.trim().endsWith("?");
       updateState("speaking");
-      const speaking = speak(data.reply);
+      // What the voice already said is not repeated; the rest comes from the final reply.
+      let rest = sentencer.finish(data.reply);
+      if (rest === null) {
+        speech?.stop();
+        speech = null;
+        rest = data.reply;
+      }
+      const speaking: Speech = speech ?? createSpeech();
       speakingRef.current = speaking;
+      if (rest.trim()) speaking.say(rest);
+      speaking.end();
       try {
         await speaking.done;
       } catch (error) {
@@ -388,7 +441,10 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
           break;
         }
         if (outcome === "ended" || outcome === "failed") break;
-        text = await listen(session, LISTEN_TIMEOUTS.followUpMs);
+        text = await listen(
+          session,
+          askedRef.current ? LISTEN_TIMEOUTS.questionMs : LISTEN_TIMEOUTS.followUpMs,
+        );
         if (session !== sessionRef.current) return;
       }
       updateState("idle");

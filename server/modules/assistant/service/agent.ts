@@ -14,6 +14,7 @@ import { trace } from "@opentelemetry/api";
 import type { AssistantAction, ChatReply, EmitStreamEvent } from "../model";
 import { buildTools, type ToolContext } from "../tools";
 import { conversationTools } from "../tools/conversation";
+import { ACTION_CLAIM, WRITE_TOOLS } from "./claims";
 import { ConversationService, type StoredMessage } from "./conversation";
 import { isFarewell } from "./farewell";
 import { ImageStorage } from "./images";
@@ -28,19 +29,6 @@ export const DEFAULT_MODEL = "openai/gpt-5-mini";
 export const MAX_STEPS = 6;
 
 const FALLBACK_REPLY = "Desculpe, não consegui responder agora.";
-
-/** Tools that change something in the house or cost money (see tools/*.ts `write`). */
-const WRITE_TOOLS = new Set([
-  "controlar_dispositivo",
-  "controlar_varios_dispositivos",
-  "aplicar_cena",
-  "executar_rotina",
-  "gerar_imagem",
-]);
-
-/** Past-tense or future wording for a change, in pt-BR ("apliquei", "vou desligar"). */
-const ACTION_CLAIM =
-  /\b(apliquei|reapliquei|apaguei|desliguei|liguei|acendi|coloquei|pus|pôs|ajustei|executei|aplicada|aplicado|desligada|desligado|apagada|apagado|vou (ligar|desligar|apagar|acender|aplicar|colocar|ajustar|executar))\b/i;
 
 /**
  * A reply that says a change was made needs a successful write action behind

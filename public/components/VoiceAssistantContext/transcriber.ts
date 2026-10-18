@@ -11,7 +11,7 @@ export const VAD = {
   /** Continuous loud audio needed before it counts as speech. */
   speechStartMs: 150,
   /** Silence after speech that ends the utterance. */
-  speechEndMs: 1200,
+  speechEndMs: 900,
   /** Hard cap on one recording. */
   maxUtteranceMs: 20000,
 };

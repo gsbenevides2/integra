@@ -50,7 +50,7 @@ otherwise.
 - The wake word and the transcriber **share one microphone**: it opens on
   first use and closes when the last listener stops. Opening a second one for
   every utterance lost the first syllables said right after the chime.
-- It ends the utterance after 1.2 s of silence, using an energy-based VAD
+- It ends the utterance after 0.9 s of silence, using an energy-based VAD
   (`VAD` constants).
 - The audio is encoded as a 16 kHz WAV (`wav.ts`) and sent to
   `POST /api/assistant/stt`.
@@ -103,9 +103,23 @@ In the chat:
     anything. The conversation's own images come from the bucket.
   - User messages stay plain text.
   - The prompt allows light markdown: bold and short lists.
-- **Voice:** it is still synthesised from the final text, once the reply is
-  complete. Before speaking, `service/speakable.ts` turns the markdown into
-  plain sentences:
+- **Voice:** it starts on the first full sentence, while the model is still
+  writing (`VoiceAssistantContext/speechStream.ts`). Each sentence (at least
+  30 characters) is synthesised in parallel as soon as it is complete and
+  played in order (`createSpeech` in `speaker.ts`). When the reply is done,
+  only the part not yet said is spoken.
+  - A sentence that claims a change ("liguei a luz") is held back until a
+    write action has succeeded, because the server swaps an unbacked claim for
+    an honest failure (`guardActionClaims`; the rules live in
+    `service/claims.ts`). It is then spoken from the final reply.
+  - If the final reply no longer continues what was said, the voice stops and
+    speaks the final reply whole.
+  - The browser logs `[assistant] first sentence sent to voice` (debug) with
+    the time to the first delta and to the first sentence.
+  - While a tool runs for more than 4 s (image generation), a soft blip plays
+    every 4 s.
+  - Before speaking, `service/speakable.ts` turns the markdown into
+    plain sentences:
   - list items and table rows become sentences, with pauses;
   - links keep only their text, and bare URLs and code blocks are dropped;
   - emphasis markers are removed.
@@ -122,8 +136,8 @@ In the chat:
     for it). Set
     `ELEVENLABS_TTS_MODEL=eleven_flash_v2_5` for faster replies; models other
     than multilingual_v2 are sent `language_code: "pt"`.
-  - The whole reply is synthesised before it plays, so total generation time is
-    what counts: ~1.8 s for a 4 s sentence with multilingual_v2.
+  - Each sentence is synthesised on its own (~1.8 s for a 4 s sentence with
+    multilingual_v2), so only the first one delays the voice.
   - Pick a voice with `bun run assistant:voices` (Brazilian voices of the
     Voice Library and the account's voices, with previews), add a library voice
     with `bun run assistant:voices -- add <public_owner_id> <voice_id>`, and set
@@ -147,7 +161,7 @@ In the chat:
 ### Follow-ups and ending
 
 - After a reply, the assistant listens for 6 more seconds without needing the
-  wake word.
+  wake word, or 12 s when the reply ends with a question.
 - Saying goodbye ("obrigado, tchau", "valeu, era só isso", "pode parar") ends
   the session right after the farewell is spoken. The conversation history is
   cleared on both sides.

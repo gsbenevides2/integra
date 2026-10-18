@@ -85,7 +85,7 @@ beforeEach(() => {
   chatEvents = [];
   uploadReply = IMAGE;
   transcripts = [];
-  Object.assign(LISTEN_TIMEOUTS, { firstTurnMs: 1000, followUpMs: 1000 });
+  Object.assign(LISTEN_TIMEOUTS, { firstTurnMs: 1000, followUpMs: 1000, questionMs: 1000 });
   localStorage.clear();
   wakeLockReleased = 0;
   wakeLockRequest = async () => ({ release: async () => void wakeLockReleased++ });
@@ -553,6 +553,69 @@ describe("streaming replies", () => {
     } finally {
       chat.restore();
     }
+  });
+
+  test("the voice starts on the first full sentence, before the reply is complete", async () => {
+    const chat = holdChat();
+    try {
+      renderProvider();
+      act(() => value.sendText("como está a casa?"));
+      await until(() => reply()?.pending === true);
+      const first = "A casa está tranquila e tudo funcionando bem. ";
+      await act(async () => chat.push({ type: "delta", text: first }));
+      await stateIs("speaking");
+      const ttsCalls = () => calls.filter((c) => c.path === "/api/assistant/tts");
+      expect(ttsCalls().map((c) => (c.body as { text: string }).text)).toEqual([first]);
+
+      await act(async () => chat.push({ type: "delta", text: "A porta está fechada." }));
+      const final = { ...REPLY, reply: first + "A porta está fechada.", actions: [] };
+      await act(async () => {
+        chat.push({ type: "done", reply: final });
+        chat.close();
+      });
+      // Only the part not yet said is requested at the end.
+      await until(() => ttsCalls().length === 2);
+      expect((ttsCalls()[1]?.body as { text: string }).text).toBe("A porta está fechada.");
+    } finally {
+      chat.restore();
+    }
+  });
+
+  test("a final reply that does not continue what was said is spoken whole", async () => {
+    const chat = holdChat();
+    try {
+      renderProvider();
+      act(() => value.sendText("liga a luz"));
+      await until(() => reply()?.pending === true);
+      await act(async () => chat.push({ type: "delta", text: "Deixa comigo, vou conferir isso com calma pra você. " }));
+      await stateIs("speaking");
+      const final = { ...REPLY, reply: "Não consegui fazer isso agora.", actions: [] };
+      await act(async () => {
+        chat.push({ type: "done", reply: final });
+        chat.close();
+      });
+      const spoken = () =>
+        calls.filter((c) => c.path === "/api/assistant/tts").map((c) => (c.body as { text: string }).text);
+      await until(() => spoken().length === 2);
+      expect(spoken()[1]).toBe("Não consegui fazer isso agora.");
+    } finally {
+      chat.restore();
+    }
+  });
+
+  test("a question stretches the follow-up window", async () => {
+    chatReply = { ...REPLY, reply: "Qual luz você quer apagar?", actions: [] };
+    LISTEN_TIMEOUTS.followUpMs = 50;
+    LISTEN_TIMEOUTS.questionMs = 1000;
+    renderProvider();
+    act(() => value.sendText("apaga a luz"));
+    await stateIs("speaking");
+    await finishSpeaking();
+    await stateIs("listening");
+    await until(() => voice.openTaps.length === 1);
+    // Silence longer than the plain window, shorter than the question one.
+    await act(async () => voice.feed(0, 300));
+    expect(value.state).toBe("listening");
   });
 
   test("a failed reply stays as an error, and retry sends the same message again", async () => {

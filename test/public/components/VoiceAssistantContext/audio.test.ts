@@ -8,7 +8,7 @@ afterAll(installVoiceFakes());
 const { CHUNK_SIZE, openMicrophone, resumeAudio } = await import(
   "@public/components/VoiceAssistantContext/microphone"
 );
-const { playChime, speak } = await import("@public/components/VoiceAssistantContext/speaker");
+const { playChime, playWaiting, speak } = await import("@public/components/VoiceAssistantContext/speaker");
 const { listenOnce, VAD } = await import("@public/components/VoiceAssistantContext/transcriber");
 const { downsample, encodeWav, WAV_SAMPLE_RATE } = await import(
   "@public/components/VoiceAssistantContext/wav"
@@ -35,6 +35,13 @@ async function until(check: () => boolean) {
   for (let i = 0; i < 50 && !check(); i++) await flush();
   expect(check()).toBe(true);
 }
+
+describe("playWaiting", () => {
+  test("plays one soft blip", () => {
+    playWaiting();
+    expect(voice.tones).toBe(1);
+  });
+});
 
 describe("microphone", () => {
   test("streams worklet chunks, and stop releases everything", async () => {
