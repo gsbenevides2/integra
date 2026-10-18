@@ -16,7 +16,9 @@ test("white preset without quick apply", () => {
   expect(screen.getByText("Branco · 80%")).toBeTruthy();
   fireEvent.click(screen.getByText("Leitura"));
   fireEvent.click(screen.getByText("Aplicar"));
-  expect(onOpen).toHaveBeenCalled();
+  expect(onOpen).toHaveBeenCalledTimes(1); // the apply button does not open it
+  fireEvent.click(screen.getByText("Branco · 80%")); // anywhere else does
+  expect(onOpen).toHaveBeenCalledTimes(2);
   expect(onApply).toHaveBeenCalled();
 });
 

@@ -28,7 +28,17 @@ export function PresetCard({
   const brightness = hsv ? Math.round(hsv.v * 100) : preset.brightness;
 
   return (
-    <div className="flex flex-col gap-3 rounded-md bg-gray-800 p-3">
+    <div
+      // Controls (the name button, the apply buttons) handle their own clicks.
+      onClick={(e) => {
+        if (!(e.target as HTMLElement).closest("button")) onOpen();
+      }}
+      className="
+        flex cursor-pointer flex-col gap-3 rounded-md bg-gray-800 p-3
+        transition-colors
+        hover:bg-gray-700/60
+      "
+    >
       <button
         type="button"
         onClick={onOpen}
@@ -49,7 +59,7 @@ export function PresetCard({
         </span>
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col items-start gap-2">
         {onQuickApply && firstOnlineDeviceName && (
           <Button variant="secondary" onClick={onQuickApply}>
             <PlayIcon className="size-4 shrink-0" /> Aplicar na{" "}

@@ -366,7 +366,7 @@ function TplinkDashboard() {
                     <th className="px-3 py-2 font-normal" />
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="stagger-in">
                   {sortedDevices.map((device) => (
                     <tr
                       key={device.id}

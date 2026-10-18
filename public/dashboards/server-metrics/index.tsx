@@ -118,7 +118,7 @@ export function ServerMetricsDashboard() {
             </div>
           ) : (
             <div className="
-              grid grid-cols-1 gap-3
+              grid stagger-in grid-cols-1 gap-3
               lg:grid-cols-2
             ">
               <MemoryChart data={snapshots} />

@@ -34,7 +34,7 @@ export function ToastContainer() {
           <div
             key={toast.id}
             className={`
-              border-l-4 bg-gray-800
+              animate-toast-in border-l-4 bg-gray-800
               ${typeClasses[toast.type]}
               flex items-center gap-2 rounded-md p-3 text-sm shadow-xl
             `}

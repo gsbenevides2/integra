@@ -82,7 +82,7 @@ export function GoogleAccountsDashboard() {
       ) : accounts.length === 0 ? (
         <p className="text-sm text-mist-300">Nenhuma conta linkada.</p>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="flex stagger-in flex-col gap-2">
           {accounts.map((email) => (
             <GoogleAccountCard
               key={email}

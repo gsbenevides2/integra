@@ -3,6 +3,7 @@ import React from "react";
 import type { Hsv } from "@server/modules/tuya/color";
 import { Input } from "@public/components/Input";
 import { RingPicker } from "@public/components/RingPicker";
+import { SegmentedControl } from "@public/components/SegmentedControl";
 import { Slider } from "@public/components/Slider";
 import { Switch } from "@public/components/Switch";
 
@@ -56,6 +57,10 @@ export function presetDraftToBody(draft: PresetDraft) {
     colorHex: draft.workMode === "colour" ? draft.colorHex : null,
   };
 }
+const TABS = [
+  ["white", "Branco"],
+  ["colour", "Cor"],
+] as const;
 
 interface Props {
   draft: PresetDraft;
@@ -78,20 +83,11 @@ export function PresetForm({ draft, onChange }: Props) {
         className="w-full"
       />
 
-      <div className="flex gap-1 rounded-full bg-gray-800 p-1 text-xs">
-        <TabButton
-          active={draft.workMode === "white"}
-          onClick={() => onChange({ ...draft, workMode: "white" })}
-        >
-          Branco
-        </TabButton>
-        <TabButton
-          active={draft.workMode === "colour"}
-          onClick={() => onChange({ ...draft, workMode: "colour" })}
-        >
-          Cor
-        </TabButton>
-      </div>
+      <SegmentedControl
+        options={TABS}
+        value={draft.workMode}
+        onChange={(workMode) => onChange({ ...draft, workMode })}
+      />
 
       {showColour ? (
         <RingPicker
@@ -151,35 +147,5 @@ export function PresetForm({ draft, onChange }: Props) {
         }
       />
     </div>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`
-        cursor-pointer rounded-full px-4 py-1 transition-colors
-        ${
-          active
-            ? "bg-gray-700 text-mist-200"
-            : `
-              text-mist-400
-              hover:text-mist-300
-            `
-        }
-      `}
-    >
-      {children}
-    </button>
   );
 }

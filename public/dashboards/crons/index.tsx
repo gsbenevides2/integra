@@ -149,7 +149,7 @@ export function CronsDashboard() {
                 <th className="px-3 py-2 font-normal" />
               </tr>
             </thead>
-            <tbody>
+            <tbody className="stagger-in">
               {jobs.map((job) => (
                 <tr
                   key={job.name}

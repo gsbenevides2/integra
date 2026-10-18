@@ -246,7 +246,8 @@ export function TuyaDashboard() {
               </h2>
               <div
                 className="
-                  grid grid-cols-[repeat(auto-fill,minmax(min(100%,480px),1fr))]
+                  grid stagger-in
+                  grid-cols-[repeat(auto-fill,minmax(min(100%,480px),1fr))]
                   gap-3
                   max-lg:landscape:grid-cols-2
                 "
@@ -297,7 +298,8 @@ export function TuyaDashboard() {
                 ) : (
                   <div
                     className="
-                      grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3
+                      grid stagger-in
+                      grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3
                     "
                   >
                     {shownLamps.map((device) => (
@@ -324,7 +326,8 @@ export function TuyaDashboard() {
                 ) : (
                   <div
                     className="
-                      grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3
+                      grid stagger-in
+                      grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3
                     "
                   >
                     {presets.map((preset) => (
@@ -383,7 +386,8 @@ export function TuyaDashboard() {
                 ) : (
                   <div
                     className="
-                      grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3
+                      grid stagger-in
+                      grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3
                     "
                   >
                     {shownSensors.map((sensor) => (
@@ -408,7 +412,8 @@ export function TuyaDashboard() {
                 ) : (
                   <div
                     className="
-                      grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3
+                      grid stagger-in
+                      grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3
                     "
                   >
                     {shownSwitches.map((device) => (

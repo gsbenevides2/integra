@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Hsv } from "@server/modules/tuya/color";
 import { RingPicker } from "@public/components/RingPicker";
+import { SegmentedControl } from "@public/components/SegmentedControl";
 import { Slider } from "@public/components/Slider";
 
 import { PowerIcon } from "@heroicons/react/24/outline";
@@ -23,6 +24,10 @@ import {
 import type { Device, DeviceCommand } from "../../types";
 
 type Tab = "white" | "colour";
+const TABS = [
+  ["white", "Branco"],
+  ["colour", "Cor"],
+] as const;
 
 interface Props {
   device: Device;
@@ -98,20 +103,7 @@ export function LampControls({ device, isBusy, onCommand }: Props) {
   return (
     <div className="flex flex-col items-center gap-4">
       {hasTabs && (
-        <div className="flex gap-1 rounded-full bg-gray-800 p-1 text-xs">
-          <TabButton
-            active={tab === "white"}
-            onClick={() => selectTab("white")}
-          >
-            Branco
-          </TabButton>
-          <TabButton
-            active={tab === "colour"}
-            onClick={() => selectTab("colour")}
-          >
-            Cor
-          </TabButton>
-        </div>
+        <SegmentedControl options={TABS} value={tab} onChange={selectTab} />
       )}
 
       {showColour ? (
@@ -237,36 +229,6 @@ export function LampControls({ device, isBusy, onCommand }: Props) {
         )
       )}
     </div>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`
-        cursor-pointer rounded-full px-4 py-1 transition-colors
-        ${
-          active
-            ? "bg-gray-700 text-mist-200"
-            : `
-              text-mist-400
-              hover:text-mist-300
-            `
-        }
-      `}
-    >
-      {children}
-    </button>
   );
 }
 

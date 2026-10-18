@@ -93,7 +93,7 @@ export function Drawer({
     >
       <div
         className={`
-          absolute inset-0 bg-black/50 transition-opacity
+          absolute inset-0 bg-black/50 transition-opacity duration-300
           ${isOpen ? `opacity-100` : `opacity-0`}
         `}
         onClick={onClose}
@@ -110,7 +110,7 @@ export function Drawer({
                 : `max-w-xl`
           }
           size-full overflow-y-auto border-l border-gray-700 bg-gray-900
-          shadow-2xl transition-transform
+          shadow-2xl transition-transform duration-300 ease-out
           ${
             isOpen
               ? "translate-x-0"

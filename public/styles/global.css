@@ -1,4 +1,53 @@
+/* eslint-disable css/no-invalid-at-rules, css/no-important, css/no-invalid-properties -- Tailwind v4 syntax; !important is needed to override every transition for reduced motion */
 @import "tailwindcss";
+
+@theme {
+  --animate-toast-in: toast-in 200ms ease-out;
+  --animate-fade-up: fade-up 300ms ease-out both;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.95);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+
+/* Every button eases its hover/press feedback; switches and tabs animate themselves. */
+button:not([role="switch"], [role="tab"]) {
+  transition-property: color, background-color, border-color, box-shadow, filter,
+    opacity, scale;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+
+button:not(:disabled, [role="switch"], [role="tab"]):active {
+  scale: 0.96;
+}
+
+@media (hover: hover) {
+  button:not(:disabled, [role="switch"], [role="tab"]):hover {
+    filter: brightness(1.15);
+  }
+}
+
+/* Respect the OS "reduce motion" setting: collapse every animation/transition. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
 
 body {
   @apply bg-gray-950 text-gray-100;
@@ -20,5 +69,13 @@ body {
   40% {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+/* Children fade up one after another; only runs on mount, so re-renders don't replay it. */
+@utility stagger-in {
+  & > * {
+    animation: var(--animate-fade-up);
+    animation-delay: calc(min(sibling-index(), 8) * 50ms - 50ms);
   }
 }

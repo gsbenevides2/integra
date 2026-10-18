@@ -34,8 +34,14 @@ export function DeviceCard({ device, isBusy, onCommand, onOpen }: Props) {
 
   return (
     <div
+      // Controls (the name button, switches, slider) handle their own clicks.
+      onClick={(e) => {
+        if (!(e.target as HTMLElement).closest("button, label")) onOpen();
+      }}
       className={`
-        flex flex-col gap-3 rounded-md bg-gray-800 p-3
+        flex cursor-pointer flex-col gap-3 rounded-md bg-gray-800 p-3
+        transition-colors
+        hover:bg-gray-700/60
         ${device.hidden ? "opacity-50" : ""}
       `}
     >

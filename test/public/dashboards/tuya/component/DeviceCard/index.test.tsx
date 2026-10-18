@@ -30,7 +30,11 @@ test("lamp on, white mode: toggle, open, brightness", () => {
   fireEvent.click(screen.getByRole("switch"));
   expect(onCommand).toHaveBeenCalledWith({ power: false });
   fireEvent.click(screen.getByText("Sala"));
-  expect(onOpen).toHaveBeenCalled();
+  expect(onOpen).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByText("Online")); // anywhere else on the card
+  expect(onOpen).toHaveBeenCalledTimes(2);
+  fireEvent.click(screen.getByRole("switch")); // controls do not open it
+  expect(onOpen).toHaveBeenCalledTimes(2);
   fireEvent.change(screen.getByRole("slider"), { target: { value: "70" } });
   expect(onCommand).toHaveBeenCalledWith({ brightness: 70 });
 });

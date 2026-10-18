@@ -9,6 +9,7 @@ import {
 } from "@public/components/GlobalDrawerContext";
 import { IconButton } from "@public/components/IconButton";
 import { initialsOf, useMe } from "@public/components/MeContext";
+import { SegmentedControl } from "@public/components/SegmentedControl";
 import { Switch } from "@public/components/Switch";
 import { useToast } from "@public/components/Toast";
 
@@ -530,28 +531,17 @@ export function PermissionsDashboard() {
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex rounded-lg bg-gray-800 p-1" role="tablist">
-          {(
-            [
-              ["resources", `Recursos (${resourceGrantCount})`],
-              ["routes", `Rotas (${grants.routes.length})`],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={tab === id}
-              onClick={() => setTab(id)}
-              className={`
-                cursor-pointer rounded-md px-3 py-1.5 text-sm transition-colors
-                ${tab === id ? "bg-gray-950 text-white" : "text-mist-300"}
-              `}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          options={[
+            ["resources", `Recursos (${resourceGrantCount})`],
+            ["routes", `Rotas (${grants.routes.length})`],
+          ]}
+          value={tab}
+          onChange={setTab}
+          className="rounded-lg bg-gray-800 text-sm"
+          pillClassName="rounded-md bg-gray-950"
+          buttonClassName="px-3 py-1.5"
+        />
         <label className="
           flex min-w-48 flex-1 items-center gap-2 rounded-md border
           border-mist-600 bg-gray-900 px-2
