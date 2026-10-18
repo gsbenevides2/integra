@@ -13,6 +13,7 @@ import {
   CAMERA_FEATURES,
   cameraLiveConfig,
   frigateFetch,
+  frigateLiveStream,
   frigateStats,
   listEnabledCameras,
   PTZ_COMMANDS,
@@ -96,29 +97,16 @@ export const frigateRoutes = new Elysia({
   )
   .get(
     "/cameras/:name/stream",
-    async ({ params, query, request }) => {
-      // Cameras often send G.711 audio, which <video> can't play; transcoding
-      // spawns ffmpeg, so only the live page (not the card thumbnails) asks.
-      const src = query.audio
-        ? encodeURIComponent(`ffmpeg:${params.name}#video=copy#audio=aac`)
-        : params.name;
-      const res = await frigateFetch(
-        `/api/go2rtc/api/stream.mp4?src=${src}`,
-        {
-          signal: request.signal,
-          // instrumentFetch reads the whole response body to trace it, which
-          // never ends for a live stream.
-          skipInstrumentation: true,
-        },
-      );
-      if (!res.ok || !res.body) throw status(502, { error: "Stream falhou" });
-      // Live fragmented MP4 from go2rtc, piped through untouched; the
-      // content-type carries the codec string the <video> needs.
-      return new Response(res.body, {
-        headers: {
-          "content-type": res.headers.get("content-type") ?? "video/mp4",
-          "cache-control": "no-store",
-        },
+    async ({ params, request }) => {
+      // go2rtc negotiates the codecs over MSE (transcoding G.711 audio itself).
+      const src = params.name;
+      const live = await frigateLiveStream(src, request.signal).catch(() => {
+        throw status(502, { error: "Stream falhou" });
+      });
+      // Fragmented MP4 piped through untouched; the content-type carries the
+      // codec string the <video> needs.
+      return new Response(live.body, {
+        headers: { "content-type": live.mime, "cache-control": "no-store" },
       });
     },
     {

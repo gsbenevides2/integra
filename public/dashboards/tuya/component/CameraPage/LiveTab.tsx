@@ -6,6 +6,7 @@ import { useToast } from "@public/components/Toast";
 import {
   ArrowDownIcon,
   ArrowLeftIcon,
+  ArrowPathIcon,
   ArrowRightIcon,
   ArrowUpIcon,
   MagnifyingGlassMinusIcon,
@@ -16,6 +17,7 @@ import {
 
 import { getFrigateEdenClient } from "../../client";
 import type { CameraState } from ".";
+import { LiveVideo } from "./LiveVideo";
 
 /** [command, icon, label, grid cell]: a D-pad on the left, zoom on the right. */
 const PAD = [
@@ -46,6 +48,8 @@ export function LiveTab({
 }) {
   const { showToast } = useToast();
   const [muted, setMuted] = useState(true);
+  // Bumping it remounts the <video>, reconnecting at the live edge (no buffered delay).
+  const [syncKey, setSyncKey] = useState(0);
   const live = useRef<HTMLVideoElement>(null);
   const [events, setEvents] = useState<FrigateEvent[]>([]);
   const [playing, setPlaying] = useState<FrigateEvent | null>(null);
@@ -53,7 +57,7 @@ export function LiveTab({
   // React only writes `muted` as an attribute, so unmuting after mount never reached the element.
   useEffect(() => {
     if (live.current) live.current.muted = muted;
-  }, [muted, playing]);
+  }, [muted, playing, syncKey]);
 
   useEffect(() => {
     const load = () =>
@@ -74,14 +78,18 @@ export function LiveTab({
       });
 
   return (
-    <div className="
+    <div
+      className="
       grid gap-4
       lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start
-    ">
+    "
+    >
       <div className="flex min-w-0 flex-col gap-3">
-        <div className="
+        <div
+          className="
           relative aspect-video overflow-hidden rounded-lg bg-gray-800
-        ">
+        "
+        >
           {playing ? (
             <video
               key={playing.id}
@@ -93,8 +101,9 @@ export function LiveTab({
               className="size-full object-contain"
             />
           ) : (
-            <video
-              ref={live}
+            <LiveVideo
+              key={syncKey}
+              videoRef={live}
               src={`/api/frigate/cameras/${name}/stream?audio=1`}
               poster={`/api/frigate/cameras/${name}/latest.jpg`}
               aria-label={name}
@@ -116,21 +125,35 @@ export function LiveTab({
               Voltar ao vivo
             </button>
           ) : (
-            <button
-              type="button"
-              onClick={() => setMuted((value) => !value)}
-              aria-label={muted ? "Ativar áudio" : "Silenciar"}
-              className="
+            <>
+              <button
+                type="button"
+                onClick={() => setSyncKey((value) => value + 1)}
+                aria-label="Ressincronizar"
+                title="Ressincronizar (remove o atraso)"
+                className="
+                  absolute right-12 bottom-2 cursor-pointer rounded-full
+                  bg-mist-950/70 p-2
+                "
+              >
+                <ArrowPathIcon className="size-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setMuted((value) => !value)}
+                aria-label={muted ? "Ativar áudio" : "Silenciar"}
+                className="
                 absolute right-2 bottom-2 cursor-pointer rounded-full
                 bg-mist-950/70 p-2
               "
-            >
-              {muted ? (
-                <SpeakerXMarkIcon className="size-5" />
-              ) : (
-                <SpeakerWaveIcon className="size-5" />
-              )}
-            </button>
+              >
+                {muted ? (
+                  <SpeakerXMarkIcon className="size-5" />
+                ) : (
+                  <SpeakerWaveIcon className="size-5" />
+                )}
+              </button>
+            </>
           )}
         </div>
         {events.length > 0 && (
@@ -180,9 +203,11 @@ export function LiveTab({
         )}
       </div>
       {ptz && (
-        <section className="
+        <section
+          className="
           flex animate-fade-up flex-col gap-4 rounded-lg bg-gray-800 p-4
-        ">
+        "
+        >
           <h2 className="text-sm font-semibold text-mist-300">Controle PTZ</h2>
           <div
             className="
@@ -220,9 +245,7 @@ export function LiveTab({
               </button>
             ))}
           </div>
-          <p className="text-center text-xs text-mist-500">
-            Segure para mover
-          </p>
+          <p className="text-center text-xs text-mist-500">Segure para mover</p>
           {ptz.presets.length > 0 && (
             <div className="flex flex-col gap-2">
               <h3 className="text-xs text-mist-400">Posições salvas</h3>

@@ -1,6 +1,8 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 
 import { VideoCameraIcon } from "@heroicons/react/24/outline";
+
+import { LiveVideo } from "../CameraPage/LiveVideo";
 
 export function CameraCard({
   name,
@@ -12,6 +14,7 @@ export function CameraCard({
   onOpen: () => void;
 }) {
   const [isLoaded, setIsLoaded] = useState(false);
+  const video = useRef<HTMLVideoElement>(null);
 
   return (
     <button
@@ -32,7 +35,8 @@ export function CameraCard({
       >
         <VideoCameraIcon className="size-10" />
       </div>
-      <video
+      <LiveVideo
+        videoRef={video}
         src={`/api/frigate/cameras/${name}/stream`}
         poster={`/api/frigate/cameras/${name}/latest.jpg`}
         autoPlay

@@ -14,6 +14,67 @@ export async function frigateFetch(path: string, init: InstrumentedInit = {}) {
   });
 }
 
+/**
+ * Live fragmented MP4 from go2rtc's MSE websocket (Frigate 0.18 no longer proxies
+ * stream.mp4). The binary frames are init + media segments, so concatenated they
+ * are a plain fMP4 stream a <video src> can play.
+ */
+export async function frigateLiveStream(src: string, signal: AbortSignal) {
+  const { access_token } = await loginInAuthentik(
+    safeEnvGet("FRIGATE_CLIENT_ID"),
+  );
+  const url = new URL("/live/mse/api/ws", safeEnvGet("FRIGATE_ENDPOINT"));
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  url.searchParams.set("src", src);
+  // Bun's WebSocket accepts headers; the DOM typings don't know the option.
+  const ws = new WebSocket(url.href, {
+    headers: { Authorization: `Bearer ${access_token}` },
+  } as unknown as string[]);
+  ws.binaryType = "arraybuffer";
+
+  let mime: string | undefined;
+  let controller!: ReadableStreamDefaultController<Uint8Array>;
+  let done = false;
+  const close = () => ws.close();
+  signal.addEventListener("abort", close);
+  const body = new ReadableStream<Uint8Array>({
+    start: (c) => void (controller = c),
+    cancel: () => {
+      done = true;
+      close();
+    },
+  });
+  const ready = new Promise<string>((resolve, reject) => {
+    ws.onopen = () =>
+      ws.send(
+        JSON.stringify({
+          type: "mse",
+          value: "avc1.640029,avc1.64002a,avc1.640033,hvc1.1.6.L153.B0,mp4a.40.2,mp4a.40.5,flac,opus",
+        }),
+      );
+    ws.onmessage = ({ data }) => {
+      if (typeof data === "string") {
+        const msg = JSON.parse(data) as { type: string; value: string };
+        if (msg.type === "mse") {
+          mime = msg.value;
+          resolve(msg.value);
+        } else if (msg.type === "error") reject(new Error(msg.value));
+      } else if (!done) controller.enqueue(new Uint8Array(data as ArrayBuffer));
+    };
+    ws.onerror = () => reject(new Error("Frigate ws error"));
+    ws.onclose = () => {
+      signal.removeEventListener("abort", close);
+      reject(new Error("Frigate ws closed"));
+      if (!done) {
+        done = true;
+        controller.close();
+      }
+    };
+  });
+  await ready;
+  return { mime: mime!, body };
+}
+
 /** Names of the enabled cameras in Frigate's config. */
 export async function listEnabledCameras(): Promise<string[]> {
   const res = await frigateFetch("/api/config");

@@ -44,23 +44,64 @@ test("cameras 502 when upstream fails", async () => {
   expect((await get("/api/frigate/cameras")).status).toBe(502);
 });
 
-test("stream proxies body and content-type", async () => {
-  fetchSpy = spyOn(globalThis, "fetch").mockResolvedValue(
-    new Response("video", { headers: { "content-type": "video/mp4; codecs=x" } }),
-  );
+const fakeWs = (onOpen: (ws: any) => void) => {
+  const urls: string[] = [];
+  globalThis.WebSocket = class {
+    onopen?: () => void;
+    onmessage?: (e: { data: unknown }) => void;
+    onclose?: () => void;
+    onerror?: () => void;
+    binaryType = "";
+    sent: string[] = [];
+    constructor(url: string) {
+      urls.push(url);
+      queueMicrotask(() => {
+        this.onopen?.();
+        onOpen(this);
+      });
+    }
+    send(m: string) {
+      this.sent.push(m);
+    }
+    close() {
+      this.onclose?.();
+    }
+  } as any;
+  return urls;
+};
+
+test("stream bridges the go2rtc MSE websocket to fMP4", async () => {
+  const urls = fakeWs((ws) => {
+    ws.onmessage({ data: JSON.stringify({ type: "mse", value: 'video/mp4; codecs="x"' }) });
+    ws.onmessage({ data: new TextEncoder().encode("vid").buffer });
+    ws.onmessage({ data: new TextEncoder().encode("eo").buffer });
+    ws.close();
+  });
   const res = await get("/api/frigate/cameras/cam-1/stream");
-  expect(res.headers.get("content-type")).toBe("video/mp4; codecs=x");
+  expect(res.headers.get("content-type")).toBe('video/mp4; codecs="x"');
   expect(res.headers.get("cache-control")).toBe("no-store");
   expect(await res.text()).toBe("video");
-  expect(String((fetchSpy.mock.calls[0] as any)[0])).toContain("stream.mp4?src=cam-1");
+  expect(urls[0]).toBe("ws://frigate.local/live/mse/api/ws?src=cam-1");
+  globalThis.WebSocket = RealWebSocket;
 });
 
-test("stream defaults content-type; fails with 502", async () => {
-  fetchSpy = spyOn(globalThis, "fetch").mockResolvedValue({ ok: true, body: new Response("v").body, headers: new Headers() } as any);
-  expect((await get("/api/frigate/cameras/c/stream")).headers.get("content-type")).toBe("video/mp4");
-  fetchSpy.mockRestore();
-  fetchSpy = spyOn(globalThis, "fetch").mockResolvedValue(new Response("x", { status: 404 }));
+test("cancelling the stream closes the websocket without throwing", async () => {
+  let socket: any;
+  fakeWs((ws) => {
+    socket = ws;
+    ws.close = mock(() => ws.onclose());
+    ws.onmessage({ data: JSON.stringify({ type: "mse", value: "video/mp4" }) });
+  });
+  const res = await get("/api/frigate/cameras/cam-1/stream");
+  await res.body!.cancel();
+  expect(socket.close).toHaveBeenCalled();
+  globalThis.WebSocket = RealWebSocket;
+});
+
+test("stream fails with 502 when the websocket errors", async () => {
+  fakeWs((ws) => ws.onerror());
   expect((await get("/api/frigate/cameras/c/stream")).status).toBe(502);
+  globalThis.WebSocket = RealWebSocket;
 });
 
 test("goToFrigate redirects; bad name rejected", async () => {
