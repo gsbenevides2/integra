@@ -570,14 +570,14 @@ export function PermissionsDashboard() {
         <div
           key={`${selectedUserId}:resources`}
           className="
-            grid stagger-in grid-cols-1 items-start gap-3
-            xl:grid-cols-2
+            stagger-in columns-1 gap-3
+            xl:columns-2
           "
         >
           {!frigateAvailable && (
             <p className="
               text-xs text-yellow-300
-              xl:col-span-2
+              [column-span:all]
             ">
               Frigate indisponível: câmeras não verificadas.
             </p>
@@ -619,7 +619,7 @@ export function PermissionsDashboard() {
               <section
                 key={type}
                 aria-label={typeLabel}
-                className="rounded-lg bg-gray-800 p-3"
+                className="mb-3 break-inside-avoid rounded-lg bg-gray-800 p-3"
               >
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <h2 className="flex-1 text-sm text-mist-200">
@@ -749,8 +749,8 @@ export function PermissionsDashboard() {
         <div
           key={`${selectedUserId}:routes`}
           className="
-            grid stagger-in grid-cols-1 items-start gap-3
-            xl:grid-cols-2
+            stagger-in columns-1 gap-3
+            xl:columns-2
           "
         >
           {[...routeGroups.entries()].map(([tag, tagRoutes]) => {
@@ -771,7 +771,7 @@ export function PermissionsDashboard() {
               <section
                 key={tag}
                 aria-label={tag}
-                className="rounded-lg bg-gray-800 p-3"
+                className="mb-3 break-inside-avoid rounded-lg bg-gray-800 p-3"
               >
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <h2 className="flex-1 text-sm text-mist-200">
@@ -843,7 +843,7 @@ export function PermissionsDashboard() {
           {orphanRouteGrants.length > 0 && (
             <section
               aria-label="Rotas órfãs"
-              className="rounded-lg bg-gray-800 p-3"
+              className="mb-3 break-inside-avoid rounded-lg bg-gray-800 p-3"
             >
               <h2 className="mb-2 text-sm text-mist-200">Rotas órfãs</h2>
               <ul className="flex flex-col divide-y divide-gray-700">
