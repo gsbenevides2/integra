@@ -1,9 +1,6 @@
 import { type KaldiRecognizer, VoskClient } from "@lichess-org/vosk-browser";
 
 import { type Microphone, openMicrophone } from "./microphone";
-import { cosine, loadSpeakerModel, type SpeakerModel } from "./speakerModel";
-import { lastSpeech } from "./speechTrim";
-import type { VoiceProfile } from "./voiceProfile";
 
 export const MODEL_URL = "/vosk/vosk-model-small-pt.tar.gz";
 export const WORKER_URL = "/vosk/vosk.worker.js";
@@ -19,14 +16,6 @@ export const WAKE_PHRASES = ["ei integra", "integra"];
 export const WAKE_COOLDOWN_MS = 3000;
 
 /**
- * How much recent audio to keep for the speaker check. Vosk only reports the
- * final result after its end-of-speech silence and the worker's latency, so a
- * short buffer often held more silence than phrase; the check embeds just the
- * phrase, cut out of this window by lastSpeech.
- */
-export const SPEAKER_BUFFER_MS = 4000;
-
-/**
  * Only a final result that is exactly a wake phrase counts. Partial results
  * and results mixed with [unk] fire on ordinary speech ("bom dia...", "a
  * integração...") far too often.
@@ -37,42 +26,6 @@ export function isWakePhrase(text: string): boolean {
 
 export interface WakeWordEngine {
   stop: () => Promise<void>;
-}
-
-/** The speaker check applied before a wake word fires, or null to skip it. */
-export interface SpeakerGate {
-  model: SpeakerModel;
-  /** Every enrolled voice's L2-normalised embeddings, flattened together. */
-  embeddings: number[][];
-  /** Minimum cosine similarity to accept the voice. */
-  threshold: number;
-}
-
-/**
- * Loads the speaker model and the union of the user's enrolled voices for a
- * wake-word speaker gate, or returns null when there is nothing to check
- * against: no model deployed, no voice enrolled for the current model, or the
- * model fails to load. When null, the wake word fires for any voice (the
- * pre-enrolment behaviour). A phrase fires if it matches ANY enrolled voice.
- */
-export async function buildSpeakerGate(
-  voiceModelUrl: string | null,
-  voiceModelId: string,
-  profiles: VoiceProfile[],
-  threshold: number,
-): Promise<SpeakerGate | null> {
-  if (!voiceModelUrl) return null;
-  const embeddings = profiles
-    .filter((profile) => profile.modelId === voiceModelId)
-    .flatMap((profile) => profile.embeddings);
-  if (embeddings.length === 0) return null;
-  try {
-    const model = await loadSpeakerModel(voiceModelUrl, voiceModelId);
-    return { model, embeddings, threshold };
-  } catch {
-    // If the model fails to load, fall back to firing for any voice.
-    return null;
-  }
 }
 
 /** Loads the model (cached in IndexedDB after the first download). */
@@ -98,103 +51,27 @@ function loadModel(): Promise<VoskClient> {
 /**
  * Starts offline wake word detection with Vosk restricted to WAKE_PHRASES.
  * Audio never leaves the browser until `onDetect` fires.
- *
- * When `gate` is given, a detected phrase only fires if the voice that said it
- * matches the enrolled profile (cosine ≥ threshold): this is what keeps other
- * people and the TV from triggering "Ei Integra". Without a gate it fires for
- * any voice.
  */
-export async function startWakeWord(
-  onDetect: () => void,
-  gate: SpeakerGate | null = null,
-): Promise<WakeWordEngine> {
+export async function startWakeWord(onDetect: () => void): Promise<WakeWordEngine> {
   const client = await loadModel();
   let recognizer: KaldiRecognizer | null = null;
   let microphone: Microphone;
 
-  // Ring buffer of the most recent audio, so the phrase just heard is still
-  // available for the speaker check when Vosk reports it.
-  let ring: Float32Array | null = null;
-  let ringRate = 0;
-  let ringWrite = 0;
-  let ringFilled = false;
-  const pushRing = (samples: Float32Array, sampleRate: number) => {
-    if (!gate) return;
-    if (!ring || ringRate !== sampleRate) {
-      ringRate = sampleRate;
-      ring = new Float32Array(Math.ceil((SPEAKER_BUFFER_MS / 1000) * sampleRate));
-      ringWrite = 0;
-      ringFilled = false;
-    }
-    for (let i = 0; i < samples.length; i++) {
-      ring[ringWrite] = samples[i]!;
-      ringWrite = (ringWrite + 1) % ring.length;
-      if (ringWrite === 0) ringFilled = true;
-    }
-  };
-  const ringSnapshot = (): { samples: Float32Array; sampleRate: number } | null => {
-    if (!ring) return null;
-    const length = ringFilled ? ring.length : ringWrite;
-    const out = new Float32Array(length);
-    for (let i = 0; i < length; i++) {
-      const idx = ringFilled ? (ringWrite + i) % ring.length : i;
-      out[i] = ring[idx]!;
-    }
-    return { samples: out, sampleRate: ringRate };
-  };
-
   try {
-    microphone = await openMicrophone((samples, sampleRate) => {
-      pushRing(samples, sampleRate);
-      recognizer?.acceptWaveformFloat(samples, sampleRate);
-    });
+    microphone = await openMicrophone((samples, sampleRate) =>
+      recognizer?.acceptWaveformFloat(samples, sampleRate),
+    );
   } catch (error) {
     client.terminate();
     throw error;
   }
 
   let lastDetection = -Infinity;
-  /** True while a speaker check is running, so a second phrase is ignored. */
-  let verifying = false;
-
-  const accept = () => {
-    lastDetection = performance.now();
-    onDetect();
-  };
-
-  const verify = async () => {
-    const snapshot = ringSnapshot();
-    if (!gate || !snapshot) {
-      accept();
-      return;
-    }
-    verifying = true;
-    try {
-      // Embed only the phrase just heard, as enrolment does; if nothing stands
-      // out from the noise (a very quiet voice), use the whole window.
-      const speech = lastSpeech(snapshot.samples, snapshot.sampleRate);
-      const candidate = await gate.model.embed(
-        speech?.samples ?? snapshot.samples,
-        snapshot.sampleRate,
-      );
-      let best = -Infinity;
-      for (const enrolled of gate.embeddings) {
-        best = Math.max(best, cosine(candidate, enrolled));
-      }
-      if (best >= gate.threshold) accept();
-    } catch {
-      // If the check fails, err toward not firing: it is the speaker gate's job.
-    } finally {
-      verifying = false;
-    }
-  };
-
   const check = (text: string) => {
     const now = performance.now();
-    if (!isWakePhrase(text) || verifying || now - lastDetection < WAKE_COOLDOWN_MS) {
-      return;
-    }
-    void verify();
+    if (!isWakePhrase(text) || now - lastDetection < WAKE_COOLDOWN_MS) return;
+    lastDetection = now;
+    onDetect();
   };
   recognizer = new client.KaldiRecognizer(
     microphone.sampleRate,

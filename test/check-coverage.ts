@@ -3,19 +3,16 @@
 //   1. every source file is loaded by some test (else it is invisible to coverage);
 //   2. every loaded file has all of its lines covered.
 // A short, explicit allow-list exempts files that run only in a real browser
-// (Web Audio / ONNX runtime), which cannot execute under the test DOM.
+// (Web Audio), which cannot execute under the test DOM.
 import { Glob } from "bun";
 
 /**
- * Files intentionally not line-covered: they need a real AudioWorklet / WebGPU /
- * ONNX session that the happy-dom test environment cannot provide. They are still
+ * Files intentionally not line-covered: they need a real AudioWorklet that the
+ * happy-dom test environment cannot provide. They are still
  * required to be *loaded* by a test (so a syntax error is caught), just not fully
  * executed. Keep this list tight — add a file only with a reason.
  */
 const LINE_COVERAGE_EXEMPT = new Set([
-  "public/components/VoiceAssistantContext/fbank.ts", // DSP run inside the audio worklet
-  "public/components/VoiceAssistantContext/speakerModel.ts", // ONNX inference session
-  "public/components/VoiceAssistantContext/transcriber.ts", // live microphone capture
 ]);
 
 const lcov = await Bun.file("coverage/lcov.info").text();

@@ -292,22 +292,6 @@ describe("voice safety", () => {
     expect(addTurn).not.toHaveBeenCalled();
   });
 
-  test("a voice turn without a verified speaker cannot change the house", async () => {
-    const denied = spy(authz, "hasRouteGrant").mockResolvedValue(true);
-    runTools = async (tools) => {
-      const result = await tool(tools, "controlar_dispositivo").function.execute({ dispositivo: "x" });
-      expect(result).toMatchObject({ error: expect.stringContaining("Não posso mudar nada") });
-    };
-    const reply = await AssistantAgent.run(TEST_USER, {
-      text: "Liga a luz",
-      writeAllowed: false,
-    });
-    expect(reply.actions).toEqual([
-      expect.objectContaining({ tool: "controlar_dispositivo", ok: false }),
-    ]);
-    denied.mockRestore();
-  });
-
   test("a claimed change with no successful write action is replaced", async () => {
     replyText = "Pronto — apliquei a cena Normal no Quarto do Gui.";
     const reply = await AssistantAgent.run(TEST_USER, { text: "Coloca no normal" });

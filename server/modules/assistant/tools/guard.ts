@@ -23,11 +23,6 @@ export interface ToolContext {
   conversationImages: StoredImage[];
   /** Streams progress (tool start, action, new images) to the browser. */
   emit?: EmitStreamEvent;
-  /**
-   * False for a voice turn whose speaker was not verified on this device: such
-   * a turn may read the house but not change it. Absent means allowed.
-   */
-  writeAllowed?: boolean;
 }
 
 /** Tools answer failures with this shape so the model can say what went wrong. */
@@ -35,12 +30,6 @@ export type ToolError = { error: string };
 
 export const NO_PERMISSION: ToolError = {
   error: "O usuário não tem permissão para isso.",
-};
-
-export const WRITE_BLOCKED: ToolError = {
-  error:
-    "Não posso mudar nada da casa por este aparelho, porque não reconheci sua voz aqui. " +
-    "Posso só consultar.",
 };
 
 export function isToolError(value: unknown): value is ToolError {
@@ -111,7 +100,6 @@ async function runGuarded<TInput extends z.ZodObject, TOutput>(
   input: z.infer<TInput>,
 ): Promise<TOutput | ToolError> {
   try {
-    if (config.write && ctx.writeAllowed === false) return WRITE_BLOCKED;
     for (const routeKey of config.routeKeys) {
       if (!(await hasRouteGrant(ctx.user.id, routeKey))) return NO_PERMISSION;
     }

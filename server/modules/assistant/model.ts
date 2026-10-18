@@ -26,18 +26,6 @@ export const chatBody = z.object({
     title: "Images",
     description: "Keys of images uploaded with POST /api/assistant/uploads",
   }),
-  source: z.enum(["voice", "text"]).optional().meta({
-    title: "Source",
-    description:
-      "Where the utterance came from. Voice turns that did not pass the " +
-      "speaker check on this device are read-only. Defaults to text.",
-  }),
-  speakerVerified: z.boolean().optional().meta({
-    title: "Speaker Verified",
-    description:
-      "For voice turns: true only if the speaker check passed on an enrolled " +
-      "device. Without it, the assistant cannot change anything in the house.",
-  }),
 });
 
 export type ChatBody = z.infer<typeof chatBody>;
@@ -53,9 +41,6 @@ export const ttsBody = z.object({
 /** Longest per-user addition to the system prompt. */
 export const MAX_EXTRA_INSTRUCTIONS_LENGTH = 4000;
 
-/** Default cosine cutoff for the wake-word speaker check: strict by default. */
-export const DEFAULT_VOICE_MATCH_THRESHOLD = 0.6;
-
 export const settingsBody = z.object({
   extraInstructions: z.string().trim().max(MAX_EXTRA_INSTRUCTIONS_LENGTH).meta({
     title: "Extra Instructions",
@@ -64,81 +49,9 @@ export const settingsBody = z.object({
       "when they talk to it (e.g. nickname, tone, room names). Empty to clear.",
     example: "A luz da sala é a 'Lâmpada Philips'. Chame o usuário de Gui.",
   }),
-  voiceMatchThreshold: z.number().min(0).max(1).meta({
-    title: "Voice Match Threshold",
-    description:
-      "Cosine-similarity cutoff for the wake-word speaker check. Higher is " +
-      "stricter. Only applies once the user has enrolled a voice profile.",
-    example: 0.6,
-  }),
 });
 
 export type AssistantSettings = z.infer<typeof settingsBody>;
-
-/** How many enrolment samples the client sends, and their embedding limits. */
-export const MIN_VOICE_SAMPLES = 1;
-export const MAX_VOICE_SAMPLES = 8;
-/** Guards against an oversized or absurd embedding dimensionality. */
-export const MAX_VOICE_DIMS = 2048;
-/** Longest voice label (display name). */
-export const MAX_VOICE_LABEL_LENGTH = 60;
-/** How many distinct voices one user may enrol. */
-export const MAX_VOICES_PER_USER = 10;
-
-const voiceLabel = z.string().trim().min(1).max(MAX_VOICE_LABEL_LENGTH).meta({
-  title: "Label",
-  description: "The voice's display name (e.g. a person or device).",
-  example: "Gui",
-});
-
-export const voiceProfileBody = z.object({
-  label: voiceLabel,
-  embeddings: z
-    .array(z.array(z.number()).min(1).max(MAX_VOICE_DIMS))
-    .min(MIN_VOICE_SAMPLES)
-    .max(MAX_VOICE_SAMPLES)
-    .meta({
-      title: "Embeddings",
-      description:
-        "One L2-normalised speaker embedding per enrolment sample, extracted " +
-        "by the client-side model. All must share the same length.",
-    }),
-  modelId: z.string().trim().min(1).max(200).meta({
-    title: "Model ID",
-    description: "Which client-side embedding model produced these embeddings.",
-  }),
-});
-
-export type VoiceProfileBody = z.infer<typeof voiceProfileBody>;
-
-/** Rename an enrolled voice. */
-export const voiceLabelBody = z.object({ label: voiceLabel });
-
-export type VoiceLabelBody = z.infer<typeof voiceLabelBody>;
-
-/** The legacy single-profile enrolment (no label): it writes the default voice. */
-export const legacyVoiceProfileBody = voiceProfileBody.omit({ label: true });
-
-/**
- * The single voice profile of the legacy `/voice-profile` routes, still used
- * by the Android app: every enrolled voice of the most recently used model,
- * flattened, so a client that checks against it accepts any of them.
- */
-export interface LegacyVoiceProfile {
-  enrolled: boolean;
-  embeddings: number[][];
-  dims: number;
-  modelId: string;
-}
-
-/** One of a user's enrolled wake-word voices (embeddings stay client-usable). */
-export interface VoiceProfile {
-  id: string;
-  label: string;
-  embeddings: number[][];
-  dims: number;
-  modelId: string;
-}
 
 /** One tool call the agent made while answering, shown as a chip in the UI. */
 export interface AssistantAction {
@@ -199,8 +112,4 @@ export interface ConversationDetail extends ConversationSummary {
 
 export interface AssistantConfig {
   wakeWordEnabled: boolean;
-  /** URL of the client-side speaker-embedding model, or null if not deployed. */
-  voiceModelUrl: string | null;
-  /** Which speaker-embedding model is deployed (invalidates old enrolments). */
-  voiceModelId: string;
 }

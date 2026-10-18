@@ -17,8 +17,6 @@ import {
 
 afterAll(installVoiceFakes());
 
-const transcriber = await import("@public/components/VoiceAssistantContext/transcriber");
-const wakeWord = await import("@public/components/VoiceAssistantContext/wakeWord");
 const {
   CHAT_ROUTE_KEY,
   CHIME_ECHO_MS,
@@ -40,15 +38,13 @@ const REPLY = {
 const IMAGE = { key: "assistant/u/upload/a.jpg", url: "https://signed/a", mediaType: "image/jpeg", source: "upload" };
 
 let config: Record<string, unknown> = { wakeWordEnabled: false };
-let voiceProfiles: unknown[] = [];
 let chatReply: unknown = REPLY;
 /** Extra stream events sent before the reply text (tools, actions, images). */
 let chatEvents: unknown[] = [];
 let transcripts: string[] = [];
 const calls = useApi({
   "GET /api/assistant/config": () => config,
-  "GET /api/assistant/voice-profiles": () => voiceProfiles,
-  "GET /api/assistant/settings": () => ({ extraInstructions: "", voiceMatchThreshold: 0.6 }),
+  "GET /api/assistant/settings": () => ({ extraInstructions: "" }),
   "POST /api/assistant/stt": () => ({ text: transcripts.shift() ?? "" }),
   "POST /api/assistant/chat/stream": () =>
     chatReply && typeof chatReply === "object" && "__status" in chatReply
@@ -85,7 +81,6 @@ let wakeLockRequest: () => Promise<{ release: () => Promise<void> }>;
 beforeEach(() => {
   voice.reset();
   config = { wakeWordEnabled: false };
-  voiceProfiles = [];
   chatReply = REPLY;
   chatEvents = [];
   uploadReply = IMAGE;
@@ -169,11 +164,8 @@ describe("VoiceAssistantProvider", () => {
     expect(value.hearingSpeech).toBe(false);
     expect(value.messages.map((m) => m.text)).toEqual(["liga a luz", "Pronto."]);
     expect(value.messages[1]?.actions?.[0]?.summary).toBe("Ligou");
-    // This device has no enrolled voice: the turn is read-only on the server.
     expect(calls.find((c) => c.path === "/api/assistant/chat/stream")?.body).toEqual({
       text: "liga a luz",
-      source: "voice",
-      speakerVerified: false,
     });
 
     await finishSpeaking();
@@ -709,56 +701,6 @@ describe("wake word", () => {
     expect(wakeLockReleased).toBe(1);
   });
 
-  test("builds the speaker gate from the deployed voice model and enrolled voices", async () => {
-    config = { wakeWordEnabled: true, voiceModelUrl: "/voice/model.onnx", voiceModelId: "m1" };
-    // Enrolled for a different model → buildSpeakerGate finds no usable embeddings
-    // and returns null, so the wake word still fires for any voice here.
-    voiceProfiles = [{ id: "v1", label: "Gui", embeddings: [[1, 2]], dims: 2, modelId: "old" }];
-    renderProvider();
-    await until(() => voice.recognizers.length === 1);
-    await waitFor(() => expect(value.voiceModel).toEqual({ url: "/voice/model.onnx", id: "m1" }));
-    expect(calls.some((c) => c.path === "/api/assistant/voice-profiles")).toBe(true);
-
-    const recognizer = voice.recognizers[0]!;
-    const now = spyOn(performance, "now").mockImplementation(() => 10_000);
-    try {
-      await act(async () => recognizer.result("ei integra"));
-      await stateIs("listening");
-    } finally {
-      now.mockRestore();
-    }
-  });
-
-  test("pausing turns the wake word off until every pause is released", async () => {
-    config = { wakeWordEnabled: true };
-    renderProvider();
-    await until(() => voice.recognizers.length === 1);
-    const first = voice.recognizers[0]!;
-
-    let resumeEnrolment: () => void = () => {};
-    let resumeOther: () => void = () => {};
-    act(() => {
-      resumeEnrolment = value.pauseWakeWord();
-      resumeOther = value.pauseWakeWord();
-    });
-    await until(() => first.removed);
-    // A phrase still being checked when it stopped does not start a session.
-    await act(async () => first.result("ei integra"));
-    await flush();
-    expect(value.state).toBe("idle");
-
-    act(() => {
-      resumeEnrolment();
-      resumeEnrolment(); // releasing the same pause twice counts once
-    });
-    await flush();
-    expect(voice.recognizers).toHaveLength(1);
-
-    act(() => resumeOther());
-    await until(() => voice.recognizers.length === 2);
-    expect(voice.recognizers[1]!.removed).toBe(false);
-  });
-
   test("the preference is remembered and turning it off stops the engine", async () => {
     config = { wakeWordEnabled: true };
     renderProvider();
@@ -820,102 +762,5 @@ describe("wake word", () => {
     unmount();
     await flush();
     expect(screen.queryByText('Não foi possível ativar o "Ei Integra"')).toBeNull();
-  });
-});
-
-describe("spoken turns and the speaker check", () => {
-  type Heard = { text: string; speaker: "verified" | "rejected" | "unknown" };
-  const GATE = { model: { embed: async () => new Float32Array([1]) }, embeddings: [[1]], threshold: 0.5 };
-  let queue: Heard[] = [];
-  let spies: { mockRestore: () => void }[] = [];
-  const track = <T extends { mockRestore: () => void }>(spy: T) => (spies.push(spy), spy);
-  const chatBodies = () =>
-    calls.filter((c) => c.path === "/api/assistant/chat/stream").map((c) => c.body as Record<string, unknown>);
-
-  /** Stands in for the microphone: the next queued utterance, checked like the real one. */
-  const fakeListen = (options: {
-    onPhase: (phase: string) => void;
-    verify?: (samples: Float32Array, rate: number) => Promise<boolean>;
-  }) => {
-    const next = queue.shift() ?? { text: "", speaker: "unknown" as const };
-    options.onPhase("speech");
-    if (options.verify) void options.verify(new Float32Array(16000), 16000);
-    options.onPhase("transcribing");
-    return {
-      result: Promise.resolve(next.speaker === "rejected" ? "" : next.text),
-      speaker: Promise.resolve(next.speaker),
-      cancel: () => {},
-    };
-  };
-
-  /** The speaker model is loaded: the gate exists, as on a device with an enrolled voice. */
-  const withVoiceModel = () => {
-    config = { wakeWordEnabled: false, voiceModelUrl: "/voice/speaker.onnx", voiceModelId: "m" };
-    return track(spyOn(wakeWord, "buildSpeakerGate").mockResolvedValue(GATE as never));
-  };
-  /** Lets the provider finish loading the speaker check before a turn starts. */
-  const gateReady = async () => {
-    await until(() => calls.some((c) => c.path === "/api/assistant/voice-profiles"));
-    await flush();
-    await flush();
-  };
-
-  beforeEach(() => {
-    queue = [];
-    spies = [track(spyOn(transcriber, "listenOnce").mockImplementation(fakeListen as never))];
-  });
-  afterEach(() => spies.splice(0).forEach((s) => s.mockRestore()));
-
-  test("a turn from the enrolled voice may change the house", async () => {
-    withVoiceModel();
-    queue = [{ text: "liga a luz", speaker: "verified" }];
-    renderProvider();
-    await gateReady();
-    act(() => value.start());
-    await stateIs("speaking");
-    expect(chatBodies()[0]).toMatchObject({ text: "liga a luz", source: "voice", speakerVerified: true });
-    await finishSpeaking();
-    await stateIs("idle");
-  });
-
-  test("a follow-up from another voice ends the session with a chime", async () => {
-    withVoiceModel();
-    queue = [
-      { text: "liga a luz", speaker: "verified" },
-      { text: "", speaker: "rejected" },
-    ];
-    renderProvider();
-    await gateReady();
-    act(() => value.start());
-    await stateIs("speaking");
-    await finishSpeaking();
-    await stateIs("idle");
-    expect(chatBodies()).toHaveLength(1);
-    expect(voice.tones).toBe(4); // the start chime, then the one for the rejected follow-up
-  });
-
-  test("a first utterance from another voice gets only a chime", async () => {
-    withVoiceModel();
-    queue = [{ text: "", speaker: "rejected" }];
-    renderProvider();
-    await gateReady();
-    act(() => value.start());
-    await until(() => voice.tones === 4);
-    await stateIs("idle");
-    expect(chatBodies()).toHaveLength(0);
-    expect(value.messages).toHaveLength(0);
-  });
-
-  test("without a loadable speaker check the turn is read-only", async () => {
-    config = { wakeWordEnabled: false, voiceModelUrl: "/voice/speaker.onnx", voiceModelId: "m" };
-    spies.push(spyOn(wakeWord, "buildSpeakerGate").mockRejectedValue(new Error("offline")));
-    queue = [{ text: "liga a luz", speaker: "unknown" }];
-    renderProvider();
-    await gateReady();
-    act(() => value.start());
-    await stateIs("speaking");
-    expect(chatBodies()[0]).toMatchObject({ source: "voice", speakerVerified: false });
-    await finishSpeaking();
-    await stateIs("idle");
   });
 });

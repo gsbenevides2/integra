@@ -9,30 +9,20 @@ import {
   chatBody,
   type ConversationDetail,
   type ConversationSummary,
-  legacyVoiceProfileBody,
   MAX_AUDIO_BYTES,
   type MessageView,
   settingsBody,
   type StreamEvent,
   ttsBody,
-  voiceLabelBody,
-  voiceProfileBody,
 } from "./model";
 import { AssistantAgent, type ChatRequest } from "./service/agent";
 import { AudioService } from "./service/audio";
 import { type Conversation, ConversationService } from "./service/conversation";
 import { IMAGE_EXTENSIONS, ImageStorage, MAX_IMAGE_BYTES } from "./service/images";
 import { AssistantSettingsService } from "./service/settings";
-import { VoiceProfileService } from "./service/voiceProfile";
 
 /** The Portuguese Vosk model; wake word detection is off until it is downloaded. */
 export const VOSK_MODEL_FILE = "public/vosk/vosk-model-small-pt.tar.gz";
-
-/** The client-side speaker-embedding model; the speaker check is off until it exists. */
-export const VOICE_MODEL_FILE = "public/voice/speaker-ecapa.onnx";
-export const VOICE_MODEL_URL = "/voice/speaker-ecapa.onnx";
-/** Bump when the model file changes, to invalidate every enrolled profile. */
-export const VOICE_MODEL_ID = "wespeaker-en-voxceleb-resnet34-LM-v1";
 
 const log = getLogger("assistant");
 
@@ -44,8 +34,6 @@ function toChatRequest(userId: string, body: ChatBody): ChatRequest | null {
     text: body.text,
     conversationId: body.conversationId,
     uploads: keys.map((key) => ImageStorage.fromUploadKey(key)),
-    // Voice turns change the house only once the speaker check passed here.
-    writeAllowed: body.source !== "voice" || body.speakerVerified === true,
   };
 }
 
@@ -67,10 +55,6 @@ export const assistantRoutes = new Elysia({
     "/config",
     async (): Promise<AssistantConfig> => ({
       wakeWordEnabled: await Bun.file(VOSK_MODEL_FILE).exists(),
-      voiceModelUrl: (await Bun.file(VOICE_MODEL_FILE).exists())
-        ? VOICE_MODEL_URL
-        : null,
-      voiceModelId: VOICE_MODEL_ID,
     }),
     {
       detail: {
@@ -314,113 +298,6 @@ export const assistantRoutes = new Elysia({
       body: settingsBody,
     },
   )
-  .get(
-    "/voice-profiles",
-    (ctx) => VoiceProfileService.list(currentUser(ctx).id),
-    {
-      detail: {
-        summary: "List My Voices",
-        description:
-          "Returns the current user's enrolled wake-word voices (label and " +
-          "embeddings), used by the client to verify it is one of their voices.",
-      },
-    },
-  )
-  .post(
-    "/voice-profiles",
-    (ctx) =>
-      VoiceProfileService.create(
-        currentUser(ctx).id,
-        ctx.body.label,
-        ctx.body.embeddings,
-        ctx.body.modelId,
-      ),
-    {
-      detail: {
-        summary: "Enrol A Voice",
-        description:
-          "Adds a labelled wake-word voice for the current user: a few " +
-          "client-extracted speaker embeddings of them saying 'Ei Integra'.",
-      },
-      body: voiceProfileBody,
-    },
-  )
-  .patch(
-    "/voice-profiles/:id",
-    async (ctx) => {
-      await VoiceProfileService.rename(currentUser(ctx).id, ctx.params.id, ctx.body.label);
-      return { ok: true };
-    },
-    {
-      detail: {
-        summary: "Rename A Voice",
-        description: "Renames one of the current user's enrolled voices.",
-      },
-      body: voiceLabelBody,
-    },
-  )
-  .delete(
-    "/voice-profiles/:id",
-    async (ctx) => {
-      await VoiceProfileService.delete(currentUser(ctx).id, ctx.params.id);
-      return { ok: true };
-    },
-    {
-      detail: {
-        summary: "Remove A Voice",
-        description:
-          "Deletes one of the current user's enrolled voices. With no voices " +
-          "left, the wake word fires for any voice again.",
-      },
-    },
-  )
-  // Legacy single-profile routes, still used by the Android app.
-  .get(
-    "/voice-profile",
-    (ctx) => VoiceProfileService.legacyProfile(currentUser(ctx).id),
-    {
-      detail: {
-        summary: "Get My Voice Profile (legacy)",
-        description:
-          "Every enrolled voice of the most recently used model as one " +
-          "profile, so a client that checks against a single profile accepts " +
-          "any of them. Prefer GET /voice-profiles.",
-      },
-    },
-  )
-  .put(
-    "/voice-profile",
-    (ctx) =>
-      VoiceProfileService.saveDefault(
-        currentUser(ctx).id,
-        ctx.body.embeddings,
-        ctx.body.modelId,
-      ),
-    {
-      detail: {
-        summary: "Enrol My Voice (legacy)",
-        description:
-          "Re-records the default voice (\"Minha voz\"), creating it if " +
-          "missing, and returns the combined profile. Prefer POST /voice-profiles.",
-      },
-      body: legacyVoiceProfileBody,
-    },
-  )
-  .delete(
-    "/voice-profile",
-    async (ctx) => {
-      await VoiceProfileService.deleteDefault(currentUser(ctx).id);
-      return { ok: true };
-    },
-    {
-      detail: {
-        summary: "Remove My Voice (legacy)",
-        description:
-          "Deletes the default voice (\"Minha voz\") only; other voices stay. " +
-          "Prefer DELETE /voice-profiles/:id.",
-      },
-    },
-  )
   .post(
     "/tts",
     async ({ body }) => {
@@ -466,36 +343,3 @@ export const voskAssetRoutes = new Elysia({
         headers: { "content-type": "application/wasm" },
       }),
   );
-
-const ORT_DIST = "node_modules/onnxruntime-web/dist";
-
-/** The onnxruntime-web runtime files the WASM backend loads at run time. */
-const ORT_FILES = [
-  "ort-wasm-simd-threaded.jsep.wasm",
-  "ort-wasm-simd-threaded.jsep.mjs",
-  "ort-wasm-simd-threaded.wasm",
-  "ort-wasm-simd-threaded.mjs",
-] as const;
-
-/**
- * The onnxruntime-web runtime, served from the installed package so the files
- * always match its version. `speakerModel.ts` points
- * `ort.env.wasm.wasmPaths` at `/ort/`, where the backend fetches these at run
- * time (otherwise they 404 against the page root). Public library code,
- * outside /api. Registered as explicit static routes, like the Vosk assets.
- */
-export const ortAssetRoutes = ORT_FILES.reduce(
-  (app, name) =>
-    app.get(
-      `/ort/${name}`,
-      () =>
-        new Response(Bun.file(`${ORT_DIST}/${name}`), {
-          headers: {
-            "content-type": name.endsWith(".wasm")
-              ? "application/wasm"
-              : "text/javascript",
-          },
-        }),
-    ),
-  new Elysia({ detail: { tags: ["FrontEnd"], hide: true } }),
-);

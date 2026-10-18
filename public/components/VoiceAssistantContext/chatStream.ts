@@ -6,9 +6,6 @@ export interface ChatRequestBody {
   text: string;
   conversationId?: string;
   images?: string[];
-  /** Set for spoken turns; the server keeps them read-only unless verified. */
-  source?: "voice";
-  speakerVerified?: boolean;
 }
 
 /**

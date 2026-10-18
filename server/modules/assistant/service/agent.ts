@@ -114,8 +114,6 @@ export interface ChatRequest {
   conversationId?: string;
   /** Uploaded images (already checked to be the user's). */
   uploads?: StoredImage[];
-  /** False when a voice turn's speaker was not verified: read-only. Default true. */
-  writeAllowed?: boolean;
 }
 
 /** User images inlined for the model, newest first; older ones are text only. */
@@ -215,7 +213,6 @@ export abstract class AssistantAgent {
           images: [],
           conversationImages: [...history.flatMap((m) => m.images), ...uploads],
           emit,
-          writeAllowed: request.writeAllowed ?? true,
         };
         let endConversation = false;
         let silenced = false;
