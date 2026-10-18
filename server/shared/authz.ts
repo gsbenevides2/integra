@@ -75,7 +75,7 @@ export const VALID_ACTIONS: Record<ResourceType, ResourceAction[]> = {
   tuya_device: ["read", "write"],
   tuya_sensor: ["read", "write"],
   tuya_preset: ["read", "write", "apply"],
-  frigate_camera: ["read"],
+  frigate_camera: ["read", "write"],
   cron_job: ["read", "execute"],
 };
 
@@ -439,6 +439,32 @@ const RESOURCE_RULES: Record<string, (ctx: GuardContext) => Requirement[]> = {
   "GET /api/frigate/cameras/:name/goToFrigate": (ctx) => [
     { type: "frigate_camera", id: param(ctx, "name"), action: "read" },
   ],
+  ...Object.fromEntries(
+    [
+      "GET /api/frigate/cameras/:name/state",
+      "GET /api/frigate/cameras/:name/events",
+      "GET /api/frigate/cameras/:name/events/:id/:asset",
+      "GET /api/frigate/cameras/:name/recordings/summary",
+      "GET /api/frigate/cameras/:name/clip.mp4",
+      "GET /api/frigate/cameras/:name/latest.jpg",
+    ].map((key) => [
+      key,
+      (ctx: GuardContext): Requirement[] => [
+        { type: "frigate_camera", id: param(ctx, "name"), action: "read" },
+      ],
+    ]),
+  ),
+  ...Object.fromEntries(
+    [
+      "POST /api/frigate/cameras/:name/ptz",
+      "PUT /api/frigate/cameras/:name/features/:feature",
+    ].map((key) => [
+      key,
+      (ctx: GuardContext): Requirement[] => [
+        { type: "frigate_camera", id: param(ctx, "name"), action: "write" },
+      ],
+    ]),
+  ),
   "POST /api/crons/run/:jobName": (ctx) => [
     { type: "cron_job", id: param(ctx, "jobName"), action: "execute" },
   ],

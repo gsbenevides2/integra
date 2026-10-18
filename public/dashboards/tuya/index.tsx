@@ -14,7 +14,9 @@ import { Bars3Icon, HomeIcon, PlusIcon } from "@heroicons/react/24/outline";
 
 import { getFrigateEdenClient, getTuyaEdenClient } from "./client";
 import { ApplyPresetModal } from "./component/ApplyPresetModal";
+import { useFrigateStats } from "../frigate/useFrigateStats";
 import { CameraCard } from "./component/CameraCard";
+import { CameraPage } from "./component/CameraPage";
 import { DeviceCard } from "./component/DeviceCard";
 import { DeviceDrawerContent } from "./component/DeviceDrawerContent";
 import { NewDeviceForm } from "./component/NewDeviceForm";
@@ -65,6 +67,7 @@ export function TuyaDashboard() {
   const [sensors, setSensors] = useState<Sensor[]>([]);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [cameras, setCameras] = useState<string[]>([]);
+  const [openCamera, setOpenCamera] = useState<string | null>(null);
   const [openSensorId, setOpenSensorId] = useState<string | null>(null);
   const [showHidden, setShowHidden] = useState(false);
   const [showHiddenDevices, setShowHiddenDevices] = useState(false);
@@ -110,6 +113,8 @@ export function TuyaDashboard() {
     const interval = setInterval(() => fetchAll(false), POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [fetchAll]);
+
+  const { stats: frigateStats } = useFrigateStats();
 
   // Loaded once, outside the poll, so the live <img> streams are never remounted.
   useEffect(() => {
@@ -185,6 +190,10 @@ export function TuyaDashboard() {
   const hiddenSensors = sensors.filter((sensor) => sensor.hidden);
   const shownSensors = showHidden ? sensors : visibleSensors;
 
+  if (openCamera) {
+    return <CameraPage name={openCamera} onBack={() => setOpenCamera(null)} />;
+  }
+
   return (
     <div className="flex flex-col gap-4 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -253,7 +262,12 @@ export function TuyaDashboard() {
                 "
               >
                 {cameras.map((name) => (
-                  <CameraCard key={name} name={name} />
+                  <CameraCard
+                    key={name}
+                    name={name}
+                    online={frigateStats ? frigateStats.cameras[name]?.fps > 0 : undefined}
+                    onOpen={() => setOpenCamera(name)}
+                  />
                 ))}
               </div>
             </section>
@@ -473,6 +487,7 @@ export function TuyaDashboard() {
       >
         {openPreset && (
           <PresetDrawerContent
+            key={openPreset.id}
             preset={openPreset}
             onChanged={() => fetchAll(false)}
             onDeleted={() => {

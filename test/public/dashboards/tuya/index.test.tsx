@@ -48,6 +48,14 @@ function boot(data: Data = full, extra: Record<string, any> = {}) {
     "GET /api/tuya/sensors": () => data.sensors ?? [],
     "GET /api/tuya/presets": () => data.presets ?? [],
     "GET /api/frigate/cameras": () => data.cameras ?? [],
+    "GET /api/frigate/stats": () => ({
+      cameras: { garagem: { fps: 5, skippedFps: 0, detectionFps: 1, detecting: true } },
+      detector: { name: "openvino", inferenceMs: 8 },
+      disk: { total: 1000 * 1024, used: 950 * 1024, free: 50 * 1024 },
+      version: "0.17.2-abc",
+      latestVersion: "0.18.0",
+      uptime: 86400 * 6,
+    }),
     "GET /api/tuya/devices/d1/history": () => ({ snapshots: [] }),
     "GET /api/tuya/sensors/s1/history": () => ({ readings: [] }),
     ...extra,
@@ -68,6 +76,8 @@ test("loads and renders every section; hidden toggles", async () => {
   expect(screen.getByText("Carregando...")).toBeTruthy();
   await screen.findByText("Iluminação (1)");
   expect(screen.getByText("Câmeras (1)")).toBeTruthy();
+  await screen.findByRole("status", { name: "Câmera online" });
+  expect(screen.getByRole("status", { name: "Câmera online" })).toBeTruthy();
   expect(screen.getByText("Modos (1)")).toBeTruthy();
   expect(screen.getByText("Sensores (1)")).toBeTruthy();
   expect(screen.getByText("Interruptores (1)")).toBeTruthy();
@@ -282,4 +292,14 @@ test("switch card opens its drawer", async () => {
   // busy state disables the rest once one is clicked, so go from the last one
   for (const sw of screen.getAllByRole("switch").reverse()) fireEvent.click(sw);
   await waitFor(() => expect(m.calls.some((c) => c.method === "POST")).toBe(true));
+});
+
+test("opening a camera shows its page and back returns to the dashboard", async () => {
+  boot(full, {
+    "GET /api/frigate/cameras/garagem/state": () => ({ ptz: null, features: {} }),
+  });
+  fireEvent.click(await screen.findByLabelText("garagem"));
+  expect(await screen.findByRole("heading", { name: "garagem" })).toBeTruthy();
+  fireEvent.click(screen.getByLabelText("Voltar"));
+  await screen.findByText("Câmeras (1)");
 });

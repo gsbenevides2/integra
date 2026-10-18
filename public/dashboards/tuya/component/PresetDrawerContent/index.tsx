@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 
 import { Button } from "@public/components/Button";
 import { useConfirm } from "@public/components/ConfirmContext";
@@ -28,8 +28,6 @@ export function PresetDrawerContent({ preset, onChanged, onDeleted }: Props) {
     presetDraftFromPreset(preset),
   );
   const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => setDraft(presetDraftFromPreset(preset)), [preset]);
 
   const save = useCallback(async () => {
     setIsSaving(true);

@@ -475,11 +475,11 @@ export function PermissionsDashboard() {
   ).size;
 
   return (
-    <div className="flex flex-col gap-4 p-3">
+    <div className="flex animate-fade-in flex-col gap-4 p-3">
       {header}
 
       <div
-        className="flex gap-2 overflow-x-auto pb-1"
+        className="flex stagger-in gap-2 overflow-x-auto pb-1"
         role="listbox"
         aria-label="Usuários"
       >
@@ -567,9 +567,18 @@ export function PermissionsDashboard() {
           </Button>
         </div>
       ) : tab === "resources" ? (
-        <div className="flex flex-col gap-3">
+        <div
+          key={`${selectedUserId}:resources`}
+          className="
+            grid stagger-in grid-cols-1 items-start gap-3
+            xl:grid-cols-2
+          "
+        >
           {!frigateAvailable && (
-            <p className="text-xs text-yellow-300">
+            <p className="
+              text-xs text-yellow-300
+              xl:col-span-2
+            ">
               Frigate indisponível: câmeras não verificadas.
             </p>
           )}
@@ -737,7 +746,13 @@ export function PermissionsDashboard() {
           })}
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div
+          key={`${selectedUserId}:routes`}
+          className="
+            grid stagger-in grid-cols-1 items-start gap-3
+            xl:grid-cols-2
+          "
+        >
           {[...routeGroups.entries()].map(([tag, tagRoutes]) => {
             const visible = tagRoutes.filter((route) =>
               matchesSearch(search, route.summary, route.key, tag),

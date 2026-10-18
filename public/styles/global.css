@@ -4,12 +4,21 @@
 @theme {
   --animate-toast-in: toast-in 200ms ease-out;
   --animate-fade-up: fade-up 300ms ease-out both;
+  --animate-fade-in: fade-in 250ms ease-out both;
 }
 
 @keyframes toast-in {
   from {
     opacity: 0;
     transform: translateY(0.5rem) scale(0.95);
+  }
+}
+
+/* Opacity only: a transform animation would make the element the containing
+   block of any fixed descendant (drawers, modals) and shrink them to it. */
+@keyframes fade-in {
+  from {
+    opacity: 0;
   }
 }
 

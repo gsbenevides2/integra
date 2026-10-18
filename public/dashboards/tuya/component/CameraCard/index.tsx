@@ -2,15 +2,25 @@ import React, { useState } from "react";
 
 import { VideoCameraIcon } from "@heroicons/react/24/outline";
 
-export function CameraCard({ name }: { name: string }) {
+export function CameraCard({
+  name,
+  online,
+  onOpen,
+}: {
+  name: string;
+  online?: boolean;
+  onOpen: () => void;
+}) {
   const [isLoaded, setIsLoaded] = useState(false);
 
   return (
-    <a
-      href={`/api/frigate/cameras/${name}/goToFrigate`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="relative block aspect-video overflow-hidden rounded-md"
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={name}
+      className="
+        relative block aspect-video cursor-pointer overflow-hidden rounded-md
+      "
     >
       <div
         aria-hidden
@@ -24,7 +34,7 @@ export function CameraCard({ name }: { name: string }) {
       </div>
       <video
         src={`/api/frigate/cameras/${name}/stream`}
-        aria-label={name}
+        poster={`/api/frigate/cameras/${name}/latest.jpg`}
         autoPlay
         muted
         playsInline
@@ -34,6 +44,16 @@ export function CameraCard({ name }: { name: string }) {
           ${isLoaded ? "opacity-100" : "opacity-0"}
         `}
       />
-    </a>
+      {online !== undefined && (
+        <span
+          role="status"
+          aria-label={online ? "Câmera online" : "Câmera sem sinal"}
+          className={`
+            absolute top-2 right-2 size-2.5 rounded-full
+            ${online ? "bg-green-500" : "bg-red-500"}
+          `}
+        />
+      )}
+    </button>
   );
 }

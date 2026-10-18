@@ -6,6 +6,7 @@ import React, {
 } from "react";
 
 import { cronsDashboard } from "@public/dashboards/crons";
+import { frigateDashboard } from "@public/dashboards/frigate";
 import { googleAccountsDashboard } from "@public/dashboards/google-accounts";
 import { permissionsDashboard } from "@public/dashboards/permissions";
 import { serverMetricsDashboard } from "@public/dashboards/server-metrics";
@@ -40,6 +41,7 @@ interface GlobalDrawerContextValue {
 
 const DASHBOARD_LIST: DashboardData[] = [
   tuyaDashboard,
+  frigateDashboard,
   voiceAssistantDashboard,
   serverMetricsDashboard,
   tplinkDashboard,

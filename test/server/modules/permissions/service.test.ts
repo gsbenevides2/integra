@@ -217,7 +217,7 @@ describe("grant creation and deletion", () => {
     });
 
     fakeDbResults.push([user]);
-    expect(await service.createResourceGrant("u1", "frigate_camera", "cam", "write")).toEqual({
+    expect(await service.createResourceGrant("u1", "frigate_camera", "cam", "execute")).toEqual({
       kind: "invalid_action",
     });
 

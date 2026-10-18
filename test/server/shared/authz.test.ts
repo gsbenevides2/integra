@@ -377,6 +377,18 @@ describe("resource requirements", () => {
       ["DELETE /api/tuya/presets/:id", { type: "tuya_preset", id: "d1", action: "write" }],
       ["GET /api/frigate/cameras/:name/stream", { type: "frigate_camera", id: "cam", action: "read" }],
       ["GET /api/frigate/cameras/:name/goToFrigate", { type: "frigate_camera", id: "cam", action: "read" }],
+      ...[
+        "GET /api/frigate/cameras/:name/state",
+        "GET /api/frigate/cameras/:name/events",
+        "GET /api/frigate/cameras/:name/events/:id/:asset",
+        "GET /api/frigate/cameras/:name/recordings/summary",
+        "GET /api/frigate/cameras/:name/clip.mp4",
+        "GET /api/frigate/cameras/:name/latest.jpg",
+      ].map((k): [string, unknown] => [k, { type: "frigate_camera", id: "cam", action: "read" }]),
+      ...[
+        "POST /api/frigate/cameras/:name/ptz",
+        "PUT /api/frigate/cameras/:name/features/:feature",
+      ].map((k): [string, unknown] => [k, { type: "frigate_camera", id: "cam", action: "write" }]),
       ["POST /api/crons/run/:jobName", { type: "cron_job", id: "job", action: "execute" }],
     ];
     for (const [key, expected] of cases) {
