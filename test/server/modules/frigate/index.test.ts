@@ -124,6 +124,7 @@ test("cameraSnapshot fetches the latest frame at assistant size", async () => {
 
 const sent: any[] = [];
 let wsFails = false;
+let wsSilent = false;
 class FakeWebSocket {
   onopen: () => void = () => {};
   onerror: () => void = () => {};
@@ -134,7 +135,7 @@ class FakeWebSocket {
   send(data: string) {
     const message = JSON.parse(data);
     sent.push(message);
-    if (message.topic === "onConnect") {
+    if (message.topic === "onConnect" && !wsSilent) {
       const config = { detect: true, record: false, snapshots: false, audio: true, autotracking: false };
       this.onmessage({ data: JSON.stringify({ topic: "model_state", payload: "{}" }) });
       this.onmessage({ data: JSON.stringify({ topic: "camera_activity", payload: JSON.stringify({ cam: { config } }) }) });
@@ -146,6 +147,7 @@ const RealWebSocket = globalThis.WebSocket;
 beforeEach(() => {
   sent.length = 0;
   wsFails = false;
+  wsSilent = false;
   globalThis.WebSocket = FakeWebSocket as any;
 });
 afterAll(() => {
@@ -283,4 +285,14 @@ test("stats trims the raw payload", async () => {
 test("stats is 502 when frigate is down", async () => {
   fetchSpy = spyOn(globalThis, "fetch").mockRejectedValue(new Error("down"));
   expect((await get("/api/frigate/stats")).status).toBe(502);
+});
+
+test("live config gives up when frigate never answers", async () => {
+  const { cameraLiveConfig } = await import("@server/modules/frigate/service/frigate");
+  wsSilent = true;
+  const realSetTimeout = globalThis.setTimeout;
+  const timers = spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void, ms?: number) =>
+    realSetTimeout(fn, ms === 5000 ? 0 : ms)) as any);
+  await expect(cameraLiveConfig("cam")).rejects.toThrow("timeout");
+  timers.mockRestore();
 });

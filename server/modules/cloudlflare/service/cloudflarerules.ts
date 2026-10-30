@@ -5,10 +5,10 @@ import safeEnvGet from "@server/safeEnvGet";
 import Cloudflare from "cloudflare";
 import { and, eq, gte } from "drizzle-orm";
 
-export class CloudflareRules {
-  static bypass_cookie = "cf_bypass_integra" as const;
+export const CloudflareRules = {
+  bypass_cookie: "cf_bypass_integra" as const,
 
-  static async createToken() {
+  async createToken() {
     const token = crypto.randomUUID();
     await db.insert(bypassToken).values({
       id: token,
@@ -16,9 +16,9 @@ export class CloudflareRules {
     });
     await this.updateCf();
     return token;
-  }
+  },
 
-  static async inativateToken(token: string) {
+  async inativateToken(token: string) {
     await db
       .update(bypassToken)
       .set({
@@ -26,14 +26,14 @@ export class CloudflareRules {
       })
       .where(eq(bypassToken.id, token));
     await this.updateCf();
-  }
+  },
 
-  static async checkIfIsValid(token: string) {
+  async checkIfIsValid(token: string) {
     const validTokens = await this.getValidTokens();
     return validTokens.includes(token);
-  }
+  },
 
-  static async getValidTokens() {
+  async getValidTokens() {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -48,9 +48,9 @@ export class CloudflareRules {
       );
 
     return validTokens.map((a) => a.id);
-  }
+  },
 
-  static async updateCf() {
+  async updateCf() {
     const client = new Cloudflare({
       apiToken: safeEnvGet("CLOUDFLARE_API_TOKEN"),
     });
@@ -90,5 +90,5 @@ export class CloudflareRules {
         action_parameters: { security_level: "essentially_off" },
       });
     }
-  }
-}
+  },
+};

@@ -44,6 +44,7 @@ test("live tab: back, mute toggle, hold-to-move ptz and presets", async () => {
 
   fireEvent.click(screen.getByLabelText("Ativar áudio"));
   expect(screen.getByLabelText("Silenciar")).toBeTruthy();
+  fireEvent.click(screen.getByLabelText("Ressincronizar"));
 
   const left = await screen.findByLabelText("Esquerda");
   fireEvent.pointerDown(left);

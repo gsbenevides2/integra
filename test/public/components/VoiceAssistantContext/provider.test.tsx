@@ -555,6 +555,26 @@ describe("streaming replies", () => {
     }
   });
 
+  test("a sentence claiming a change is held back when nothing was written", async () => {
+    const chat = holdChat();
+    try {
+      renderProvider();
+      act(() => value.sendText("desliga a luz"));
+      await until(() => reply()?.pending === true);
+      await act(async () =>
+        chat.push({ type: "delta", text: "Desliguei a luz da sala para você agora. " }),
+      );
+      await until(() => reply()?.text.startsWith("Desliguei") === true);
+      expect(calls.filter((c) => c.path === "/api/assistant/tts")).toEqual([]);
+      await act(async () => {
+        chat.push({ type: "done", reply: { ...REPLY, reply: "Não consegui desligar.", actions: [] } });
+        chat.close();
+      });
+    } finally {
+      chat.restore();
+    }
+  });
+
   test("the voice starts on the first full sentence, before the reply is complete", async () => {
     const chat = holdChat();
     try {
@@ -826,4 +846,21 @@ describe("wake word", () => {
     await flush();
     expect(screen.queryByText('Não foi possível ativar o "Ei Integra"')).toBeNull();
   });
+});
+
+test("outside a provider the assistant is an inert no-op", async () => {
+  let value!: Value;
+  const Probe = () => ((value = useVoiceAssistant()), null);
+  render(<Probe />);
+  expect(value.allowed).toBe(false);
+  value.setWakeEnabled(true);
+  value.start();
+  value.sendText("oi");
+  value.stop();
+  value.retry(1);
+  value.markTyped(1);
+  value.removeAttachment("k");
+  await value.reset();
+  await value.openConversation("c");
+  await value.attachImage(new Blob());
 });

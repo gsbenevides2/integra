@@ -55,7 +55,6 @@ export function createSpeech(): Speech {
   const done = new Promise<void>((resolve, reject) => {
     finish = { resolve, reject };
   });
-  tail.catch(() => {});
 
   return {
     done,

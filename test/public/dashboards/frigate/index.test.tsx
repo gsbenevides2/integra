@@ -2,7 +2,7 @@ import "@public/components/GlobalDrawerContext"; // load order: avoids dashboard
 
 import React from "react";
 
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { afterEach, expect, test } from "bun:test";
 
 import { fail, useApi } from "../../../helpers/dash-api";
@@ -24,7 +24,7 @@ const stats = {
   uptime: 86400 * 6 + 3600 * 2,
 };
 
-let reply: unknown = stats;
+const reply: unknown = stats;
 let broken = false;
 useApi({ "GET /api/frigate/stats": () => (broken ? fail() : reply) });
 afterEach(() => {
@@ -50,4 +50,10 @@ test("shows an error when Frigate is unavailable", async () => {
   broken = true;
   renderWithProviders(<FrigateDashboard />);
   await screen.findByText("Frigate indisponível");
+});
+
+test("the menu button opens the drawer", async () => {
+  renderWithProviders(<FrigateDashboard />);
+  fireEvent.click(screen.getByLabelText("Abrir menu"));
+  await screen.findByText("frente");
 });
