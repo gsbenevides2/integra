@@ -48,6 +48,7 @@
     "@opentelemetry/sdk-trace-web": "^2.11.0",
     "@opentelemetry/semantic-conventions": "^1.43.0",
     "@tuya/tuya-connector-nodejs": "^2.1.2",
+    "cloudflare": "^7.3.0",
     "crypto-js": "^4.2.0",
     "drizzle-orm": "^1.0.0-rc.4",
     "elysia": "latest",

@@ -6,11 +6,16 @@ import { registerCrons } from "./cron";
 import { instrumentFetch } from "./instrumentation/instrumentFetch";
 import { instrumentGaxios } from "./instrumentation/instrumentGaxios";
 import { elysiaOtel } from "./instrumentation/instrumentHttpServer";
-import { getLogger, logWarn,setupLoggerProvider } from "./instrumentation/instrumentLogger";
+import {
+  getLogger,
+  logWarn,
+  setupLoggerProvider,
+} from "./instrumentation/instrumentLogger";
 import { flushTelemetryOnExit } from "./instrumentation/shutdown";
 import { assistantRoutes, voskAssetRoutes } from "./modules/assistant";
 import { authentikRoutes } from "./modules/authentik";
 import { clientConfigRoutes } from "./modules/client-config";
+import { cloudflareRoutes } from "./modules/cloudlflare";
 import { cronsRoutes } from "./modules/crons";
 import { frigateRoutes } from "./modules/frigate";
 import { googleRoutes } from "./modules/google";
@@ -23,10 +28,7 @@ import { trainStatusRoutes } from "./modules/train-status";
 import { tuyaRoutes } from "./modules/tuya";
 import { startTuyaPulsar } from "./modules/tuya/service/pulsar";
 import { openapi } from "./openapi";
-import {
-  registerGuardedRoutes,
-  warnDevOverrideConfig,
-} from "./shared/authz";
+import { registerGuardedRoutes, warnDevOverrideConfig } from "./shared/authz";
 
 instrumentFetch();
 setupLoggerProvider();
@@ -68,6 +70,7 @@ export const app = new Elysia()
   .use(assistantRoutes)
   .use(authentikRoutes)
   .use(meRoutes)
+  .use(cloudflareRoutes)
   .use(permissionsRoutes);
 
 registerGuardedRoutes(app);
@@ -91,7 +94,7 @@ export const server = Bun.serve({
   port: 3000,
   routes: { "/": indexHtml },
   fetch: app.fetch,
-  development: serverDevelopmentMode ,
+  development: serverDevelopmentMode,
 });
 
 console.log(`🦊 Elysia is running at ${server.hostname}:${server.port}`);
