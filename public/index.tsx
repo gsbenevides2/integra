@@ -9,6 +9,7 @@ import { ToastContainer, ToastProvider } from "@public/components/Toast";
 import { VoiceAssistantProvider } from "@public/components/VoiceAssistantContext";
 import { VoiceAssistantOverlay } from "@public/components/VoiceAssistantOverlay";
 
+import { ensureCloudflareBypass } from "./cloudflareBypass";
 import { GlobalDrawerProvider } from "./components/GlobalDrawerContext";
 import { instrumentFrontend } from "./instrumentFrontend";
 import { registerServiceWorker } from "./registerServiceWorker";
@@ -37,3 +38,4 @@ const root = createRoot(document.getElementById("root")!);
 root.render(<App />);
 
 registerServiceWorker();
+void ensureCloudflareBypass();
