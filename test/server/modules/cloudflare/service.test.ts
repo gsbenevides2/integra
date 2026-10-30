@@ -19,9 +19,8 @@ mock.module("cloudflare", () => ({
     rulesets = { rules: { edit } };
   },
 }));
-const { CloudflareRules } = await import(
-  "@server/modules/cloudlflare/service/cloudflarerules"
-);
+const { CloudflareRules } =
+  await import("@server/modules/cloudlflare/service/cloudflarerules");
 afterAll(() => restoreDb());
 
 const T1 = "11111111-1111-4111-8111-111111111111";
@@ -66,7 +65,7 @@ describe("updateCf", () => {
     await CloudflareRules.updateCf();
     expect(editBody().enabled).toBe(true);
     expect(editBody().expression).toBe(
-      `(http.host contains "integra.infr.gui.dev.br" and http.cookie contains "${cookie}=${T1}")`,
+      `(http.host contains "integra.infra.gui.dev.br" and http.cookie contains "${cookie}=${T1}")`,
     );
   });
 
@@ -74,7 +73,7 @@ describe("updateCf", () => {
     fakeDbResults.push([{ id: T1 }, { id: T2 }]);
     await CloudflareRules.updateCf();
     expect(editBody().expression).toBe(
-      `(http.host contains "integra.infr.gui.dev.br" and ((http.cookie contains "${cookie}=${T1}") or (http.cookie contains "${cookie}=${T2}")))`,
+      `(http.host contains "integra.infra.gui.dev.br" and ((http.cookie contains "${cookie}=${T1}") or (http.cookie contains "${cookie}=${T2}")))`,
     );
     expect(editBody().action_parameters).toEqual({
       security_level: "essentially_off",
