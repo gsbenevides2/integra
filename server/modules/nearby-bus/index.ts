@@ -43,7 +43,7 @@ export const nearbyBusRoutes = new Elysia({
       detail: {
         summary: "Nearby Buses",
         description:
-          "EMTU lines 381 and 215 stops within ~150 m of the position, with live or scheduled arrivals.",
+          "EMTU lines 381 and 215 stops within ~600 m of the position, with live or scheduled arrivals.",
       },
     },
   );

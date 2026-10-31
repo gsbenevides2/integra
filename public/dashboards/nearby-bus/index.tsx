@@ -98,8 +98,15 @@ function StopCard({ stop, isNearest }: { stop: NearbyStop; isNearest: boolean })
   );
 }
 
+const PLACES = {
+  pena: { label: "Ponto da Pena", lat: -23.639141, lng: -46.322004 },
+  terminal: { label: "Terminal Ribeirão Pires", lat: -23.712173, lng: -46.415905 },
+} as const;
+type Place = "auto" | keyof typeof PLACES;
+
 export function NearbyBusDashboard() {
-  const [position, setPosition] = useState<Position>();
+  const [place, setPlace] = useState<Place>("auto");
+  const [gps, setGps] = useState<Position>();
   const [geoError, setGeoError] = useState<string>();
   const [stops, setStops] = useState<NearbyStop[]>();
   const [mapKey, setMapKey] = useState<string>();
@@ -119,13 +126,21 @@ export function NearbyBusDashboard() {
     }
     const id = navigator.geolocation.watchPosition(
       (p) => {
-        setPosition({ lat: p.coords.latitude, lng: p.coords.longitude });
+        setGeoError(undefined);
+        setGps({ lat: p.coords.latitude, lng: p.coords.longitude });
       },
-      () => setGeoError("Permita o acesso à localização para ver os ônibus perto de você."),
-      { enableHighAccuracy: false, maximumAge: 10_000 },
+      (e) =>
+        setGeoError(
+          e.code === e.PERMISSION_DENIED
+            ? "Permita o acesso à localização para ver os ônibus perto de você."
+            : "Não consegui obter sua localização agora, tentando de novo…",
+        ),
+      { enableHighAccuracy: false, maximumAge: 10_000, timeout: 15_000 },
     );
     return () => navigator.geolocation.clearWatch(id);
   }, []);
+
+  const position = place === "auto" ? gps : PLACES[place];
 
   const fetchStops = useCallback(
     async (pos: Position) => {
@@ -136,12 +151,15 @@ export function NearbyBusDashboard() {
     [showToast],
   );
 
+  const lat = position?.lat;
+  const lng = position?.lng;
   useEffect(() => {
-    if (!position) return;
-    fetchStops(position);
-    const interval = setInterval(() => fetchStops(position), POLL_INTERVAL_MS);
+    if (lat === undefined || lng === undefined) return;
+    const pos = { lat, lng };
+    fetchStops(pos);
+    const interval = setInterval(() => fetchStops(pos), POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [position, fetchStops]);
+  }, [lat, lng, fetchStops]);
 
   const nearest = stops && nearestBus(stops);
   const showMap = Boolean(mapKey && position && stops && stops.length > 0);
@@ -155,7 +173,26 @@ export function NearbyBusDashboard() {
         <h1 className="text-xl">Ônibus perto de mim</h1>
       </div>
 
-      {geoError ? (
+      <div className="flex flex-wrap gap-2">
+        {(["auto", "pena", "terminal"] as const).map((id) => (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={place === id}
+            onClick={() => {
+              setPlace(id);
+              setStops(undefined);
+            }}
+            className={`rounded-full border px-3 py-1 text-sm ${
+              place === id ? "border-mist-200 bg-mist-700 text-white" : "border-mist-700 text-mist-300"
+            }`}
+          >
+            {id === "auto" ? "Minha localização" : PLACES[id].label}
+          </button>
+        ))}
+      </div>
+
+      {geoError && place === "auto" ? (
         <p className="text-mist-200">{geoError}</p>
       ) : !stops ? (
         <p className="text-mist-400">Buscando sua localização…</p>
@@ -176,7 +213,7 @@ export function NearbyBusDashboard() {
               h-80
               lg:sticky lg:top-3 lg:h-[calc(100dvh-6rem)]
             ">
-              <NearbyBusMap apiKey={mapKey!} position={position!} stops={stops} nearest={nearest} />
+              <NearbyBusMap key={place} apiKey={mapKey!} position={position!} stops={stops} nearest={nearest} />
             </div>
           )}
           <div className="flex stagger-in flex-col gap-2">

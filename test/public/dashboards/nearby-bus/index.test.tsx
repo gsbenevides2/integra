@@ -24,7 +24,7 @@ const calls = useApi({
 
 type GeoCb = (p: { coords: { latitude: number; longitude: number } }) => void;
 let onFix: GeoCb | undefined;
-let onErr: (() => void) | undefined;
+let onErr: ((e: { code: number; PERMISSION_DENIED: number }) => void) | undefined;
 let cleared = false;
 const realGeo = Object.getOwnPropertyDescriptor(navigator, "geolocation");
 const setGeo = (value: unknown) => Object.defineProperty(navigator, "geolocation", { value, configurable: true });
@@ -34,7 +34,7 @@ beforeEach(() => {
   reply = { stops: [] };
   mapReply = { apiKey: null };
   setGeo({
-    watchPosition: (ok: GeoCb, err: () => void) => {
+    watchPosition: (ok: GeoCb, err: NonNullable<typeof onErr>) => {
       onFix = ok;
       onErr = err;
       return 7;
@@ -133,10 +133,32 @@ describe("NearbyBusDashboard", () => {
 
   test("explains denied permission and stops watching on unmount", async () => {
     const { unmount } = renderWithProviders(<NearbyBusDashboard />);
-    await act(async () => onErr!());
+    await act(async () => onErr!({ code: 1, PERMISSION_DENIED: 1 }));
     screen.getByText("Permita o acesso à localização para ver os ônibus perto de você.");
     unmount();
     expect(cleared).toBe(true);
+  });
+
+  test("keeps trying when the position is unavailable and recovers on a fix", async () => {
+    renderWithProviders(<NearbyBusDashboard />);
+    await act(async () => onErr!({ code: 2, PERMISSION_DENIED: 1 }));
+    screen.getByText("Não consegui obter sua localização agora, tentando de novo…");
+    await fix();
+    expect(screen.queryByText("Não consegui obter sua localização agora, tentando de novo…")).toBeNull();
+  });
+
+  test("lets the user pick the Pena stop or the Ribeirão Pires terminal instead of the GPS", async () => {
+    renderWithProviders(<NearbyBusDashboard />);
+    await fix();
+    fireEvent.click(screen.getByRole("button", { name: "Terminal Ribeirão Pires" }));
+    await waitFor(() =>
+      expect(calls.some((c) => c.path === "/api/nearby-bus" && c.query.lat === "-23.712173" && c.query.lng === "-46.415905")).toBe(true),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Ponto da Pena" }));
+    await waitFor(() => expect(calls.some((c) => c.path === "/api/nearby-bus" && c.query.lat === "-23.639141")).toBe(true));
+    expect(screen.getByRole("button", { name: "Ponto da Pena" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Minha localização" }));
+    await waitFor(() => expect(calls.at(-1)?.query.lat).toBe("-23.62"));
   });
 
   test("handles browsers without geolocation", () => {

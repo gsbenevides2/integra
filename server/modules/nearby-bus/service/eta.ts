@@ -5,6 +5,7 @@ import {
   type NearbyStop,
   type PortalLine,
   type PortalRoute,
+  PREFERRED_STOP,
   RADIUS_M,
   STALE_MS,
 } from "../model";
@@ -171,5 +172,8 @@ export function findNearbyStops(lines: PortalLine[], pos: Point, now = new Date(
       });
     }
   }
-  return result.sort((a, b) => a.distanceM - b.distanceM);
+  const preferred = result.filter(
+    (s) => haversine([s.lat, s.lng], [PREFERRED_STOP.lat, PREFERRED_STOP.lng]) <= PREFERRED_STOP.radiusM,
+  );
+  return (preferred.length > 0 ? preferred : result).sort((a, b) => a.distanceM - b.distanceM);
 }

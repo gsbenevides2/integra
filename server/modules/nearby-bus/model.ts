@@ -1,5 +1,7 @@
 export const NEARBY_BUS_LINES = ["381", "215"] as const;
-export const RADIUS_M = 150;
+export const RADIUS_M = 600;
+/** "Ponto 12" (km 59,5 oeste, in front of Pena): wins whenever it is among the nearby stops. */
+export const PREFERRED_STOP = { lat: -23.639141, lng: -46.322004, radiusM: 30 };
 export const STALE_MS = 5 * 60_000;
 export const DEFAULT_SPEED_KMH = 20;
 export const MAX_ARRIVALS = 3;

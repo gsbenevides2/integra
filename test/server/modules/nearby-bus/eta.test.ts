@@ -88,6 +88,15 @@ describe("findNearbyStops", () => {
     expect(stops.map((s) => s.line)).toEqual(["215", "381"]);
   });
 
+  test("the preferred stop wins over other nearby stops", () => {
+    const pena = makeLine(now, { codigo: "215" });
+    pena.rotas[1]!.pontos[1] = { latitude: -23.639141, longitude: -46.322004, endereco: "Pena" };
+    const other = makeLine(now);
+    other.rotas[1]!.pontos[1] = { latitude: -23.6432, longitude: -46.3215, endereco: "Outro" };
+    const stops = findNearbyStops([other, pena], [-23.6431, -46.3213], WED);
+    expect(stops.map((s) => s.address)).toEqual(["Pena"]);
+  });
+
   test("defaults `now` to the current time", () => {
     expect(findNearbyStops([makeLine(Date.now())], [-23.7, LNG])).toEqual([]);
   });
