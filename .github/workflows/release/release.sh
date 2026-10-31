@@ -66,13 +66,15 @@ EOF
 
 cat /tmp/changes.txt >> /tmp/prompt.txt
 
-GENERATED=$(opencode run --model openrouter/xiaomi/mimo-v2.5 "$(cat /tmp/prompt.txt)" 2>/dev/null || true)
+GENERATED=$(opencode run --model openrouter/xiaomi/mimo-v2.6-pro "$(cat /tmp/prompt.txt)" 2>/tmp/opencode.err || true)
 
 echo "Release notes geradas (ou fallback):"
 echo "$GENERATED"
 
 if [ -z "$GENERATED" ]; then
     echo "Nenhuma release note gerada, usando fallback."
+    echo "--- stderr do opencode:"
+    cat /tmp/opencode.err || true
     GENERATED="Release automático - veja os commits para detalhes."
 fi
 

@@ -60,6 +60,7 @@ server/
     ├── server-metrics/         # SSH-collected system stats + Cloudflare speedtest
     ├── status-platform/        # Uptime checks against status pages
     ├── train-status/           # São Paulo train/metro line status
+    ├── nearby-bus/             # EMTU 381/215 stops and ETAs near the browser GPS position
     ├── birthday/               # Cron-only Discord announcement
     └── authentik/               # Login-failed webhook → Discord
 
