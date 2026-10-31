@@ -32,15 +32,6 @@ echo "Montando contexto para geração de release notes..."
 echo "Contexto montado em /tmp/changes.txt"
 
 # =========================
-# Instala OpenCode
-# =========================
-echo "Instalando OpenCode CLI..."
-
-npm install -g opencode-ai@1.15.13
-
-echo "OpenCode CLI instalado: $(opencode --version)"
-
-# =========================
 # Gera release notes
 # =========================
 echo "Gerando release notes com IA..."
@@ -66,15 +57,28 @@ EOF
 
 cat /tmp/changes.txt >> /tmp/prompt.txt
 
-GENERATED=$(opencode run --model openrouter/xiaomi/mimo-v2.6-pro "$(cat /tmp/prompt.txt)" 2>/tmp/opencode.err || true)
+# Chamada direta à API do OpenRouter (sem CLI intermediária): um erro da API aparece no log.
+MODEL="xiaomi/mimo-v2.6-pro"
+
+RESPONSE=$(jq -n --arg model "$MODEL" --rawfile prompt /tmp/prompt.txt \
+    '{model: $model, messages: [{role: "user", content: $prompt}]}' |
+    curl -sS --max-time 300 https://openrouter.ai/api/v1/chat/completions \
+        -H "Authorization: Bearer ${OPENROUTER_API_KEY}" \
+        -H "Content-Type: application/json" \
+        -d @- 2>/tmp/openrouter.err || true)
+
+GENERATED=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty' 2>/dev/null || true)
 
 echo "Release notes geradas (ou fallback):"
 echo "$GENERATED"
 
 if [ -z "$GENERATED" ]; then
     echo "Nenhuma release note gerada, usando fallback."
-    echo "--- stderr do opencode:"
-    cat /tmp/opencode.err || true
+    echo "--- resposta do OpenRouter (sem o conteúdo gerado):"
+    echo "$RESPONSE" | head -c 2000
+    echo
+    echo "--- stderr do curl:"
+    cat /tmp/openrouter.err || true
     GENERATED="Release automático - veja os commits para detalhes."
 fi
 
