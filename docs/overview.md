@@ -47,6 +47,7 @@ server/
 │   ├── status-platform/         # Uptime checks against status pages (Atlassian, Instatus, ...)
 │   ├── train-status/            # São Paulo train/metro line status scrapers
 │   ├── nearby-bus/              # EMTU 381/215 arrivals near the browser GPS position
+│   ├── motiva-trilhos/          # Next-train ETA for a fixed Luz↔Pinheiros↔Morumbi commute
 │   ├── birthday/                # Daily Discord birthday announcement (cron-only, no routes/UI)
 │   └── authentik/                # Authentik login-failed webhook → Discord
 └── utils/getProjectInfo.ts      # Re-exports name/description/version/... from package.json

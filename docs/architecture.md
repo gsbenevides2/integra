@@ -61,6 +61,7 @@ server/
     ├── status-platform/        # Uptime checks against status pages
     ├── train-status/           # São Paulo train/metro line status
     ├── nearby-bus/             # EMTU 381/215 stops and ETAs near the browser GPS position
+    ├── motiva-trilhos/         # Next-train ETA for a fixed Luz↔Pinheiros↔Morumbi commute
     ├── birthday/               # Cron-only Discord announcement
     └── authentik/               # Login-failed webhook → Discord
 

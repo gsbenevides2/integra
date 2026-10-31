@@ -19,6 +19,7 @@ import { cloudflareRoutes } from "./modules/cloudlflare";
 import { cronsRoutes } from "./modules/crons";
 import { frigateRoutes } from "./modules/frigate";
 import { googleRoutes } from "./modules/google";
+import { motivaTrilhosRoutes } from "./modules/motiva-trilhos";
 import { nearbyBusRoutes } from "./modules/nearby-bus";
 import { meRoutes, permissionsRoutes } from "./modules/permissions";
 import { runAuthzStartupChecks } from "./modules/permissions/service";
@@ -65,6 +66,7 @@ export const app = new Elysia()
   .use(googleRoutes)
   .use(trainStatusRoutes)
   .use(nearbyBusRoutes)
+  .use(motivaTrilhosRoutes)
   .use(statusPlatformRoutes)
   .use(serverMetricsRoutes)
   .use(tplinkRoutes)

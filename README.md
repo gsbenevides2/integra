@@ -7,7 +7,7 @@ Personal home-automation and monitoring server built with **Bun** and **Elysia**
 - **Tuya smart home** — lamps, switches, and sensors, updated in real time via Tuya's Pulsar push connection (no polling)
 - **TP-Link router** — device inventory, DHCP/firewall reconciliation, connection history
 - **Google accounts** — Calendar reminders, Gmail-based support-ticket and payslip watchers
-- **Monitoring** — SSH-collected server stats + Cloudflare speedtest, status-page uptime checks, train/metro line status, EMTU buses near you (GPS)
+- **Monitoring** — SSH-collected server stats + Cloudflare speedtest, status-page uptime checks, train/metro line status, EMTU buses near you (GPS), next-train ETA for a fixed Motiva Trilhos commute
 - **Notifications** — Discord messages for an Authentik login-failed webhook and a daily birthday announcement
 - **Full OpenTelemetry tracing** — every HTTP request, outgoing `fetch`, DB query and cron run, backend and frontend
 - **React dashboard** — one screen per integration, reachable from a single drawer menu

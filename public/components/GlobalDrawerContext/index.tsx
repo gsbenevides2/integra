@@ -8,6 +8,7 @@ import React, {
 import { cronsDashboard } from "@public/dashboards/crons";
 import { frigateDashboard } from "@public/dashboards/frigate";
 import { googleAccountsDashboard } from "@public/dashboards/google-accounts";
+import { motivaTrilhosDashboard } from "@public/dashboards/motiva-trilhos";
 import { nearbyBusDashboard } from "@public/dashboards/nearby-bus";
 import { permissionsDashboard } from "@public/dashboards/permissions";
 import { serverMetricsDashboard } from "@public/dashboards/server-metrics";
@@ -49,6 +50,7 @@ const DASHBOARD_LIST: DashboardData[] = [
   statusPlatformDashboard,
   trainStatusDashboard,
   nearbyBusDashboard,
+  motivaTrilhosDashboard,
   cronsDashboard,
   googleAccountsDashboard,
   permissionsDashboard,

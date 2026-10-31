@@ -69,6 +69,7 @@ The HTTP port is hardcoded to `3000` in `server/index.ts` — unlike the old rep
 | `BIRTHDAY_SERVICE_CLIENT_ID`, `BIRTHDAY_SERVICE_ENDPOINT` | The birthday module's MCP call, authenticated via the above |
 | `EMTU_BUSTIME_AUTH` | Full `Authorization` header (`Basic …`) for the EMTU bus-tracking portal (`server/modules/nearby-bus`). It is the credential embedded in the official EMTU app; without it the portal answers 200 with an empty body |
 | `GOOGLE_MAPS_API_KEY` | Optional. Google Maps JavaScript API key for the nearby-bus map (`GET /api/nearby-bus/map-config`, behind the authz guard). Browser key: enable "Maps JavaScript API" and restrict it by HTTP referrer. Without it the screen simply has no map |
+| `MOTIVA_API_KEY` | `apim-api-key` for the Motiva Trilhos (CCR/ViaMobilidade) train API (`server/modules/motiva-trilhos`). Embedded in the official app, see [`docs/motiva-trilhos.md`](./motiva-trilhos.md) |
 | `FRIGATE_CLIENT_ID`, `FRIGATE_ENDPOINT` | Frigate camera proxy (`server/modules/frigate`), authenticated via the above |
 | `ROUTER_PASSWORD_SECRET` | Encrypts the TP-Link router's admin password at rest (`server/modules/tplink`) |
 | `SSH_DEFAULT_HOST`, `SSH_DEFAULT_PORT`, `SSH_DEFAULT_USERNAME`, `SSH_DEFAULT_PRIVATE_KEY` | `server/shared/ssh.ts`, used by `server-metrics` |
