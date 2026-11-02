@@ -23,7 +23,17 @@ echo "Logando no Github Container Registry..."
 echo "${GITHUB_TOKEN}" | docker login ${REGISTRY} -u "${REPO_OWNER}" --password-stdin
 
 echo "Construindo e publicando imagem Docker com tag ${VERSION}..."
-docker build --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} -t "${VERSION_TAG}" .
+DESCRIPTION=$(grep -m1 '"description"' package.json | sed -E 's/.*"description": *"(.*)",?$/\1/')
+docker build --build-arg GITHUB_TOKEN=${GITHUB_TOKEN} \
+  --label "org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --label "org.opencontainers.image.description=${DESCRIPTION}" \
+  --label "org.opencontainers.image.licenses=NOASSERTION" \
+  --label "org.opencontainers.image.revision=${GITHUB_SHA:-$(git rev-parse HEAD)}" \
+  --label "org.opencontainers.image.source=https://github.com/${FULL_REPO}" \
+  --label "org.opencontainers.image.title=${IMAGE_NAME}" \
+  --label "org.opencontainers.image.url=https://github.com/${FULL_REPO}" \
+  --label "org.opencontainers.image.version=${VERSION}" \
+  -t "${VERSION_TAG}" .
 
 echo "Imagem Docker construída com tag ${VERSION_TAG}, marcando também como ${LATEST_TAG}, ${MINOR_TAG}, ${MAJOR_TAG}..."
 docker tag "${VERSION_TAG}" "${LATEST_TAG}"
