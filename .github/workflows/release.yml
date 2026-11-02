@@ -58,7 +58,7 @@ jobs:
           VERSION: ${{ needs.prepare-release.outputs.version }}
           PREV_TAG: ${{ needs.prepare-release.outputs.prev_tag }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FULL_REPO: ${{ github.repository }}
         run: |
           chmod +x .github/workflows/release/release.sh
@@ -74,23 +74,8 @@ jobs:
       - name: Run Build and Push Docker Image
         env:
           VERSION: ${{ needs.prepare-release.outputs.version }}
-          TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FULL_REPO: ${{ github.repository }}
         run: |
           chmod +x .github/workflows/release/docker.sh
           .github/workflows/release/docker.sh
-  coolify:
-    needs: docker
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - name: Run Coolify Deployment Script
-        env:
-          COOLIFY_WEBHOOK_URL: ${{ vars.COOLIFY_WEBHOOK_URL }}
-          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
-        run: |
-          chmod +x .github/workflows/release/coolify.sh
-          .github/workflows/release/coolify.sh
