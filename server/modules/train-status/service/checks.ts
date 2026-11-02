@@ -1,10 +1,15 @@
 import { db } from "@server/db";
 import { trainStatusChecks } from "@server/db/schema";
 
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, type AnyColumn, eq, lt, sql } from "drizzle-orm";
 
+import { TRAIN_LINES } from "../model";
 import { getTrainLinesStatus } from "./fetchers";
 import { buildSegments } from "./history";
+
+// Must match the indexes' "DESC NULLS LAST"; plain desc() is NULLS FIRST and
+// stops Postgres from using the index for ORDER BY ... LIMIT.
+const newestFirst = (col: AnyColumn) => sql`${col} desc nulls last`;
 
 const HISTORY_PAGE_SIZE = 100;
 
@@ -29,20 +34,27 @@ export abstract class TrainStatusService {
     );
   }
 
+  // One LIMIT 1 index probe per line instead of DISTINCT ON scanning and
+  // sorting the whole (ever-growing) checks table.
   static async listLatest() {
-    const lines = await db
-      .selectDistinctOn([trainStatusChecks.lineCode], {
-        lineCode: trainStatusChecks.lineCode,
-        lineColor: trainStatusChecks.lineColor,
-        situation: trainStatusChecks.situation,
-        status: trainStatusChecks.status,
-        description: trainStatusChecks.description,
-        checkedAt: trainStatusChecks.checkedAt,
-      })
-      .from(trainStatusChecks)
-      .orderBy(trainStatusChecks.lineCode, desc(trainStatusChecks.checkedAt));
-
-    return lines.sort((a, b) => a.lineCode - b.lineCode);
+    const perLine = await Promise.all(
+      TRAIN_LINES.map((line) =>
+        db
+          .select({
+            lineCode: trainStatusChecks.lineCode,
+            lineColor: trainStatusChecks.lineColor,
+            situation: trainStatusChecks.situation,
+            status: trainStatusChecks.status,
+            description: trainStatusChecks.description,
+            checkedAt: trainStatusChecks.checkedAt,
+          })
+          .from(trainStatusChecks)
+          .where(eq(trainStatusChecks.lineCode, line.code))
+          .orderBy(newestFirst(trainStatusChecks.checkedAt))
+          .limit(1),
+      ),
+    );
+    return perLine.flat().sort((a, b) => a.lineCode - b.lineCode);
   }
 
   static async getHistory(lineCode: number, before: Date) {
@@ -60,7 +72,7 @@ export abstract class TrainStatusService {
           lt(trainStatusChecks.checkedAt, before),
         ),
       )
-      .orderBy(desc(trainStatusChecks.checkedAt))
+      .orderBy(newestFirst(trainStatusChecks.checkedAt))
       .limit(HISTORY_PAGE_SIZE);
 
     const ordered = checks.slice().reverse();
