@@ -116,7 +116,7 @@ curl \
     -sS \
     -X POST \
     -H "Accept: application/vnd.github+json" \
-    -H "Authorization: Bearer ${TOKEN_GITHUB}" \
+    -H "Authorization: Bearer ${GITHUB_TOKEN}" \
     "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases" \
     -d @- <<EOF
 {
