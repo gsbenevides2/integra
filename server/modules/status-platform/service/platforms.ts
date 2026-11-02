@@ -2,12 +2,16 @@ import { db } from "@server/db";
 import { platforms, platformStatusChecks } from "@server/db/schema";
 
 import { trace } from "@opentelemetry/api";
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, type AnyColumn, eq, lt, sql } from "drizzle-orm";
 
 import { withSpan } from "../../../instrumentation/withSpan";
 import type { PlatformBody } from "../model";
 import { Fetchers } from "./fetchers";
 import { buildSegments } from "./history";
+
+// Must match the indexes' "DESC NULLS LAST"; plain desc() is NULLS FIRST and
+// stops Postgres from using the index for ORDER BY ... LIMIT.
+const newestFirst = (col: AnyColumn) => sql`${col} desc nulls last`;
 
 const tracer = trace.getTracer("status-platform");
 
@@ -16,19 +20,19 @@ const HISTORY_PAGE_SIZE = 100;
 type PlatformRow = typeof platforms.$inferSelect;
 type NewCheck = typeof platformStatusChecks.$inferInsert;
 
+// LATERAL + LIMIT 1 = one index probe per platform, instead of DISTINCT ON
+// scanning/sorting the whole (ever-growing) checks table.
 function latestChecksSubquery() {
   return db
-    .selectDistinctOn([platformStatusChecks.platformId], {
-      platformId: platformStatusChecks.platformId,
+    .select({
       status: platformStatusChecks.status,
       problemDescription: platformStatusChecks.problemDescription,
       checkedAt: platformStatusChecks.checkedAt,
     })
     .from(platformStatusChecks)
-    .orderBy(
-      platformStatusChecks.platformId,
-      desc(platformStatusChecks.checkedAt),
-    )
+    .where(eq(platformStatusChecks.platformId, platforms.id))
+    .orderBy(newestFirst(platformStatusChecks.checkedAt))
+    .limit(1)
     .as("latest_checks");
 }
 
@@ -110,7 +114,7 @@ export abstract class StatusPlatformService {
         lastCheckedAt: latestChecks.checkedAt,
       })
       .from(platforms)
-      .leftJoin(latestChecks, eq(platforms.id, latestChecks.platformId));
+      .leftJoinLateral(latestChecks, sql`true`);
 
     if (platformId) {
       return query.where(eq(platforms.id, platformId));
@@ -133,7 +137,7 @@ export abstract class StatusPlatformService {
           lt(platformStatusChecks.checkedAt, beforeDate),
         ),
       )
-      .orderBy(desc(platformStatusChecks.checkedAt))
+      .orderBy(newestFirst(platformStatusChecks.checkedAt))
       .limit(HISTORY_PAGE_SIZE);
 
     const ordered = checks.slice().reverse();

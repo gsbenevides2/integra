@@ -156,7 +156,7 @@ describe("TrainStatusService", () => {
   });
 
   test("listLatest sorts by code", async () => {
-    fake.push([{ lineCode: 3 }, { lineCode: 1 }]);
+    TRAIN_LINES.forEach((l, i) => fake.push(i === 0 ? [{ lineCode: 3 }] : i === 1 ? [{ lineCode: 1 }] : []));
     expect(await TrainStatusService.listLatest()).toEqual([{ lineCode: 1 }, { lineCode: 3 }]);
   });
 
@@ -188,7 +188,7 @@ describe("routes", () => {
   });
   const call = (p: string) => trainStatusRoutes.handle(new Request(`http://localhost${p}`));
   test("lines", async () => {
-    fake.push([{ lineCode: 1 }]);
+    TRAIN_LINES.forEach((_, i) => fake.push(i === 0 ? [{ lineCode: 1 }] : []));
     expect(await (await call("/api/train-status/lines")).json()).toEqual([{ lineCode: 1 }]);
   });
   test("history with and without before", async () => {
