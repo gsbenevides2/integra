@@ -4,7 +4,7 @@ import {
   CalendarService,
 } from "@server/modules/google/service/calendar";
 import { redisGet, redisSet } from "@server/shared/cache";
-import { sendEvolutionMessage } from "@server/shared/evolution";
+import { sendGotifyMessage } from "@server/shared/gotify";
 
 import { trace } from "@opentelemetry/api";
 
@@ -209,7 +209,7 @@ async function writeState(state: StoredAlarmState): Promise<void> {
 
 /**
  * Cron entry point: gate on day/window/holiday, compare the latest line statuses
- * with what was last notified and send a single grouped WhatsApp message when
+ * with what was last notified and send a single grouped Gotify message when
  * anything changed. State is only persisted after a successful send, so a failed
  * delivery is retried on the next run.
  */
@@ -268,7 +268,7 @@ export async function runTrainStatusAlarm(now: Date): Promise<void> {
     return;
   }
 
-  await sendEvolutionMessage(buildAlarmMessage(lines));
+  await sendGotifyMessage(buildAlarmMessage(lines));
 
   await writeState({
     window: windowKey,

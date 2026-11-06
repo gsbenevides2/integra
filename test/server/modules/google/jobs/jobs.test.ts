@@ -5,8 +5,7 @@ installDb();
 
 const real = {
   cache: { ...(await import("@server/shared/cache")) },
-  discord: { ...(await import("@server/shared/discord")) },
-  evolution: { ...(await import("@server/shared/evolution")) },
+  gotify: { ...(await import("@server/shared/gotify")) },
   ssh: { ...(await import("@server/shared/ssh")) },
   openrouter: { ...(await import("@server/modules/google/service/openrouter")) },
 };
@@ -22,8 +21,7 @@ mock.module("@server/shared/cache", () => ({
   redisGet: async (k: string) => store.get(k) ?? null,
   redisSet: async (k: string, v: string) => void store.set(k, v),
 }));
-mock.module("@server/shared/discord", () => ({ ...real.discord, sendDiscordMessage: async (m: string) => void sent.push(`d:${m}`) }));
-mock.module("@server/shared/evolution", () => ({ ...real.evolution, sendEvolutionMessage: async (m: string) => void sent.push(`e:${m}`) }));
+mock.module("@server/shared/gotify", () => ({ ...real.gotify, sendGotifyMessage: async (m: string) => void sent.push(m) }));
 mock.module("@server/shared/ssh", () => ({
   ...real.ssh,
   writeSshFile: async (path: string, _b: Buffer, opts: unknown) => void written.push({ path, opts }),
@@ -60,8 +58,7 @@ afterEach(() => {
 afterAll(() => {
   restoreDb();
   mock.module("@server/shared/cache", () => real.cache);
-  mock.module("@server/shared/discord", () => real.discord);
-  mock.module("@server/shared/evolution", () => real.evolution);
+  mock.module("@server/shared/gotify", () => real.gotify);
   mock.module("@server/shared/ssh", () => real.ssh);
   mock.module("@server/modules/google/service/openrouter", () => real.openrouter);
 });
@@ -113,7 +110,7 @@ describe("extractPayslips", () => {
       "Recibos de Salário/2010-11-2-13.PDF",
       "Informes de Redimentos/Informe 2020.pdf",
     ]);
-    expect(sent).toHaveLength(6);
+    expect(sent).toHaveLength(3);
     expect(label).toHaveBeenCalledWith(expect.any(String), "m1", "L");
   });
 });
@@ -132,7 +129,7 @@ describe("watchSupportTickets", () => {
     await watchSupportTickets();
     expect(search.mock.calls[1][1]).toContain("after:123");
     expect(chatCalls[0]![1]).toBe("Assunto: s\nConteúdo: b\nDe: f");
-    expect(sent).toEqual(["d:hello", "e:hello"]);
+    expect(sent).toEqual(["hello"]);
   });
 });
 
@@ -202,7 +199,7 @@ describe("calendar reminders", () => {
     expect(sent).toEqual([]);
     store.set("google:calendar:pending", JSON.stringify([mk("now", "2026-03-10T11:59:00Z"), mk("later", "2026-03-10T13:00:00Z")]));
     await sendScheduledMessages();
-    expect(sent.sort()).toEqual(["d:now", "e:now"]);
+    expect(sent).toEqual(["now"]);
     expect(pending().map((r: any) => r.eventId)).toEqual(["later"]);
   });
 });

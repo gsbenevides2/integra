@@ -1,6 +1,5 @@
 import { redisGet, redisSet } from "@server/shared/cache";
-import { sendDiscordMessage } from "@server/shared/discord";
-import { sendEvolutionMessage } from "@server/shared/evolution";
+import { sendGotifyMessage } from "@server/shared/gotify";
 
 import { trace } from "@opentelemetry/api";
 
@@ -157,10 +156,7 @@ export async function sendScheduledMessages(): Promise<void> {
   trace.getActiveSpan()?.setAttribute("items.processed", due.length);
 
   await Promise.all(
-    due.flatMap((reminder) => [
-      sendDiscordMessage(reminder.message),
-      sendEvolutionMessage(reminder.message),
-    ]),
+    due.map((reminder) => sendGotifyMessage(reminder.message)),
   );
 
   const dueIds = new Set(due.map((reminder) => reminder.eventId));

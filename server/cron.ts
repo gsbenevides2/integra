@@ -180,7 +180,7 @@ for (const def of jobDefinitions) {
 }
 
 export function registerCrons() {
-  // Crons hit real hardware/APIs (routers, SSH boxes, Discord, Google, Tuya) — only
+  // Crons hit real hardware/APIs (routers, SSH boxes, Gotify, Google, Tuya) — only
   // run them in production by default. Set ENABLE_CRONS=true to test one locally.
   if (
     process.env.NODE_ENV !== "production" &&

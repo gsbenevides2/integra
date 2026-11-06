@@ -1,6 +1,6 @@
 # Integra — Complete Overview
 
-**Integra** is a personal home-automation and monitoring server built with **Bun** and **Elysia**. It talks to real hardware and external APIs (a Tuya smart-home account, a TP-Link router, Google accounts, SSH-reachable servers, status pages, train APIs, Discord, Authentik) and exposes a React dashboard over all of it. Every HTTP request, outgoing `fetch`, database query and cron run is traced end-to-end with OpenTelemetry.
+**Integra** is a personal home-automation and monitoring server built with **Bun** and **Elysia**. It talks to real hardware and external APIs (a Tuya smart-home account, a TP-Link router, Google accounts, SSH-reachable servers, status pages, train APIs, Gotify, Authentik) and exposes a React dashboard over all of it. Every HTTP request, outgoing `fetch`, database query and cron run is traced end-to-end with OpenTelemetry.
 
 It is a from-scratch rewrite of an older project (`integra`) that used a heavier custom trigger/tracing framework (MQTT, Redis pub/sub, PostgreSQL polling, IMAP email triggers, a bespoke Postgres-backed tracer). None of that framework survived the rewrite — see [`instrumentation.md`](./instrumentation.md) and [`triggers.md`](./triggers.md) for what replaced it.
 
@@ -31,7 +31,7 @@ server/
 │   └── instrumentDb.ts          # Wraps Bun's SQL client to trace every query
 ├── shared/                      # Cross-module services (not tied to one domain)
 │   ├── ssh.ts                   # runSshCommand() via node-ssh
-│   ├── discord.ts               # sendDiscordMessage()
+│   ├── gotify.ts                # sendGotifyMessage()
 │   ├── cache.ts                 # redisGet/redisSet via Bun.redis
 │   └── authentik.ts             # loginInAuthentik() — Authentik OAuth client-credentials login
 ├── db/
@@ -48,8 +48,8 @@ server/
 │   ├── train-status/            # São Paulo train/metro line status scrapers
 │   ├── nearby-bus/              # EMTU 381/215 arrivals near the browser GPS position
 │   ├── motiva-trilhos/          # Next-train ETA for a fixed Luz↔Pinheiros↔Morumbi commute
-│   ├── birthday/                # Daily Discord birthday announcement (cron-only, no routes/UI)
-│   └── authentik/                # Authentik login-failed webhook → Discord
+│   ├── birthday/                # Daily Gotify birthday announcement (cron-only, no routes/UI)
+│   └── authentik/                # Authentik login-failed webhook → Gotify
 └── utils/getProjectInfo.ts      # Re-exports name/description/version/... from package.json
 
 public/
@@ -110,7 +110,7 @@ A domain's business logic, as `static` methods on an `abstract class` (e.g. `Dev
 A plain exported `async function` under a module's `jobs/` folder, with zero self-scheduling inside it. `server/cron.ts` is the only place that decides when a job runs.
 
 ### Cron safety
-`registerCrons()` (`server/cron.ts`) no-ops unless `NODE_ENV=production` or `ENABLE_CRONS=true` is set, so running `bun run dev` locally never hits a real router, SSH box, Discord channel or external API on a schedule. Set `ENABLE_CRONS=true` to test one deliberately.
+`registerCrons()` (`server/cron.ts`) no-ops unless `NODE_ENV=production` or `ENABLE_CRONS=true` is set, so running `bun run dev` locally never hits a real router, SSH box, Gotify channel or external API on a schedule. Set `ENABLE_CRONS=true` to test one deliberately.
 
 ### Instrumentation
 Everything is traced with OpenTelemetry, not a custom tracer — see [`instrumentation.md`](./instrumentation.md).

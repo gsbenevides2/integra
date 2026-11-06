@@ -1,6 +1,5 @@
 import { authz } from "@server/shared/authz";
-import { sendDiscordMessage } from "@server/shared/discord";
-import { sendEvolutionMessage } from "@server/shared/evolution";
+import { sendGotifyMessage } from "@server/shared/gotify";
 
 import Elysia from "elysia";
 
@@ -22,8 +21,7 @@ export const authentikRoutes = new Elysia({
       body.event_user_email,
       body.event_user_username,
     );
-    await sendDiscordMessage(message);
-    await sendEvolutionMessage(message);
+    await sendGotifyMessage(message);
     return "OK";
   },
   {
@@ -31,7 +29,7 @@ export const authentikRoutes = new Elysia({
     detail: {
       summary: "Authentik Login Failed Webhook",
       description:
-        "Receives Authentik's login_failed notification webhook and posts an alert to Discord.",
+        "Receives Authentik's login_failed notification webhook and posts an alert to Gotify.",
     },
   },
 );

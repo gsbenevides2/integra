@@ -5,22 +5,13 @@ import { afterAll, describe, expect, mock, test } from "bun:test";
 import { installTestAuthz } from "../../../helpers/auth";
 
 const restoreAuthz = await installTestAuthz();
-const discord = { ...(await import("@server/shared/discord")) };
-const evolution = { ...(await import("@server/shared/evolution")) };
+const gotify = { ...(await import("@server/shared/gotify")) };
 const sent: string[] = [];
-mock.module("@server/shared/discord", () => ({
-  ...discord,
-  sendDiscordMessage: async (m: string) => void sent.push(`d:${m}`),
-}));
-mock.module("@server/shared/evolution", () => ({
-  ...evolution,
-  sendEvolutionMessage: async (m: string) => void sent.push(`e:${m}`),
-}));
+mock.module("@server/shared/gotify", () => ({ ...gotify, sendGotifyMessage: async (m: string) => void sent.push(m) }));
 const { authentikRoutes } = await import("@server/modules/authentik/index");
 afterAll(() => {
   restoreAuthz();
-  mock.module("@server/shared/discord", () => discord);
-  mock.module("@server/shared/evolution", () => evolution);
+  mock.module("@server/shared/gotify", () => gotify);
 });
 
 describe("generateMessage", () => {
@@ -63,6 +54,6 @@ describe("route", () => {
       }),
     );
     expect(await res.text()).toBe("OK");
-    expect(sent.map((s) => s[0])).toEqual(["d", "e"]);
+    expect(sent).toHaveLength(1);
   });
 });

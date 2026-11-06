@@ -1,5 +1,4 @@
-import { sendDiscordMessage } from "@server/shared/discord";
-import { sendEvolutionMessage } from "@server/shared/evolution";
+import { sendGotifyMessage } from "@server/shared/gotify";
 import { writeSshFile } from "@server/shared/ssh";
 
 import { trace } from "@opentelemetry/api";
@@ -119,8 +118,7 @@ export async function extractPayslips(): Promise<void> {
         await writeSshFile(destination, bytes, {
           "ssh.action": "save-payslip",
         });
-        await sendDiscordMessage(`Arquivo salvo no servidor: ${destination}`);
-        await sendEvolutionMessage(`Arquivo salvo no servidor: ${destination}`);
+        await sendGotifyMessage(`Arquivo salvo no servidor: ${destination}`);
       }
     }
 

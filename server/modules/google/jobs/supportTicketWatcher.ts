@@ -1,6 +1,5 @@
 import { redisGet, redisSet } from "@server/shared/cache";
-import { sendDiscordMessage } from "@server/shared/discord";
-import { sendEvolutionMessage } from "@server/shared/evolution";
+import { sendGotifyMessage } from "@server/shared/gotify";
 
 import { z } from "zod";
 
@@ -57,9 +56,6 @@ export async function watchSupportTickets(): Promise<void> {
     ),
   );
   await Promise.all(
-    summaries.flatMap((summary) => [
-      sendDiscordMessage(summary.message),
-      sendEvolutionMessage(summary.message),
-    ]),
+    summaries.map((summary) => sendGotifyMessage(summary.message)),
   );
 }

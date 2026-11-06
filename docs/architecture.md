@@ -25,7 +25,7 @@ External callers / browser
                 │
    ┌────────────┼───────────────┐
    ▼            ▼               ▼
- Postgres    External API    Discord / SSH / etc.
+ Postgres    External API    Gotify / SSH / etc.
  (Drizzle,   (fetch, auto-   (server/shared/*)
  own schema)  traced)
 
@@ -41,7 +41,7 @@ Every hop in the request path — the HTTP request itself, any outgoing `fetch`,
 - **Module**: a self-contained feature (`server/modules/<domain>/`) — its own DB schema, service classes, routes, and optionally a dashboard. Nothing generic connects modules together; `server/index.ts` and `server/cron.ts` wire each one in explicitly.
 - **Service**: a domain's logic as `static` methods on an `abstract class`. Routes and jobs call services; services are the only thing that touches the database or an external API for that domain.
 - **Job**: a plain `async function` a module exports for `server/cron.ts` to schedule — it has no idea when or how often it runs.
-- **Shared service** (`server/shared/*`): a service used by more than one module (SSH, Discord, Redis cache, Authentik login) — lives outside any single module so nothing has to import across module boundaries.
+- **Shared service** (`server/shared/*`): a service used by more than one module (SSH, Gotify, Redis cache, Authentik login) — lives outside any single module so nothing has to import across module boundaries.
 
 ## Directory Structure
 
@@ -52,7 +52,7 @@ server/
 ├── openapi.ts                 # OpenAPI/Scalar docs metadata
 ├── db/                        # One pgSchema per module + the schema.ts barrel
 ├── instrumentation/            # OTEL wiring for HTTP, fetch, and DB
-├── shared/                     # Cross-module services (ssh, discord, cache, authentik)
+├── shared/                     # Cross-module services (ssh, gotify, cache, authentik)
 └── modules/
     ├── google/                # Account linking, Calendar reminders, Gmail watchers, payslips
     ├── tuya/                  # Cloud devices/sensors + Pulsar real-time push
@@ -62,8 +62,8 @@ server/
     ├── train-status/           # São Paulo train/metro line status
     ├── nearby-bus/             # EMTU 381/215 stops and ETAs near the browser GPS position
     ├── motiva-trilhos/         # Next-train ETA for a fixed Luz↔Pinheiros↔Morumbi commute
-    ├── birthday/               # Cron-only Discord announcement
-    └── authentik/               # Login-failed webhook → Discord
+    ├── birthday/               # Cron-only Gotify announcement
+    └── authentik/               # Login-failed webhook → Gotify
 
 public/
 ├── index.tsx                 # App shell (Toast/Confirm/GlobalDrawer providers)

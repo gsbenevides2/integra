@@ -1,6 +1,6 @@
 # Integra
 
-Personal home-automation and monitoring server built with **Bun** and **Elysia**. Integrates a Tuya smart-home account, a TP-Link router, Google accounts, an SSH-reachable server, status pages, São Paulo train/metro lines, and Discord/Authentik notifications — with a React dashboard and end-to-end OpenTelemetry tracing.
+Personal home-automation and monitoring server built with **Bun** and **Elysia**. Integrates a Tuya smart-home account, a TP-Link router, Google accounts, an SSH-reachable server, status pages, São Paulo train/metro lines, and Gotify/Authentik notifications — with a React dashboard and end-to-end OpenTelemetry tracing.
 
 ## Features
 
@@ -8,7 +8,7 @@ Personal home-automation and monitoring server built with **Bun** and **Elysia**
 - **TP-Link router** — device inventory, DHCP/firewall reconciliation, connection history
 - **Google accounts** — Calendar reminders, Gmail-based support-ticket and payslip watchers
 - **Monitoring** — SSH-collected server stats + Cloudflare speedtest, status-page uptime checks, train/metro line status, EMTU buses near you (GPS), next-train ETA for a fixed Motiva Trilhos commute
-- **Notifications** — Discord messages for an Authentik login-failed webhook and a daily birthday announcement
+- **Notifications** — Gotify notifications for an Authentik login-failed webhook and a daily birthday announcement
 - **Full OpenTelemetry tracing** — every HTTP request, outgoing `fetch`, DB query and cron run, backend and frontend
 - **React dashboard** — one screen per integration, reachable from a single drawer menu
 - **Zod validation** end to end, documented automatically via OpenAPI/Scalar

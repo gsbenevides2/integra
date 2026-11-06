@@ -20,9 +20,9 @@ Runs a command over SSH (`node-ssh`), wrapped in an OpenTelemetry span. Reads `S
 const { stdout, stderr } = await runSshCommand("cat /proc/loadavg");
 ```
 
-### `sendDiscordMessage(content: string): Promise<void>` — `discord.ts`
+### `sendGotifyMessage(message: string): Promise<void>` — `gotify.ts`
 
-Posts a message to a Discord channel via the REST API (v10), authenticated with a bot token (`DISCORD_DEFAULT_PUBLIC_KEY` — the name is misleading, it's a bot token). The channel ID is hardcoded. Used by `authentik` and `birthday`.
+Posts a notification to Gotify (`POST /message`) using `GOTIFY_URL` and `GOTIFY_TOKEN`. Used by `authentik`, `birthday`, `google` jobs and `train-status`.
 
 ### `redisGet(key)` / `redisSet(key, value)` — `cache.ts`
 

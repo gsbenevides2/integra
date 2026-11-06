@@ -64,7 +64,8 @@ The HTTP port is hardcoded to `3000` in `server/index.ts` — unlike the old rep
 | `ASSISTANT_TTS_MODEL` | Optional OpenRouter text-to-speech model for the assistant's replies, used when ElevenLabs is not configured; defaults to `microsoft/mai-voice-2.1-flash` (native pt-BR voices) |
 | `ASSISTANT_VOICE` | Optional voice for `ASSISTANT_TTS_MODEL`; voices are model-specific. Defaults to `pt-BR-Luana:MAI-Voice-2.1-Flash` (others: `pt-BR-Caio`, `pt-BR-Pedro`, `pt-BR-Rafael`, `pt-BR-Harper`, `pt-BR-Grant`, with the same `:MAI-Voice-2.1-Flash` suffix). Set it whenever you change the model |
 | `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`, `S3_ENDPOINT` | Read implicitly by Bun's built-in `Bun.s3` client. The voice assistant keeps its images (uploads, generated images, camera snapshots) in this **private** bucket under `assistant/<userId>/`, and hands the browser presigned URLs (`server/modules/assistant/service/images.ts`) |
-| `DISCORD_DEFAULT_PUBLIC_KEY` | Discord bot token (`server/shared/discord.ts`) — the name is misleading, it's a bot token, not a public key |
+| `GOTIFY_URL` | Gotify base URL (`server/shared/gotify.ts`) |
+| `GOTIFY_TOKEN` | Gotify application token |
 | `AUTHENTIK_URL`, `AUTHENTIK_USERNAME`, `AUTHENTIK_PASSWORD` | Authentik client-credentials login (`server/shared/authentik.ts`) |
 | `BIRTHDAY_SERVICE_CLIENT_ID`, `BIRTHDAY_SERVICE_ENDPOINT` | The birthday module's MCP call, authenticated via the above |
 | `EMTU_BUSTIME_AUTH` | Full `Authorization` header (`Basic …`) for the EMTU bus-tracking portal (`server/modules/nearby-bus`). It is the credential embedded in the official EMTU app; without it the portal answers 200 with an empty body |

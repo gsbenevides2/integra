@@ -17,7 +17,7 @@ import {
 process.env.DATABASE_URL ??= "postgres://u:p@127.0.0.1:1/none";
 
 const realCache = { ...(await import("@server/shared/cache")) };
-const realEvolution = { ...(await import("@server/shared/evolution")) };
+const realGotify = { ...(await import("@server/shared/gotify")) };
 
 const store = new Map<string, string>();
 const sent: string[] = [];
@@ -28,10 +28,10 @@ mock.module("@server/shared/cache", () => ({
   redisGet: async (key: string) => store.get(key) ?? null,
   redisSet: async (key: string, value: string) => void store.set(key, value),
 }));
-mock.module("@server/shared/evolution", () => ({
-  ...realEvolution,
-  sendEvolutionMessage: async (message: string) => {
-    if (failSend) throw new Error("evolution down");
+mock.module("@server/shared/gotify", () => ({
+  ...realGotify,
+  sendGotifyMessage: async (message: string) => {
+    if (failSend) throw new Error("gotify down");
     sent.push(message);
   },
 }));
@@ -125,7 +125,7 @@ afterEach(() => {
 
 afterAll(() => {
   mock.module("@server/shared/cache", () => realCache);
-  mock.module("@server/shared/evolution", () => realEvolution);
+  mock.module("@server/shared/gotify", () => realGotify);
 });
 
 describe("gating helpers", () => {
@@ -396,7 +396,7 @@ describe("runTrainStatusAlarm", () => {
     setup([line(2, "CRITICAL", "Paralisada")]);
     failSend = true;
     await expect(runTrainStatusAlarm(MONDAY_MORNING)).rejects.toThrow(
-      "evolution down",
+      "gotify down",
     );
     expect(store.has(ALARM_STATE_KEY)).toBe(false);
 

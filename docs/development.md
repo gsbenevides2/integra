@@ -75,6 +75,6 @@ There is no automated test suite in this repo. Treat these as the equivalent:
 This daemon controls real devices (a router, smart-home devices), talks to a shared Postgres instance, and its cron jobs hit real external services on a schedule.
 
 - **`bun run dev` disables cron jobs by default** (`server/cron.ts`, gated on `NODE_ENV`/`ENABLE_CRONS`) — leave it that way. Set `ENABLE_CRONS=true` only when you deliberately want to exercise one job locally, and expect it to actually hit the real router/SSH box/Discord channel/etc. when you do.
-- **Never trigger an action with a real-world side effect** (sending a command to a physical device, sending a Discord notification, posting to an external API) while testing, unless the user explicitly asks you to verify that specific action.
+- **Never trigger an action with a real-world side effect** (sending a command to a physical device, sending a Gotify notification, posting to an external API) while testing, unless the user explicitly asks you to verify that specific action.
 - **Ask before running `bun run db:sync`** against the shared Postgres instance, even for an additive, non-destructive change.
 - Prefer read-only checks (`curl` a GET route, read a table via `db:studio`) over the corresponding write action whenever a read-only check answers the same question.

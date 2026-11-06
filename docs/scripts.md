@@ -6,14 +6,14 @@ What the old repo called a "script" (business logic under `src/extensions/script
 
 File: `server/modules/authentik/`
 
-This module listens for an HTTP POST from **Authentik** (the SSO provider) when a login attempt fails, and sends a formatted Discord notification. It's the simplest kind of module: no database table, no cron job, no dashboard — just a route and a service function.
+This module listens for an HTTP POST from **Authentik** (the SSO provider) when a login attempt fails, and sends a formatted Gotify notification. It's the simplest kind of module: no database table, no cron job, no dashboard — just a route and a service function.
 
 ### Structure
 
 ```text
 server/modules/authentik/
 ├── model.ts            # Zod schema for the inbound webhook body
-├── service/message.ts   # generateMessage() — parses the payload, formats a Discord message
+├── service/message.ts   # generateMessage() — parses the payload, formats a notification message
 └── index.ts             # Elysia route: POST /api/authentik/login-failed
 ```
 
@@ -21,8 +21,8 @@ server/modules/authentik/
 
 1. Authentik sends a POST to `/api/authentik/login-failed` with login attempt details.
 2. Elysia validates the body against `loginFailedBody` (Zod) before the handler even runs.
-3. `generateMessage()` parses Authentik's payload (a Python-dict-repr string embedded in one field) and formats a Discord message.
-4. The message is sent via `sendDiscordMessage()` (`server/shared/discord.ts`).
+3. `generateMessage()` parses Authentik's payload (a Python-dict-repr string embedded in one field) and formats a notification message.
+4. The message is sent via `sendGotifyMessage()` (`server/shared/gotify.ts`).
 5. The span the request already has (from `elysiaOtel`) records the outcome — no manual logging call needed.
 
 ### Creating a New Module
