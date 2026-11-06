@@ -3,7 +3,7 @@ import { tplinkDevices, tplinkInterfaces, tplinkOnlineChecks, tplinkOnlineDevice
 import { getLogger, logError, logWarn } from "@server/instrumentation/instrumentLogger";
 
 import { eq, type SQL } from "drizzle-orm";
-import getVendor from "mac-oui-lookup";
+import { getVendor } from "mac-oui-lookup";
 
 import type {
   ConnectedDevices,
