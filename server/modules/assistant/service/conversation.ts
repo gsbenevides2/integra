@@ -181,7 +181,7 @@ export abstract class ConversationService {
   /** Every image key some message still refers to (any user). */
   static async referencedImageKeys(): Promise<Set<string>> {
     const rows = await db
-      .select({ key: sql<string>`jsonb_array_elements(${assistantMessages.images})->>'key'` })
+      .selectDistinct({ key: sql<string>`jsonb_array_elements(${assistantMessages.images})->>'key'` })
       .from(assistantMessages);
     return new Set(rows.map((row) => row.key));
   }

@@ -21,6 +21,12 @@ const fetchSpy = spyOn(globalThis, "fetch").mockImplementation((async (input: un
       headers: { "content-type": "application/json" },
     });
   }
+  if (url.includes("/client-config")) {
+    return Response.json({
+      version: "1",
+      rum: { clientToken: "t", site: "s.example.com", organization: "org", env: "development" },
+    });
+  }
   return new Response("{}");
 }) as never);
 
@@ -49,6 +55,9 @@ test("entry point mounts the app and boots instrumentation + service worker", as
     await import("@public/index");
   });
 
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  });
   expect(spies[0]!).toHaveBeenCalled();
   expect(root.textContent).toContain("tuya page");
   expect(root.textContent).toContain("Menu");

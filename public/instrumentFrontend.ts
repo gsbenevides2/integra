@@ -1,3 +1,5 @@
+import type { ClientConfig } from "@server/modules/client-config";
+
 import { openobserveLogs } from "@openobserve/browser-logs";
 import { openobserveRum } from "@openobserve/browser-rum";
 import { SpanStatusCode } from "@opentelemetry/api";
@@ -24,16 +26,28 @@ export function getRumSessionId(): string | undefined {
   }
 }
 
-export function instrumentFrontend(): void {
+/** RUM settings come from the server at runtime, so the bundle can be prebuilt. */
+async function fetchRumConfig(): Promise<ClientConfig["rum"]> {
+  try {
+    const response = await fetch("/client-config");
+    return response.ok ? ((await response.json()) as ClientConfig).rum : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function instrumentFrontend(): Promise<void> {
+  const rum = await fetchRumConfig();
+  if (!rum) return;
   const serviceName = "integra-web";
   const traceUrl = `${window.location.origin}/v1/traces`;
   const options = {
-    clientToken: process.env.PUBLIC_RUM_TOKEN!,
+    clientToken: rum.clientToken,
     applicationId: serviceName, // any string identifying your application
-    site: process.env.PUBLIC_RUM_SITE!,
-    organizationIdentifier: process.env.PUBLIC_OTEL_ORGANIZATION!,
+    site: rum.site,
+    organizationIdentifier: rum.organization,
     service: serviceName,
-    env: process.env.NODE_ENV === "production" ? "production" : "development",
+    env: rum.env,
     version: APP_VERSION,
     insecureHTTP: false,
     apiVersion: "v1",

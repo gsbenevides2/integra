@@ -13,6 +13,7 @@ export const IMAGE_ROUTE = "/api/assistant/images/";
 export const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000;
 const ROOT_PREFIX = "assistant/";
 /** Uploads are downscaled in the browser; this only stops abuse. */
+const DELETE_BATCH = 50;
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
 /** Accepted image types and the extension their objects are stored with. */
@@ -135,7 +136,9 @@ export async function sweepOrphanImages(
         }
         continuationToken = page.isTruncated ? page.nextContinuationToken : undefined;
       } while (continuationToken);
-      await Promise.all(orphans.map((key) => Bun.s3.delete(key)));
+      for (let i = 0; i < orphans.length; i += DELETE_BATCH) {
+        await Promise.all(orphans.slice(i, i + DELETE_BATCH).map((key) => Bun.s3.delete(key)));
+      }
       span.setAttribute("assistant.image.count", orphans.length);
       return orphans.length;
     },

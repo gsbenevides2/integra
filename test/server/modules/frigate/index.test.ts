@@ -85,6 +85,23 @@ test("stream bridges the go2rtc MSE websocket to fMP4", async () => {
   globalThis.WebSocket = RealWebSocket;
 });
 
+test("a client too far behind gets the stream ended instead of buffering forever", async () => {
+  let socket: any;
+  fakeWs((ws) => {
+    socket = ws;
+    ws.close = mock(() => ws.onclose());
+    ws.onmessage({ data: JSON.stringify({ type: "mse", value: "video/mp4" }) });
+    const big = new Uint8Array(5 * 1024 * 1024).buffer;
+    ws.onmessage({ data: big });
+    ws.onmessage({ data: big });
+    ws.onmessage({ data: big }); // queue is over its limit: dropped, stream ended
+  });
+  const res = await get("/api/frigate/cameras/cam-1/stream");
+  expect((await res.arrayBuffer()).byteLength).toBe(10 * 1024 * 1024);
+  expect(socket.close).toHaveBeenCalled();
+  globalThis.WebSocket = RealWebSocket;
+});
+
 test("cancelling the stream closes the websocket without throwing", async () => {
   let socket: any;
   fakeWs((ws) => {
