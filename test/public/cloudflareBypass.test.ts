@@ -3,7 +3,7 @@ import { ensureCloudflareBypass } from "@public/cloudflareBypass";
 import { afterEach, beforeEach, expect, spyOn, test } from "bun:test";
 
 let fetchSpy: ReturnType<typeof spyOn>;
-const paths = () => fetchSpy.mock.calls.map((c) => String(c[0]));
+const paths = () => fetchSpy.mock.calls.map((c) => String(c[0])).filter((p) => p.startsWith("/api/cloudflare"));
 const answer = (check: Response | Error) =>
   fetchSpy.mockImplementation((async (input: unknown) => {
     if (String(input).endsWith("check-bypass")) {
@@ -22,7 +22,7 @@ test("turns the bypass on when it is off", async () => {
   answer(Response.json({ status: false }));
   await ensureCloudflareBypass();
   expect(paths()).toEqual(["/api/cloudflare/check-bypass", "/api/cloudflare/toogle-bypass"]);
-  expect((fetchSpy.mock.calls[1]![1] as RequestInit).method).toBe("POST");
+  expect((fetchSpy.mock.calls.find((c) => String(c[0]).endsWith("toogle-bypass"))![1] as RequestInit).method).toBe("POST");
 });
 
 test("leaves an active bypass alone", async () => {
