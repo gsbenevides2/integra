@@ -2,7 +2,7 @@ import css from "@eslint/css";
 import js from "@eslint/js";
 import json from "@eslint/json";
 import markdown from "@eslint/markdown";
-import { defineConfig } from "eslint/config";
+import { defineConfig, globalIgnores } from "eslint/config";
 import eslintConfigPrettier from "eslint-config-prettier/flat";
 import betterTailwindcss from "eslint-plugin-better-tailwindcss";
 import pluginReact from "eslint-plugin-react";
@@ -34,6 +34,7 @@ const REACT_FIRST_IMPORT_GROUPS = [
 ];
 
 export default defineConfig([
+  globalIgnores(["dist/**"]),
   {
     files: ["**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
     plugins: { js, "simple-import-sort": simpleImportSort },

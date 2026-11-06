@@ -13,9 +13,11 @@ COPY . .
 # not committed). Skipped when the build context already has it.
 RUN bun run assistant:model
 
-# ponytail: bun build --compile fails ahead-of-time bundling the frontend's
-# @opentelemetry browser packages (resolves Node builtins instead of browser
-# exports). Running from source works today; revisit --compile if startup
-# memory becomes a problem.
+# Frontend and server prebuilt here (RUM settings come from /client-config at
+# runtime). Measured idle RSS: ~280 MB from source vs ~205 MB bundled; --smol
+# made no difference. node_modules stays: vosk assets and gaxios resolve there.
+# ponytail: bun build --compile still fails on public/index.html (it resolves the
+# Node builds of @opentelemetry); revisit if image size matters.
+RUN bun run build:web
 EXPOSE 3000
-CMD ["bun", "run", "server/index.ts"]
+CMD ["bun", "dist/server/index.js"]

@@ -16,6 +16,7 @@
   },
   "license": "MIT",
   "scripts": {
+    "build:web": "bun scripts/build-web.ts",
     "dev": "bun run --watch server/index.ts",
     "test": "bun --no-env-file test && bun test/check-coverage.ts",
     "lint": "bun --bun eslint .",

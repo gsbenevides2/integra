@@ -9,7 +9,8 @@ import { afterAll, expect, spyOn, test } from "bun:test";
 
 // The OTLP span exporter would otherwise flush over the (absent) network.
 spyOn(XMLHttpRequest.prototype, "send").mockImplementation(() => {});
-spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
+const fetchSpy = spyOn(globalThis, "fetch").mockResolvedValue(new Response("{}"));
+const RUM = { clientToken: "t", site: "s.example.com", organization: "org", env: "production" };
 spyOn(OTLPTraceExporter.prototype, "export").mockImplementation((_s, cb) => cb({ code: 0 }));
 
 const spies: { mockRestore(): void }[] = [];
@@ -43,7 +44,8 @@ test("instrumentFrontend wires RUM, logs, tracing and error capture", async () =
   trace.disable();
   context.disable();
   propagation.disable();
-  instrumentFrontend();
+  fetchSpy.mockResolvedValueOnce(Response.json({ version: "1", rum: RUM }));
+  await instrumentFrontend();
   const uiConfig = setConfig.mock.calls[0]![0] as any;
   const attrs: Record<string, string> = {};
   uiConfig.shouldPreventSpanCreation("click", document.createElement("b"), {
@@ -54,6 +56,8 @@ test("instrumentFrontend wires RUM, logs, tracing and error capture", async () =
   expect(replay).toHaveBeenCalled();
   const cfg = rumInit.mock.calls[0]![0] as any;
   expect(cfg.service).toBe("integra-web");
+  expect(cfg.clientToken).toBe("t");
+  expect(cfg.organizationIdentifier).toBe("org");
 
   // beforeSend drops static assets and our own trace exporter, keeps the rest
   const res = (type: string, url = "/x") => ({ type: "resource", resource: { type, url } });
@@ -80,4 +84,17 @@ test("instrumentFrontend wires RUM, logs, tracing and error capture", async () =
   const processors = (trace.getTracerProvider() as any).getDelegate()._activeSpanProcessor._spanProcessors;
   await processors[0].forceFlush();
   await processors[0].shutdown();
+});
+
+test("instrumentFrontend does nothing without RUM config", async () => {
+  const rumInit = spyOn(openobserveRum, "init").mockImplementation(() => {});
+  spies.push(rumInit);
+  rumInit.mockClear();
+  fetchSpy.mockResolvedValueOnce(Response.json({ version: "1", rum: null }));
+  await instrumentFrontend();
+  fetchSpy.mockRejectedValueOnce(new Error("offline"));
+  await instrumentFrontend();
+  fetchSpy.mockResolvedValueOnce(new Response("no", { status: 500 }));
+  await instrumentFrontend();
+  expect(rumInit).not.toHaveBeenCalled();
 });

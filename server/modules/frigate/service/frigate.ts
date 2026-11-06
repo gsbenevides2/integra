@@ -14,6 +14,8 @@ export async function frigateFetch(path: string, init: InstrumentedInit = {}) {
   });
 }
 
+const MAX_QUEUED_BYTES = 8 * 1024 * 1024;
+
 /**
  * Live fragmented MP4 from go2rtc's MSE websocket (Frigate 0.18 no longer proxies
  * stream.mp4). The binary frames are init + media segments, so concatenated they
@@ -37,13 +39,17 @@ export async function frigateLiveStream(src: string, signal: AbortSignal) {
   let done = false;
   const close = () => ws.close();
   signal.addEventListener("abort", close);
-  const body = new ReadableStream<Uint8Array>({
-    start: (c) => void (controller = c),
-    cancel: () => {
-      done = true;
-      close();
+  const body = new ReadableStream<Uint8Array>(
+    {
+      start: (c) => void (controller = c),
+      cancel: () => {
+        done = true;
+        close();
+      },
     },
-  });
+    // Queue limit in bytes: a slow client must not make it grow unbounded.
+    { highWaterMark: MAX_QUEUED_BYTES, size: (chunk) => chunk?.byteLength ?? 0 },
+  );
   const ready = new Promise<string>((resolve, reject) => {
     ws.onopen = () =>
       ws.send(
@@ -59,7 +65,15 @@ export async function frigateLiveStream(src: string, signal: AbortSignal) {
           mime = msg.value;
           resolve(msg.value);
         } else if (msg.type === "error") reject(new Error(msg.value));
-      } else if (!done) controller.enqueue(new Uint8Array(data as ArrayBuffer));
+      } else if (!done) {
+        // fMP4 can't skip segments: if the client is too far behind, end the
+        // stream so it reconnects instead of buffering forever.
+        if ((controller.desiredSize ?? 0) < 0) {
+          done = true;
+          controller.close();
+          close();
+        } else controller.enqueue(new Uint8Array(data as ArrayBuffer));
+      }
     };
     ws.onerror = () => reject(new Error("Frigate ws error"));
     ws.onclose = () => {

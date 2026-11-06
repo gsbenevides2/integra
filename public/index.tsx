@@ -14,7 +14,7 @@ import { GlobalDrawerProvider } from "./components/GlobalDrawerContext";
 import { instrumentFrontend } from "./instrumentFrontend";
 import { registerServiceWorker } from "./registerServiceWorker";
 
-instrumentFrontend();
+void instrumentFrontend();
 
 function App() {
   return (
