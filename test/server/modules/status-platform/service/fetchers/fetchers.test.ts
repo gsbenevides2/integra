@@ -139,6 +139,51 @@ describe.each([
   });
 });
 
+describe("ignoreSsl", () => {
+  const tlsOf = (f: ReturnType<typeof mockFetch>, call = 0) =>
+    (f.mock.calls[call]![1] as { tls?: unknown } | undefined)?.tls;
+
+  test("generic disables certificate validation only when asked", async () => {
+    const f = mockFetch(() => new Response("ok"));
+    await fetchFromGenericHttp("https://x.io");
+    await fetchFromGenericHttp("https://x.io", { ignoreSsl: true });
+    expect(tlsOf(f, 0)).toBeUndefined();
+    expect(tlsOf(f, 1)).toEqual({ rejectUnauthorized: false });
+  });
+  test("atlassian forwards it to every request", async () => {
+    const f = mockFetch((u) =>
+      u.includes("status.json") ? json({ status: { indicator: "major" } }) : json({ incidents: [] }),
+    );
+    await fetchFromAtlassianStatuspage("https://a.io", { ignoreSsl: true });
+    expect(f.mock.calls).toHaveLength(2);
+    expect(tlsOf(f, 0)).toEqual({ rejectUnauthorized: false });
+    expect(tlsOf(f, 1)).toEqual({ rejectUnauthorized: false });
+  });
+  test("incident.io forwards it to every request", async () => {
+    const f = mockFetch((u) =>
+      u.endsWith("/incidents") ? json({ incidents: [] }) : json({ summary: { affected_components: [1] } }),
+    );
+    await fetchFromIncidentIoStatus("https://i.io", { ignoreSsl: true });
+    expect(f.mock.calls).toHaveLength(2);
+    expect(tlsOf(f, 0)).toEqual({ rejectUnauthorized: false });
+    expect(tlsOf(f, 1)).toEqual({ rejectUnauthorized: false });
+  });
+  test("instatus forwards it", async () => {
+    const f = mockFetch(() => json({ page: { status: "UP" } }));
+    await fetchFromInstatusStatuspage("https://i.io", { ignoreSsl: true });
+    expect(tlsOf(f)).toEqual({ rejectUnauthorized: false });
+  });
+  test("wake forwards it to tenants and summary requests", async () => {
+    const f = mockFetch((u) =>
+      u.endsWith("/tenants") ? json([{ id: "t1", display_name: "One" }]) : json({ overall_status: "operational" }),
+    );
+    await fetchFromWakeStatuspage("https://w.io", { ignoreSsl: true });
+    expect(f.mock.calls).toHaveLength(2);
+    expect(tlsOf(f, 0)).toEqual({ rejectUnauthorized: false });
+    expect(tlsOf(f, 1)).toEqual({ rejectUnauthorized: false });
+  });
+});
+
 describe("generic", () => {
   test("200 OK", async () => {
     mockFetch(() => new Response("ok"));

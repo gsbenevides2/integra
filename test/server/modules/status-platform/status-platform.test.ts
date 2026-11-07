@@ -36,6 +36,8 @@ describe("buildSegments", () => {
 test("model validates body", () => {
   expect(platformBody.safeParse({ name: "a", url: "u", type: "wake" }).success).toBe(true);
   expect(platformBody.safeParse({ name: "a", url: "u", type: "nope" }).success).toBe(false);
+  expect(platformBody.parse({ name: "a", url: "u", type: "wake" }).ignoreSsl).toBe(false);
+  expect(platformBody.parse({ name: "a", url: "u", type: "wake", ignoreSsl: true }).ignoreSsl).toBe(true);
 });
 
 describe("StatusPlatformService", () => {
@@ -49,6 +51,13 @@ describe("StatusPlatformService", () => {
   test("checkOne stores OK", async () => {
     await StatusPlatformService.checkOne(platform);
     expect(fake.calls).toContain("values");
+  });
+
+  test("checkOne passes the platform's ignoreSsl to the fetcher", async () => {
+    await StatusPlatformService.checkOne({ ...(platform as object), ignoreSsl: true } as never);
+    expect((fetchSpy.mock.calls[0]![1] as { tls?: unknown }).tls).toEqual({ rejectUnauthorized: false });
+    await StatusPlatformService.checkOne({ ...(platform as object), ignoreSsl: false } as never);
+    expect((fetchSpy.mock.calls[1]![1] as { tls?: unknown }).tls).toBeUndefined();
   });
 
   test("checkOne stores DOWN description from fetcher", async () => {
@@ -114,7 +123,7 @@ describe("StatusPlatformService", () => {
   });
 
   test("create / update / remove", async () => {
-    const body = { name: "a", url: "https://x.io", type: "generic" as const };
+    const body = { name: "a", url: "https://x.io", type: "generic" as const, ignoreSsl: false };
     fake.push([], );
     expect(await StatusPlatformService.create(body)).toEqual([]);
     fake.push([platform], undefined, [{ listed: true }]);

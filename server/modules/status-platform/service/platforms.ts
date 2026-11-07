@@ -51,13 +51,16 @@ export abstract class StatusPlatformService {
           "platform.name": platform.name,
           "platform.type": platform.type,
           "url.full": platform.url,
+          "platform.ignore_ssl": platform.ignoreSsl,
         },
       },
       async (span) => {
         const fetcher = Fetchers[platform.type];
         const checkedAt = new Date();
         try {
-          const result = await fetcher(platform.url);
+          const result = await fetcher(platform.url, {
+            ignoreSsl: platform.ignoreSsl,
+          });
           span.setAttribute("platform.status", result.status);
           return {
             platformId: platform.id,
@@ -109,6 +112,7 @@ export abstract class StatusPlatformService {
         name: platforms.name,
         url: platforms.url,
         type: platforms.type,
+        ignoreSsl: platforms.ignoreSsl,
         status: latestChecks.status,
         problemDescription: latestChecks.problemDescription,
         lastCheckedAt: latestChecks.checkedAt,

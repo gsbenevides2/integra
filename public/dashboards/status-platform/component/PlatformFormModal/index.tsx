@@ -14,6 +14,7 @@ export interface PlatformFormValues {
   name: string;
   url: string;
   type: Platform;
+  ignoreSsl: boolean;
 }
 
 interface Props {
@@ -44,6 +45,7 @@ export function PlatformFormModal({
       const name = formData.get("name")?.toString();
       const type = formData.get("type")?.toString();
       const url = formData.get("url")?.toString();
+      const ignoreSsl = formData.get("ignoreSsl") === "on";
       if (!name) return showToast("Missing name!", "error");
       if (!type) return showToast("Missing type", "error");
       if (!url) return showToast("Missing url", "error");
@@ -57,8 +59,9 @@ export function PlatformFormModal({
             name,
             type,
             url,
+            ignoreSsl,
           })
-        : client.api["status-platform"].post({ name, type, url });
+        : client.api["status-platform"].post({ name, type, url, ignoreSsl });
 
       request
         .then(({ error }) => {
@@ -118,6 +121,14 @@ export function PlatformFormModal({
             value: option,
           }))}
         />
+        <label className="flex items-center gap-2 text-xs text-mist-300">
+          <input
+            type="checkbox"
+            name="ignoreSsl"
+            defaultChecked={platform?.ignoreSsl}
+          />
+          Ignore SSL/TLS certificate errors
+        </label>
         <div className="mt-1 flex justify-end gap-2">
           <Button
             type="button"

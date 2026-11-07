@@ -27,6 +27,12 @@ export const platformBody = z.object({
     description: "Which fetcher to use when checking this platform",
     example: "shopify",
   }),
+  ignoreSsl: z.boolean().default(false).meta({
+    title: "Ignore SSL",
+    description:
+      "Skip SSL/TLS certificate validation when checking this platform",
+    example: false,
+  }),
 });
 export type PlatformBody = z.infer<typeof platformBody>;
 

@@ -1,4 +1,5 @@
-import type { StatusFetcher } from "./types";
+import { tlsInit } from "./tls";
+import type { FetcherOptions, StatusFetcher } from "./types";
 
 const TENANT_HEADER = "X-Public-Tenant-Id";
 
@@ -49,9 +50,12 @@ function getTenantFromUrl(url: URL): string | null {
   return tenant?.trim() ? tenant.trim() : null;
 }
 
-async function fetchTenants(baseUrl: string): Promise<Array<WakeTenant | null>> {
+async function fetchTenants(
+  baseUrl: string,
+  options?: FetcherOptions,
+): Promise<Array<WakeTenant | null>> {
   try {
-    const response = await fetch(`${baseUrl}/api/public/tenants`);
+    const response = await fetch(`${baseUrl}/api/public/tenants`, tlsInit(options));
     const tenants = (await response.json()) as WakeTenant[];
     return Array.isArray(tenants) && tenants.length > 0 ? tenants : [null];
   } catch {
@@ -63,9 +67,11 @@ async function fetchTenants(baseUrl: string): Promise<Array<WakeTenant | null>> 
 async function fetchSummary(
   baseUrl: string,
   tenantId: string | null,
+  options?: FetcherOptions,
 ): Promise<WakeSummaryResponse> {
   const response = await fetch(`${baseUrl}/api/public/summary`, {
     headers: tenantId ? { [TENANT_HEADER]: tenantId } : undefined,
+    ...tlsInit(options),
   });
   return (await response.json()) as WakeSummaryResponse;
 }
@@ -109,18 +115,21 @@ function describeProblem(summary: WakeSummaryResponse): string {
  * X-Public-Tenant-Id header - when no tenant is pinned in the URL, every
  * product is checked.
  */
-export const fetchFromWakeStatuspage: StatusFetcher = async (endpoint) => {
+export const fetchFromWakeStatuspage: StatusFetcher = async (
+  endpoint,
+  options,
+) => {
   const endpointUrl = new URL(endpoint);
   const baseUrl = `${endpointUrl.protocol}//${endpointUrl.host}`;
   const pinnedTenant = getTenantFromUrl(endpointUrl);
 
   const tenants = pinnedTenant
     ? [{ id: pinnedTenant, display_name: pinnedTenant }]
-    : await fetchTenants(baseUrl);
+    : await fetchTenants(baseUrl, options);
 
   const summaries = await Promise.all(
     tenants.map(async (tenant) => {
-      const summary = await fetchSummary(baseUrl, tenant?.id ?? null);
+      const summary = await fetchSummary(baseUrl, tenant?.id ?? null, options);
       return { tenant, summary };
     }),
   );

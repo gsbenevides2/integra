@@ -21,6 +21,7 @@ const row = (id: string, status: "OK" | "DOWN" | null, extra = {}) => ({
   name: `Plat ${id}`,
   url: `https://${id}.test`,
   type: PLATFORMS[0],
+  ignoreSsl: false,
   status,
   problemDescription: status === "DOWN" ? "it broke" : null,
   lastCheckedAt: null,
@@ -121,7 +122,7 @@ describe("StatusPlatformDashboard", () => {
     select.value = PLATFORMS[0];
     submit();
     await screen.findByText("Saved successfully");
-    expect(calls.find((c) => c.method === "POST")!.body).toEqual({ name: "N", type: PLATFORMS[0], url: "https://n.test" });
+    expect(calls.find((c) => c.method === "POST")!.body).toEqual({ name: "N", type: PLATFORMS[0], url: "https://n.test", ignoreSsl: false });
 
     writeFail = true;
     fireEvent.click(screen.getAllByText("Add Platform")[0]!.closest("button")!);
