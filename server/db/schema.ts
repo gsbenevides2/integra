@@ -1,5 +1,6 @@
 export * from "./assistant";
 export * from "./auth";
+export * from "./birthday";
 export * from "./cloudflare";
 export * from "./google";
 export * from "./serverMetrics";

@@ -1,25 +1,48 @@
-import safeEnvGet from "@server/safeEnvGet";
-import { loginInAuthentik } from "@server/shared/authentik";
+import { db } from "@server/db";
+import { birthdayEvents } from "@server/db/schema";
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+import { asc, eq } from "drizzle-orm";
 
-export async function getEventsOfToday(): Promise<string> {
-  const { access_token } = await loginInAuthentik(
-    safeEnvGet("BIRTHDAY_SERVICE_CLIENT_ID"),
-  );
-  const client = new Client({ name: "Integra", version: "1.0.0" });
-  const headers = new Headers();
-  headers.set("Authorization", `Bearer ${access_token}`);
-  const url = new URL("/mcp", safeEnvGet("BIRTHDAY_SERVICE_ENDPOINT"));
-  const transport = new StreamableHTTPClientTransport(url, {
-    requestInit: { headers },
-  });
-  await client.connect(transport);
-  const result = await client.callTool({
-    name: "list-birthday-events-by-current-day",
-    arguments: {},
-  });
-  const content = result.content as { text: string }[];
-  return content.at(0)?.text ?? "";
+import type { EventBody } from "../model";
+
+export abstract class BirthdayService {
+  // explicit ctor: bun cannot count an implicit one as covered
+  protected constructor() {}
+
+  static list() {
+    return db
+      .select()
+      .from(birthdayEvents)
+      .orderBy(asc(birthdayEvents.month), asc(birthdayEvents.day));
+  }
+
+  static async listToday(now = new Date()): Promise<string[]> {
+    const rows = await BirthdayService.list();
+    const month = now.getMonth() + 1;
+    const day = now.getDate();
+    return rows
+      .filter((e) => e.month === month && e.day === day)
+      .map((e) => e.title);
+  }
+
+  static create(body: EventBody) {
+    return db.insert(birthdayEvents).values(body).returning();
+  }
+
+  static async update(id: string, body: EventBody) {
+    const [row] = await db
+      .update(birthdayEvents)
+      .set({ ...body, updatedAt: new Date() })
+      .where(eq(birthdayEvents.id, id))
+      .returning();
+    return row;
+  }
+
+  static async remove(id: string) {
+    const [row] = await db
+      .delete(birthdayEvents)
+      .where(eq(birthdayEvents.id, id))
+      .returning();
+    return row;
+  }
 }

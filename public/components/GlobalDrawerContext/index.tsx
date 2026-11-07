@@ -5,6 +5,7 @@ import React, {
   useState,
 } from "react";
 
+import { birthdayDashboard } from "@public/dashboards/birthday";
 import { cronsDashboard } from "@public/dashboards/crons";
 import { frigateDashboard } from "@public/dashboards/frigate";
 import { googleAccountsDashboard } from "@public/dashboards/google-accounts";
@@ -48,6 +49,7 @@ const DASHBOARD_LIST: DashboardData[] = [
   serverMetricsDashboard,
   tplinkDashboard,
   statusPlatformDashboard,
+  birthdayDashboard,
   trainStatusDashboard,
   nearbyBusDashboard,
   motivaTrilhosDashboard,

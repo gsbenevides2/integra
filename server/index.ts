@@ -13,6 +13,7 @@ import {
 import { flushTelemetryOnExit } from "./instrumentation/shutdown";
 import { assistantRoutes, voskAssetRoutes } from "./modules/assistant";
 import { authentikRoutes } from "./modules/authentik";
+import { birthdayRoutes } from "./modules/birthday";
 import { clientConfigRoutes } from "./modules/client-config";
 import { cloudflareRoutes } from "./modules/cloudlflare";
 import { cronsRoutes } from "./modules/crons";
@@ -75,6 +76,7 @@ export const app = new Elysia()
   .use(nearbyBusRoutes)
   .use(motivaTrilhosRoutes)
   .use(statusPlatformRoutes)
+  .use(birthdayRoutes)
   .use(serverMetricsRoutes)
   .use(tplinkRoutes)
   .use(cronsRoutes)
