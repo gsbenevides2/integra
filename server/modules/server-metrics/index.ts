@@ -30,6 +30,18 @@ export const serverMetricsRoutes = new Elysia({
       },
     },
   )
+  .post("/refresh", async () => {
+    await Promise.all([
+      ServerMetricsService.collect(),
+      ServerMetricsService.collectSpeedtest(),
+    ]);
+    return { ok: true };
+  }, {
+    detail: {
+      summary: "Refresh Server Metrics",
+      description: "Collects the SSH snapshot and a speedtest immediately.",
+    },
+  })
   .get("/speedtest/latest", () => ServerMetricsService.speedtestLatest(), {
     detail: {
       summary: "Latest Speedtest",

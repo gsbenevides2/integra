@@ -133,6 +133,12 @@ describe("routes", () => {
     expect(await (await call("/api/server-metrics/latest")).json()).toEqual({ id: 1 });
     expect(await (await call("/api/server-metrics/speedtest/latest")).json()).toEqual({ id: 2 });
   });
+  test("refresh", async () => {
+    sshOut = JSON.stringify(status);
+    const res = await serverMetricsRoutes.handle(new Request("http://localhost/api/server-metrics/refresh", { method: "POST" }));
+    expect(await res.json()).toEqual({ ok: true });
+    expect(fake.calls.filter((c) => c === "values")).toHaveLength(2);
+  });
   test("histories with and without before", async () => {
     fake.push([], [], [], []);
     for (const p of [

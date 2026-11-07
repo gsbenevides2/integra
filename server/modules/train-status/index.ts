@@ -18,6 +18,15 @@ export const trainStatusRoutes = new Elysia({
       description: "Latest status check for every tracked train line.",
     },
   })
+  .post("/refresh", async () => {
+    await TrainStatusService.checkAll();
+    return { ok: true };
+  }, {
+    detail: {
+      summary: "Refresh Train Lines",
+      description: "Fetches the train line status immediately.",
+    },
+  })
   .get(
     "/:code/history",
     ({ params, query }) => {

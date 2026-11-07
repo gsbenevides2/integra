@@ -55,6 +55,7 @@ const calls = useApi({
   "GET /api/status-platform/list": () => listReply,
   "GET /api/status-platform/:id/history": ({ query }) => historyFn(query),
   "DELETE /api/status-platform/:id": () => (writeFail ? fail() : { ok: true }),
+  "POST /api/status-platform/refresh": () => (writeFail ? fail() : { ok: true }),
   "POST /api/status-platform": () => {
     if (writeThrow) return malformed();
     return writeFail ? fail() : { ok: true };
@@ -213,6 +214,17 @@ describe("StatusPlatformDashboard", () => {
     fireEvent.click(screen.getAllByRole("button").filter((b) => b.className.includes("disabled:opacity-30"))[1]!);
     await act(async () => {});
     expect(calls.length).toBe(before);
+  });
+
+  test("refresh button success and failure, last checked shown", async () => {
+    listReply = rows.map((r) => ({ ...r, lastCheckedAt: "2024-01-01T10:00:00.000Z" }));
+    renderWithProviders(<Dashboard />);
+    await screen.findByText(/Última verificação/);
+    fireEvent.click(screen.getByText("Atualizar"));
+    await waitFor(() => expect(screen.getByText("Atualizar").closest("button")!.disabled).toBe(false));
+    writeFail = true;
+    fireEvent.click(screen.getByText("Atualizar"));
+    await screen.findByText("Failed to refresh");
   });
 
   test("polling refreshes", async () => {

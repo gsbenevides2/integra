@@ -40,14 +40,17 @@ const history = (over: object = {}) => ({
   ...over,
 });
 
+let refreshFail = false;
 let linesReply: unknown = lines;
 let historyFn: (q: Record<string, string>) => unknown = () => history();
 const calls = useApi({
   "GET /api/train-status/lines": () => linesReply,
+  "POST /api/train-status/refresh": () => (refreshFail ? fail() : { ok: true }),
   "GET /api/train-status/:code/history": ({ query }) => historyFn(query),
 });
 afterEach(() => {
   cleanup();
+  refreshFail = false;
   linesReply = lines;
   historyFn = () => history();
 });
@@ -124,6 +127,17 @@ describe("TrainStatusDashboard", () => {
     linesReply = [];
     await act(async () => tick!());
     await screen.findByText("No train lines tracked yet");
+  });
+
+  test("refresh button success and failure, last checked shown", async () => {
+    linesReply = [{ ...lines[0], checkedAt: iso(5) }];
+    renderWithProviders(<TrainStatusDashboard />);
+    await screen.findByText(/Última verificação/);
+    fireEvent.click(screen.getByText("Atualizar"));
+    await waitFor(() => expect(calls.some((c) => c.method === "POST")).toBe(true));
+    refreshFail = true;
+    fireEvent.click(screen.getByText("Atualizar"));
+    await screen.findByText("Failed to refresh");
   });
 
   test("Card handles unknown line codes", () => {

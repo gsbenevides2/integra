@@ -10,6 +10,7 @@ import { IconButton } from "@public/components/IconButton";
 import { useToast } from "@public/components/Toast";
 
 import {
+  ArrowPathIcon,
   Bars3Icon,
   PlusIcon,
   ServerStackIcon,
@@ -46,6 +47,7 @@ function StatusPlatformDashboard() {
   const [platforms, setPlatforms] = useState<PlatformRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { showToast } = useToast();
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchPlatforms = useCallback(
     async (useLoading: boolean) => {
@@ -68,6 +70,22 @@ function StatusPlatformDashboard() {
     const interval = setInterval(() => fetchPlatforms(false), 4000);
     return () => clearInterval(interval);
   }, [fetchPlatforms]);
+
+  const refresh = useCallback(async () => {
+    setIsRefreshing(true);
+    const { error } = await getStatusPlatformEdenClient().api[
+      "status-platform"
+    ].refresh.post();
+    if (error) showToast("Failed to refresh", "error");
+    else await fetchPlatforms(false);
+    setIsRefreshing(false);
+  }, [fetchPlatforms, showToast]);
+
+  const lastChecked = platforms
+    .map((p) => p.lastCheckedAt)
+    .filter((d): d is Date | string => d !== null)
+    .map((d) => new Date(d).getTime())
+    .reduce((a, b) => Math.max(a, b), 0);
 
   const openCreateModal = useCallback(() => {
     setEditingPlatform(undefined);
@@ -105,10 +123,25 @@ function StatusPlatformDashboard() {
           </IconButton>
           <h1 className="text-xl">Status Platform</h1>
         </div>
-        <Button onClick={openCreateModal}>
-          <PlusIcon className="size-4.5" />
-          <span>Add Platform</span>
+        <div className="flex items-center gap-2">
+          {lastChecked > 0 && (
+            <span className="text-xs text-mist-400">
+              Última verificação: {new Date(lastChecked).toLocaleString("pt-BR")}
+            </span>
+          )}
+        <Button
+          variant="secondary"
+          isLoading={isRefreshing}
+          onClick={refresh}
+        >
+          <ArrowPathIcon className="size-4.5" />
+          <span>Atualizar</span>
         </Button>
+          <Button onClick={openCreateModal}>
+            <PlusIcon className="size-4.5" />
+            <span>Add Platform</span>
+          </Button>
+        </div>
       </div>
       {isLoading ? (
         <div className="

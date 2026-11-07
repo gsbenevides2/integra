@@ -2,7 +2,7 @@ import "@public/components/GlobalDrawerContext"; // load order: avoids dashboard
 
 import React from "react";
 
-import { act, cleanup, fireEvent, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterAll, afterEach, describe, expect, mock, test } from "bun:test";
 
 import { fail, fakeRecharts, useApi } from "../../../helpers/dash-api";
@@ -37,12 +37,15 @@ const speed = (i: number) => ({
 
 let history: unknown = { snapshots: [snap(1), snap(2)] };
 let speedtest: unknown = { snapshots: [speed(1), speed(2)] };
+let refreshFail = false;
 useApi({
+  "POST /api/server-metrics/refresh": () => (refreshFail ? fail() : { ok: true }),
   "GET /api/server-metrics/history": () => history,
   "GET /api/server-metrics/speedtest/history": () => speedtest,
 });
 afterEach(() => {
   cleanup();
+  refreshFail = false;
   history = { snapshots: [snap(1), snap(2)] };
   speedtest = { snapshots: [speed(1), speed(2)] };
 });
@@ -59,6 +62,16 @@ describe("ServerMetricsDashboard", () => {
     expect(screen.getByText("12 ms")).toBeTruthy();
     expect(screen.getByText("/dev/d2 (/)")).toBeTruthy();
     expect(serverMetricsDashboard.id).toBe("server-metrics");
+  });
+
+  test("refresh button success and failure, last update shown", async () => {
+    renderWithProviders(<ServerMetricsDashboard />);
+    await screen.findByText(/Última atualização/);
+    fireEvent.click(screen.getByText("Atualizar"));
+    await waitFor(() => expect(screen.getByText("Atualizar").closest("button")!.disabled).toBe(false));
+    refreshFail = true;
+    fireEvent.click(screen.getByText("Atualizar"));
+    await screen.findByText("Falha ao atualizar métricas");
   });
 
   test("empty data", async () => {

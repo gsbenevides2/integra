@@ -4,10 +4,11 @@ import {
   DashboardData,
   useGlobalDrawer,
 } from "@public/components/GlobalDrawerContext";
+import { Button } from "@public/components/Button";
 import { IconButton } from "@public/components/IconButton";
 import { useToast } from "@public/components/Toast";
 
-import { Bars3Icon, TruckIcon } from "@heroicons/react/24/outline";
+import { ArrowPathIcon, Bars3Icon, TruckIcon } from "@heroicons/react/24/outline";
 
 import { getTrainStatusEdenClient } from "./client";
 import { Card } from "./component/Card";
@@ -31,6 +32,7 @@ export function TrainStatusDashboard() {
   const [lines, setLines] = useState<TrainLineRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { showToast } = useToast();
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const globalDrawer = useGlobalDrawer();
 
   const fetchLines = useCallback(
@@ -48,6 +50,18 @@ export function TrainStatusDashboard() {
     [showToast],
   );
 
+  const refresh = async () => {
+    setIsRefreshing(true);
+    const { error } = await getTrainStatusEdenClient().api["train-status"].refresh.post();
+    if (error) showToast("Failed to refresh", "error");
+    else await fetchLines(false);
+    setIsRefreshing(false);
+  };
+
+  const lastChecked = lines
+    .map((l) => (l.checkedAt ? new Date(l.checkedAt).getTime() : 0))
+    .reduce((a, b) => Math.max(a, b), 0);
+
   useEffect(() => {
     fetchLines(true);
     const interval = setInterval(() => fetchLines(false), POLL_INTERVAL_MS);
@@ -62,7 +76,8 @@ export function TrainStatusDashboard() {
         lineCode={historyLineCode}
       />
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+       <div className="flex items-center gap-2">
         <IconButton
           onClick={() => globalDrawer.setIsOpen(true)}
           aria-label="Abrir menu"
@@ -70,6 +85,22 @@ export function TrainStatusDashboard() {
           <Bars3Icon className="size-5" />
         </IconButton>
         <h1 className="text-xl">Train Status</h1>
+       </div>
+        <div className="flex items-center gap-2">
+          {lastChecked > 0 && (
+            <span className="text-xs text-mist-400">
+              Última verificação: {new Date(lastChecked).toLocaleString("pt-BR")}
+            </span>
+          )}
+        <Button
+          variant="secondary"
+          isLoading={isRefreshing}
+          onClick={refresh}
+        >
+          <ArrowPathIcon className="size-4.5" />
+          <span>Atualizar</span>
+        </Button>
+        </div>
       </div>
 
       {isLoading ? (

@@ -156,6 +156,11 @@ describe("routes", () => {
     const res = await call("/api/status-platform/p1/history?before=2026-01-01T00:00:00Z");
     expect((await res.json()).hasMore).toBe(false);
   });
+  test("refresh", async () => {
+    fake.push([]);
+    const res = await call("/api/status-platform/refresh", { method: "POST" });
+    expect(await res.json()).toEqual({ ok: true });
+  });
   test("create, patch, delete", async () => {
     fake.push([]);
     expect(await (await call("/api/status-platform/", json("POST", body))).json()).toEqual([]);

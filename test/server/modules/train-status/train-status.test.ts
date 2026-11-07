@@ -191,6 +191,12 @@ describe("routes", () => {
     TRAIN_LINES.forEach((_, i) => fake.push(i === 0 ? [{ lineCode: 1 }] : []));
     expect(await (await call("/api/train-status/lines")).json()).toEqual([{ lineCode: 1 }]);
   });
+  test("refresh", async () => {
+    respond(routeAll);
+    const res = await trainStatusRoutes.handle(new Request("http://localhost/api/train-status/refresh", { method: "POST" }));
+    expect(await res.json()).toEqual({ ok: true });
+    expect(fake.calls).toContain("values");
+  });
   test("history with and without before", async () => {
     fake.push([], []);
     const a = await call("/api/train-status/1/history?before=2026-01-01T00:00:00Z");

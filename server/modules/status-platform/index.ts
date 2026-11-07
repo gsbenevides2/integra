@@ -30,6 +30,15 @@ export const statusPlatformRoutes = new Elysia({
       query: historyQuery,
     },
   )
+  .post("/refresh", async () => {
+    await StatusPlatformService.checkAll();
+    return { ok: true };
+  }, {
+    detail: {
+      summary: "Refresh Platforms",
+      description: "Checks all platforms immediately.",
+    },
+  })
   .post("/", ({ body }) => StatusPlatformService.create(body), {
     detail: {
       summary: "Create Platform",

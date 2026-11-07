@@ -4,10 +4,11 @@ import {
   DashboardData,
   useGlobalDrawer,
 } from "@public/components/GlobalDrawerContext";
+import { Button } from "@public/components/Button";
 import { IconButton } from "@public/components/IconButton";
 import { useToast } from "@public/components/Toast";
 
-import { Bars3Icon, ServerIcon } from "@heroicons/react/24/outline";
+import { ArrowPathIcon, Bars3Icon, ServerIcon } from "@heroicons/react/24/outline";
 
 import { getServerMetricsEdenClient } from "./client";
 import { DiskUsage } from "./component/DiskUsage";
@@ -50,6 +51,7 @@ export function ServerMetricsDashboard() {
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [speedtestSnapshots, setSpeedtestSnapshots] = useState<SpeedtestSnapshot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchHistory = useCallback(
     async (useLoading: boolean) => {
@@ -77,6 +79,14 @@ export function ServerMetricsDashboard() {
     [showToast],
   );
 
+  const refresh = async () => {
+    setIsRefreshing(true);
+    const { error } = await getServerMetricsEdenClient().api["server-metrics"].refresh.post();
+    if (error) showToast("Falha ao atualizar métricas", "error");
+    else await fetchHistory(false);
+    setIsRefreshing(false);
+  };
+
   useEffect(() => {
     fetchHistory(true);
     const interval = setInterval(() => fetchHistory(false), POLL_INTERVAL_MS);
@@ -85,10 +95,15 @@ export function ServerMetricsDashboard() {
 
   const latest = snapshots.at(-1);
   const latestSpeedtest = speedtestSnapshots.at(-1) ?? null;
+  const lastChecked = Math.max(
+    latest ? new Date(latest.collectedAt).getTime() : 0,
+    latestSpeedtest ? new Date(latestSpeedtest.collectedAt).getTime() : 0,
+  );
 
   return (
     <div className="flex flex-col gap-4 p-3">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+       <div className="flex items-center gap-2">
         <IconButton
           onClick={() => globalDrawer.setIsOpen(true)}
           aria-label="Abrir menu"
@@ -96,6 +111,22 @@ export function ServerMetricsDashboard() {
           <Bars3Icon className="size-5" />
         </IconButton>
         <h1 className="text-xl">Server Metrics</h1>
+       </div>
+        <div className="flex items-center gap-2">
+          {lastChecked > 0 && (
+            <span className="text-xs text-mist-400">
+              Última atualização: {new Date(lastChecked).toLocaleString("pt-BR")}
+            </span>
+          )}
+        <Button
+          variant="secondary"
+          isLoading={isRefreshing}
+          onClick={refresh}
+        >
+          <ArrowPathIcon className="size-4.5" />
+          <span>Atualizar</span>
+        </Button>
+        </div>
       </div>
       {isLoading ? (
         <p className="text-sm text-mist-400">Carregando métricas...</p>
