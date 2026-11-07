@@ -3,7 +3,7 @@ import { bypassToken } from "@server/db/cloudflare";
 import safeEnvGet from "@server/safeEnvGet";
 
 import Cloudflare from "cloudflare";
-import { and, eq, gte } from "drizzle-orm";
+import { and, desc, eq, gte, notInArray } from "drizzle-orm";
 
 export const CloudflareRules = {
   bypass_cookie: "cf_bypass_integra" as const,
@@ -45,7 +45,10 @@ export const CloudflareRules = {
           gte(bypassToken.createdAt, thirtyDaysAgo),
           eq(bypassToken.active, true),
         ),
-      );
+      )
+      // CF expressions cap at 4096 chars (~39/token): keep newest 90, older ones are deactivated in updateCf
+      .orderBy(desc(bypassToken.createdAt))
+      .limit(90);
 
     return validTokens.map((a) => a.id);
   },
@@ -56,6 +59,15 @@ export const CloudflareRules = {
     });
 
     const validTokens = await this.getValidTokens();
+    if (validTokens.length > 0) {
+      // deactivate everything beyond the newest 90 so DB matches what CF enforces
+      await db
+        .update(bypassToken)
+        .set({ active: false })
+        .where(
+          and(eq(bypassToken.active, true), notInArray(bypassToken.id, validTokens)),
+        );
+    }
     if (validTokens.length === 0) {
       await client.rulesets.rules.edit(safeEnvGet("CLOUDFLARE_RULE_ID"), {
         ruleset_id: safeEnvGet("CLOUDFLARE_RULESET_ID"),
@@ -75,16 +87,13 @@ export const CloudflareRules = {
         action_parameters: { security_level: "essentially_off" },
       });
     } else if (validTokens.length > 1) {
-      const andString = validTokens
-        .map(
-          (token) => `(http.cookie contains "${this.bypass_cookie}=${token}")`,
-        )
-        .join(" or ");
+      // set literal (~39 chars/token vs ~76 with "contains"); count capped in getValidTokens
+      const set = validTokens.map((token) => `"${token}"`).join(" ");
       await client.rulesets.rules.edit(safeEnvGet("CLOUDFLARE_RULE_ID"), {
         ruleset_id: safeEnvGet("CLOUDFLARE_RULESET_ID"),
         zone_id: safeEnvGet("CLOUDFLARE_ZONE_ID"),
         action: "set_config",
-        expression: `(http.host contains "integra.infra.gui.dev.br" and (${andString}))`,
+        expression: `(http.host contains "integra.infra.gui.dev.br" and any(http.request.cookies["${this.bypass_cookie}"][*] in {${set}}))`,
         description: "Disabled defense mode for integra-users",
         enabled: true,
         action_parameters: { security_level: "essentially_off" },

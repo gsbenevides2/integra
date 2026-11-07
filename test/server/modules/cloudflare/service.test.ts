@@ -69,11 +69,11 @@ describe("updateCf", () => {
     );
   });
 
-  test("several tokens are OR-ed", async () => {
+  test("several tokens use a set literal", async () => {
     fakeDbResults.push([{ id: T1 }, { id: T2 }]);
     await CloudflareRules.updateCf();
     expect(editBody().expression).toBe(
-      `(http.host contains "integra.infra.gui.dev.br" and ((http.cookie contains "${cookie}=${T1}") or (http.cookie contains "${cookie}=${T2}")))`,
+      `(http.host contains "integra.infra.gui.dev.br" and any(http.request.cookies["${cookie}"][*] in {"${T1}" "${T2}"}))`,
     );
     expect(editBody().action_parameters).toEqual({
       security_level: "essentially_off",
