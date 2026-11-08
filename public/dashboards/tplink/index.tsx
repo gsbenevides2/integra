@@ -174,7 +174,7 @@ function NewDeviceForm({
               checked={isController}
               onChange={(e) => setIsController(e.target.checked)}
             />
-            Este roteador é o controller
+            Este roteador é o controlador
           </label>
         )}
       </div>
@@ -310,7 +310,7 @@ function TplinkDashboard() {
           >
             <Bars3Icon className="size-5" />
           </IconButton>
-          <h1 className="text-xl">TP-Link Center</h1>
+          <h1 className="text-xl">Rede TP-Link</h1>
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={sync} isLoading={isSyncing}>
@@ -360,8 +360,18 @@ function TplinkDashboard() {
                     "
                   >
                     <th className="px-3 py-2 font-normal">Nome</th>
-                    <th className="px-3 py-2 font-normal">Marca</th>
-                    <th className="px-3 py-2 font-normal">Tipo</th>
+                    <th className="
+                      hidden px-3 py-2 font-normal
+                      sm:table-cell
+                    ">
+                      Marca
+                    </th>
+                    <th className="
+                      hidden px-3 py-2 font-normal
+                      md:table-cell
+                    ">
+                      Tipo
+                    </th>
                     <th className="px-3 py-2 font-normal">Status</th>
                     <th className="px-3 py-2 font-normal" />
                   </tr>
@@ -379,15 +389,23 @@ function TplinkDashboard() {
                     >
                       <td className="flex items-center gap-2 px-3 py-2">
                         <WifiIcon className="size-4 shrink-0 text-mist-400" />
-                        {device.name}
+                        <span className="first-letter:uppercase">{device.name}</span>
                       </td>
-                      <td className="px-3 py-2 text-mist-300">
-                        {device.brand}
+                      <td className="
+                        hidden px-3 py-2 text-mist-300
+                        sm:table-cell
+                      ">
+                        <span className="first-letter:uppercase">
+                          {device.brand}
+                        </span>
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="
+                        hidden px-3 py-2
+                        md:table-cell
+                      ">
                         {device.type === "router"
                           ? device.isController
-                            ? "Roteador (Controller)"
+                            ? "Roteador (controlador)"
                             : "Roteador (Agente)"
                           : "Cliente"}
                       </td>
@@ -411,6 +429,7 @@ function TplinkDashboard() {
                         <div className="flex justify-end">
                           <button
                             type="button"
+                            aria-label={`Remover ${device.name}`}
                             onClick={(e) => {
                               e.stopPropagation();
                               removeDevice(device);
@@ -468,5 +487,5 @@ export const tplinkDashboard: DashboardData = {
   id: "tplink",
   content: TplinkDashboard,
   icon: WifiIcon,
-  name: "TP-Link Center",
+  name: "Rede TP-Link",
 };

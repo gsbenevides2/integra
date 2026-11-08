@@ -257,7 +257,7 @@ export function LiveTab({
                     className="border border-gray-600"
                     onClick={() => send(`preset_${preset}`)}
                   >
-                    Preset {preset}
+                    Posição {preset}
                   </Button>
                 ))}
               </div>

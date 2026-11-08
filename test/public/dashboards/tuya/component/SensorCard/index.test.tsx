@@ -27,7 +27,7 @@ test("door open/closed, battery percentage, tamper, click", () => {
   expect(screen.getByText("Aberta")).toBeTruthy();
   expect(screen.getByText("80%")).toBeTruthy();
   expect(screen.getByText("Violação")).toBeTruthy();
-  expect(screen.getByText("Online")).toBeTruthy();
+  expect(screen.getByText("Conectado")).toBeTruthy();
   fireEvent.click(screen.getByRole("button"));
   expect(onOpen).toHaveBeenCalled();
 });
@@ -39,7 +39,7 @@ test("door closed + offline + hidden + battery state map", () => {
     readings: { doorcontact_state: "false", battery_state: "middle" },
   });
   expect(screen.getByText("Fechada")).toBeTruthy();
-  expect(screen.getByText("Offline")).toBeTruthy();
+  expect(screen.getByText("Desconectado")).toBeTruthy();
   expect(screen.getByText("Oculto")).toBeTruthy();
   expect(screen.getByText("média")).toBeTruthy();
 });

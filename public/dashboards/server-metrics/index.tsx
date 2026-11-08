@@ -110,7 +110,7 @@ export function ServerMetricsDashboard() {
         >
           <Bars3Icon className="size-5" />
         </IconButton>
-        <h1 className="text-xl">Server Metrics</h1>
+        <h1 className="text-xl">Métricas do servidor</h1>
        </div>
         <div className="flex items-center gap-2">
           {lastChecked > 0 && (
@@ -169,5 +169,5 @@ export const serverMetricsDashboard: DashboardData = {
   id: "server-metrics",
   content: ServerMetricsDashboard,
   icon: ServerIcon,
-  name: "Server Metrics",
+  name: "Métricas do servidor",
 };

@@ -142,7 +142,7 @@ function InterfaceRow({
         </span>
       </div>
       {isControllerRouter ? (
-        <p className="text-xs text-mist-500">Interface do controller não pode ser editada.</p>
+        <p className="text-xs text-mist-500">Interface do controlador não pode ser editada.</p>
       ) : (
         <div className="flex flex-wrap gap-4 pt-1">
           <Switch checked={iface.reservedIp} onChange={(v) => toggleFlag("reservedIp", v)} label="IP fixo" />
@@ -182,7 +182,7 @@ export function DeviceDrawerContent({
         <span className="ml-4 text-mist-400">Tipo:</span>{" "}
         <span>{device.type === "router" ? "Roteador" : "Cliente"}</span>
         {device.isController && (
-          <span className="rounded-full bg-mist-900 px-2 py-0.5 text-xs">Controller</span>
+          <span className="rounded-full bg-mist-900 px-2 py-0.5 text-xs">Controlador</span>
         )}
       </div>
 

@@ -36,7 +36,7 @@ test("submits a switch with channel count", async () => {
   m = mockTuyaFetch({ "POST /api/tuya/devices": () => ({ id: "x" }) });
   const { onCreated, onClose } = setup();
   type("Nome", "Quarto");
-  type("Device ID (Tuya)", "abc");
+  type("ID do dispositivo (Tuya)", "abc");
   fireEvent.change(field("Tipo"), { target: { value: "switch" } });
   type("Quantidade de canais", "3");
   fireEvent.click(screen.getByText("Cadastrar"));
@@ -50,7 +50,7 @@ test("lamp sends null channelCount; failure toasts", async () => {
   m = mockTuyaFetch({ "POST /api/tuya/devices": fail });
   const { onCreated } = setup();
   type("Nome", "A");
-  type("Device ID (Tuya)", "b");
+  type("ID do dispositivo (Tuya)", "b");
   fireEvent.click(screen.getByText("Cadastrar"));
   await screen.findByText("Falha ao cadastrar o dispositivo");
   expect(m.calls[0]!.body.channelCount).toBeNull();

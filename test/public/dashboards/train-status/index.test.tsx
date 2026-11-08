@@ -62,13 +62,13 @@ describe("TrainStatusDashboard", () => {
     await screen.findByText("slow trains");
     fireEvent.click(screen.getByLabelText("Abrir menu"));
     expect(screen.getByText("stopped")).toBeTruthy();
-    expect(screen.getByText("Status: Not checked yet")).toBeTruthy();
+    expect(screen.getByText("Status: Ainda não verificado")).toBeTruthy();
 
     fireEvent.click(screen.getByText("Slow"));
-    await screen.findByText("History - Line 2");
-    await waitFor(() => expect(screen.queryByText("Loading history...")).toBeNull());
+    await screen.findByText("Histórico - Linha 2");
+    await waitFor(() => expect(screen.queryByText("Carregando histórico...")).toBeNull());
     expect(calls.at(-1)!.path).toBe("/api/train-status/2/history");
-    expect(screen.getAllByText(/since/).length).toBe(2);
+    expect(screen.getAllByText(/desde/).length).toBe(2);
 
     const [newer, older] = screen.getAllByRole("button").filter((b) => b.className.includes("disabled:opacity-30")) as HTMLButtonElement[];
     expect(newer!.disabled).toBe(true);
@@ -85,8 +85,8 @@ describe("TrainStatusDashboard", () => {
     // goOlder with no cursor is a no-op
     historyFn = () => history({ hasMore: true, nextCursor: null });
     // overlay click closes; inner click does not
-    const modal = screen.getByText("History - Line 2").closest(".fixed") as HTMLElement;
-    fireEvent.click(screen.getByText("History - Line 2"));
+    const modal = screen.getByText("Histórico - Linha 2").closest(".fixed") as HTMLElement;
+    fireEvent.click(screen.getByText("Histórico - Linha 2"));
     fireEvent.click(modal);
     await waitFor(() => expect(modal.className).toContain("opacity-0"));
   });
@@ -96,10 +96,10 @@ describe("TrainStatusDashboard", () => {
     renderWithProviders(<TrainStatusDashboard />);
     await screen.findByText("slow trains");
     fireEvent.click(screen.getByText("Slow"));
-    await screen.findByText("Failed to fetch history");
+    await screen.findByText("Falha ao buscar histórico");
     historyFn = () => history({ checks: [], segments: [], hasMore: true, nextCursor: null });
     fireEvent.click(screen.getByText("Off"));
-    await screen.findByText("No history available for this period.");
+    await screen.findByText("Nenhum histórico disponível para este período.");
     const older = screen.getAllByRole("button").filter((b) => b.className.includes("disabled:opacity-30"))[1]!;
     fireEvent.click(older);
     const before = calls.length;
@@ -110,11 +110,11 @@ describe("TrainStatusDashboard", () => {
   test("empty and failing lists", async () => {
     linesReply = [];
     const { unmount } = renderWithProviders(<TrainStatusDashboard />);
-    await screen.findByText("No train lines tracked yet");
+    await screen.findByText("Nenhuma linha de trem acompanhada ainda");
     unmount();
     linesReply = fail();
     renderWithProviders(<TrainStatusDashboard />);
-    await screen.findByText("Failed to fetch train lines");
+    await screen.findByText("Falha ao buscar as linhas de trem");
   });
 
   test("polls without skeleton", async () => {
@@ -126,7 +126,7 @@ describe("TrainStatusDashboard", () => {
     await screen.findByText("slow trains");
     linesReply = [];
     await act(async () => tick!());
-    await screen.findByText("No train lines tracked yet");
+    await screen.findByText("Nenhuma linha de trem acompanhada ainda");
   });
 
   test("refresh button success and failure, last checked shown", async () => {
@@ -137,11 +137,11 @@ describe("TrainStatusDashboard", () => {
     await waitFor(() => expect(calls.some((c) => c.method === "POST")).toBe(true));
     refreshFail = true;
     fireEvent.click(screen.getByText("Atualizar"));
-    await screen.findByText("Failed to refresh");
+    await screen.findByText("Falha ao atualizar");
   });
 
   test("Card handles unknown line codes", () => {
     const { container } = renderWithProviders(<Card lineCode={12345} situation="s" status="WARNING" description={null} onOpenHistory={() => {}} />);
-    expect(within(container).getByText(/Line 12345/)).toBeTruthy();
+    expect(within(container).getByText(/Linha 12345/)).toBeTruthy();
   });
 });

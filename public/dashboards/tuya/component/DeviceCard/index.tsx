@@ -67,7 +67,7 @@ export function DeviceCard({ device, isBusy, onCommand, onOpen }: Props) {
               style={isOn ? { color: tint } : undefined}
             />
           )}
-          <span className="truncate">{device.name}</span>
+          <span className="truncate first-letter:uppercase">{device.name}</span>
         </button>
         <div className="flex shrink-0 items-center gap-1">
           {device.hidden && (
@@ -89,7 +89,7 @@ export function DeviceCard({ device, isBusy, onCommand, onOpen }: Props) {
               }
             `}
           >
-            {state.online ? "Online" : "Offline"}
+            {state.online ? "Conectado" : "Desconectado"}
           </span>
         </div>
       </div>

@@ -258,7 +258,7 @@ function BirthdayDashboard() {
                       <CakeIcon className="
                         mt-px size-3.5 shrink-0 text-mist-300
                       " />
-                      <span className="line-clamp-2 wrap-break-word">{e.title}</span>
+                      <span className="line-clamp-2 wrap-break-word first-letter:uppercase">{e.title}</span>
                     </button>
                   ))}
                 </div>
@@ -303,7 +303,9 @@ function BirthdayDashboard() {
                 </span>
               </span>
               <span className="flex min-w-0 flex-col">
-                <span className="truncate">{e.title}</span>
+                <span className="truncate first-letter:uppercase" title={e.title}>
+                  {e.title}
+                </span>
                 <span className="text-xs text-mist-400">
                   {e.inDays === 0 ? "Hoje 🎉" : e.inDays === 1 ? "Amanhã" : `em ${e.inDays} dias`}
                 </span>

@@ -52,7 +52,7 @@ test("live tab: back, mute toggle, hold-to-move ptz and presets", async () => {
   fireEvent.pointerLeave(left, { buttons: 1 });
   fireEvent.pointerLeave(left, { buttons: 0 });
   fireEvent.pointerCancel(left);
-  fireEvent.click(screen.getByText("Preset 100"));
+  fireEvent.click(screen.getByText("Posição 100"));
   await waitFor(() =>
     expect(m.calls.filter((c) => c.path === `${BASE}/ptz`).map((c) => c.body.command)).toEqual([
       "MOVE_LEFT",

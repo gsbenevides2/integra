@@ -35,7 +35,7 @@ test("success", async () => {
   m = mockTuyaFetch({ "POST /api/tuya/sensors": () => ({ id: "s" }) });
   const { onCreated, onClose } = setup();
   type("Nome", "Porta");
-  type("Device ID (Tuya)", "xyz");
+  type("ID do dispositivo (Tuya)", "xyz");
   fireEvent.click(screen.getByText("Cadastrar"));
   await screen.findByText("Sensor cadastrado");
   expect(m.calls[0]!.body).toEqual({ name: "Porta", tuyaDeviceId: "xyz" });
@@ -47,7 +47,7 @@ test("failure and cancel", async () => {
   m = mockTuyaFetch({ "POST /api/tuya/sensors": fail });
   const { onClose } = setup();
   type("Nome", "Porta");
-  type("Device ID (Tuya)", "xyz");
+  type("ID do dispositivo (Tuya)", "xyz");
   fireEvent.click(screen.getByText("Cadastrar"));
   await screen.findByText("Falha ao cadastrar o sensor");
   fireEvent.click(btn("Cancelar"));

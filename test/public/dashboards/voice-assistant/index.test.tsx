@@ -228,7 +228,7 @@ describe("voice assistant dashboard", () => {
 
   test("the wake word switch reflects availability", async () => {
     renderApp(ALLOWED, <VoiceAssistantDashboard />);
-    expect(screen.getByText(/Wake word indisponível/)).toBeTruthy();
+    expect(screen.getByText(/Palavra de ativação indisponível/)).toBeTruthy();
 
     cleanup();
     config = { wakeWordEnabled: true };
@@ -236,7 +236,7 @@ describe("voice assistant dashboard", () => {
     Object.defineProperty(window, "isSecureContext", { value: true, configurable: true });
     try {
       renderApp(ALLOWED, <VoiceAssistantDashboard />);
-      await waitFor(() => expect(screen.queryByText(/Wake word indisponível/)).toBeNull());
+      await waitFor(() => expect(screen.queryByText(/Palavra de ativação indisponível/)).toBeNull());
       const toggle = screen.getByRole("switch");
       expect(toggle.getAttribute("aria-checked")).toBe("true");
       fireEvent.click(toggle);

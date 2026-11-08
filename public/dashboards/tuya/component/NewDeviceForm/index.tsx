@@ -55,7 +55,7 @@ export function NewDeviceForm({
           onChange={(e) => setDraft({ ...draft, name: e.target.value })}
         />
         <Input
-          label="Device ID (Tuya)"
+          label="ID do dispositivo (Tuya)"
           value={draft.tuyaDeviceId}
           onChange={(e) => setDraft({ ...draft, tuyaDeviceId: e.target.value })}
         />

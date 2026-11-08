@@ -36,7 +36,7 @@ export const fetchFromAtlassianStatuspage: StatusFetcher = async (
     (await incidentsResponse.json()) as AtlassianIncidentResponse;
   const problemDescription =
     incidentsData.incidents[0]?.incident_updates[0]?.body ??
-    "Unknown incident";
+    "Incidente desconhecido";
 
   return { status: "DOWN", problemDescription };
 };

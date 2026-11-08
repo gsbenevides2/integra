@@ -226,7 +226,7 @@ export function VoiceAssistantDashboard() {
   };
 
   return (
-    <div className="flex h-dvh flex-col gap-3 p-3">
+    <div className="flex h-dvh animate-fade-in flex-col gap-3 p-3">
       <div className="flex items-center gap-2">
         <IconButton
           onClick={() => globalDrawer.setIsOpen(true)}
@@ -273,7 +273,7 @@ export function VoiceAssistantDashboard() {
         <PermissionDenied label="Peça acesso ao assistente para um administrador." />
       ) : (
         <div className="
-          flex min-h-0 flex-1 flex-col gap-3
+          flex min-h-0 flex-1 stagger-in flex-col gap-3
           max-lg:landscape:flex-row
         ">
           <div className="
@@ -294,7 +294,7 @@ export function VoiceAssistantDashboard() {
             />
             {!assistant.wakeAvailable && (
               <p className="max-w-56 text-center text-[11px] text-mist-500">
-                Wake word indisponível: baixe o modelo de voz com
+                Palavra de ativação indisponível: baixe o modelo de voz com
                 bun run assistant:model (veja docs/assistant.md).
               </p>
             )}
@@ -302,8 +302,8 @@ export function VoiceAssistantDashboard() {
 
           <div className="flex min-h-0 flex-1 flex-col gap-2">
             <div ref={listRef} className="
-              flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-md
-              bg-gray-900 p-3
+              flex min-h-0 flex-1 stagger-in flex-col gap-3 overflow-y-auto
+              rounded-md bg-gray-900 p-3
             ">
               {assistant.messages.length === 0 ? (
                 <div className="
@@ -312,7 +312,7 @@ export function VoiceAssistantDashboard() {
                 ">
                   <MicrophoneIcon className="size-8 text-mist-500" />
                   <p className="text-sm text-mist-300">Experimente dizer:</p>
-                  <div className="flex flex-wrap justify-center gap-2">
+                  <div className="flex stagger-in flex-wrap justify-center gap-2">
                     {SUGGESTIONS.map((suggestion) => (
                       <button
                         key={suggestion}

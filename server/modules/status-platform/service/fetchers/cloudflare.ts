@@ -30,7 +30,7 @@ export const fetchFromCloudflareStatus: StatusFetcher = async () => {
     if (!response.ok) {
       return {
         status: "DOWN",
-        problemDescription: `Cloudflare API returned ${response.status}`,
+        problemDescription: `API da Cloudflare retornou ${response.status}`,
       };
     }
 
@@ -46,10 +46,10 @@ export const fetchFromCloudflareStatus: StatusFetcher = async () => {
   } catch (error) {
     const problemDescription =
       error instanceof Error && error.name === "TimeoutError"
-        ? "Request timed out"
+        ? "Tempo de resposta esgotado"
         : error instanceof Error
           ? error.message
-          : "Unknown error occurred";
+          : "Erro desconhecido";
 
     return { status: "DOWN", problemDescription };
   }

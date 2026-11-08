@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 
 import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
 
@@ -9,9 +9,21 @@ export { ConfirmProvider, useConfirm } from "./ConfirmContext";
 
 export function ConfirmDialog() {
   const { state, resolve } = useConfirmState();
+  const resolveRef = useRef(resolve);
+  resolveRef.current = resolve;
+
+  useEffect(() => {
+    if (!state.isOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") resolveRef.current(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [state.isOpen]);
 
   return (
     <div
+      inert={!state.isOpen}
       className={`
         fixed inset-0 z-50 flex items-center justify-center bg-mist-950/90 p-4
         backdrop-blur-sm transition-opacity duration-200
@@ -26,6 +38,9 @@ export function ConfirmDialog() {
       }}
     >
       <div
+        role="alertdialog"
+        aria-modal="true"
+        aria-label={state.isOpen ? state.title : undefined}
         className={`
           flex w-full max-w-sm flex-col gap-4 rounded-lg bg-gray-800 p-4
           shadow-xl transition-all duration-200

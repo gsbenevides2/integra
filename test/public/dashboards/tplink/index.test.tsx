@@ -85,9 +85,9 @@ describe("TplinkDashboard", () => {
     fireEvent.click(screen.getByLabelText("Abrir menu"));
     const names = Array.from(document.querySelectorAll("tbody tr td:first-child")).map((t) => t.textContent);
     expect(names.slice(0, 4)).toEqual(["RouterCtl", "RouterAgent", "Client1", "Client2"]);
-    expect(screen.getByText("Roteador (Controller)")).toBeTruthy();
+    expect(screen.getByText("Roteador (controlador)")).toBeTruthy();
     expect(screen.getByText("Roteador (Agente)")).toBeTruthy();
-    expect(screen.getAllByText("Conectado").length).toBe(1);
+    expect(screen.getAllByText("Conectado").length).toBe(2);
     expect(screen.getAllByText("Desconectado").length).toBe(3);
     expect(screen.getByText("1.1.1.1")).toBeTruthy();
     expect(screen.getByText("CPU, memória e conexão do roteador")).toBeTruthy();

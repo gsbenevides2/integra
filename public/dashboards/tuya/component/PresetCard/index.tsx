@@ -45,7 +45,7 @@ export function PresetCard({
         className="flex min-w-0 cursor-pointer items-center gap-2 text-left"
       >
         <LightBulbIcon className="size-5 shrink-0" style={{ color: tint }} />
-        <span className="truncate">{preset.name}</span>
+        <span className="truncate first-letter:uppercase">{preset.name}</span>
       </button>
 
       <div className="flex items-center gap-2">

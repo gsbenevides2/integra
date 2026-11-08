@@ -100,5 +100,5 @@ export const googleAccountsDashboard: DashboardData = {
   id: "google-accounts",
   content: GoogleAccountsDashboard,
   icon: UserGroupIcon,
-  name: "Google Accounts",
+  name: "Contas Google",
 };

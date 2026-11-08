@@ -38,7 +38,7 @@ describe("CronsDashboard", () => {
 
   test("runs jobs covering every result branch", async () => {
     renderWithProviders(<CronsDashboard />);
-    expect(screen.getByText("Carregando crons...")).toBeTruthy();
+    expect(screen.getByText("Carregando tarefas...")).toBeTruthy();
     await screen.findByText("Label a");
     fireEvent.click(screen.getByLabelText("Abrir menu"));
     expect(screen.getAllByText("—").length).toBe(4);
@@ -71,17 +71,17 @@ describe("CronsDashboard", () => {
   test("empty list, ok:false list and list failure", async () => {
     list = { ok: true };
     const { unmount } = renderWithProviders(<CronsDashboard />);
-    await screen.findByText("Nenhum cron registrado");
+    await screen.findByText("Nenhuma tarefa agendada");
     unmount();
 
     list = { ok: false };
     const second = renderWithProviders(<CronsDashboard />);
-    await screen.findByText("Nenhum cron registrado");
+    await screen.findByText("Nenhuma tarefa agendada");
     second.unmount();
 
     list = "fail";
     renderWithProviders(<CronsDashboard />);
-    await screen.findByText("Falha ao buscar crons");
+    await screen.findByText("Falha ao buscar tarefas agendadas");
   });
 
   test("polls without the loading state", async () => {

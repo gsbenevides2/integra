@@ -49,6 +49,23 @@ test("renders title, children, classes per direction/size, close handlers", () =
   expect(container.innerHTML).toContain("max-w-md");
 });
 
+test("Escape closes only while open and locks the page scroll", () => {
+  const onClose = mock();
+  const { rerender, unmount } = render(
+    <Drawer isOpen onClose={onClose} title="T">x</Drawer>,
+  );
+  expect(screen.getByRole("dialog", { name: "T" })).toBeTruthy();
+  expect(document.body.style.overflow).toBe("hidden");
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(onClose).toHaveBeenCalledTimes(1);
+
+  rerender(<Drawer isOpen={false} onClose={onClose} title="T">x</Drawer>);
+  expect(document.body.style.overflow).toBe("");
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(onClose).toHaveBeenCalledTimes(1);
+  unmount();
+});
+
 test("no listeners without swipe props", () => {
   const onClose = mock();
   render(<Drawer isOpen onClose={onClose}>x</Drawer>);

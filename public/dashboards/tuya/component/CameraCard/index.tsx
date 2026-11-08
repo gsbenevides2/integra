@@ -51,7 +51,7 @@ export function CameraCard({
       {online !== undefined && (
         <span
           role="status"
-          aria-label={online ? "Câmera online" : "Câmera sem sinal"}
+          aria-label={online ? "Câmera conectada" : "Câmera sem sinal"}
           className={`
             absolute top-2 right-2 size-2.5 rounded-full
             ${online ? "bg-green-500" : "bg-red-500"}

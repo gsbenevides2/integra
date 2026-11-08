@@ -73,7 +73,7 @@ export const RESOURCE_TYPE_LABELS: Record<string, string> = {
   tuya_device: "Dispositivos Tuya",
   tuya_sensor: "Sensores Tuya",
   tuya_preset: "Modos Tuya",
-  cron_job: "Crons",
+  cron_job: "Tarefas agendadas",
 };
 
 /** Section order on the resources tab; unknown types are appended after these. */
@@ -668,7 +668,9 @@ export function PermissionsDashboard() {
                           flex flex-wrap items-center justify-between gap-2 py-2
                         "
                       >
-                        <span className="min-w-0 text-sm text-mist-100">
+                        <span className="
+                          min-w-0 text-sm text-mist-100 first-letter:uppercase
+                        ">
                           {row.label}
                           <KindBadge kind={row.kind} />
                           <FlagText flag={row.flag} />

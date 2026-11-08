@@ -23,15 +23,15 @@ export const fetchFromGenericHttp: StatusFetcher = async (endpoint) => {
 
     return {
       status: "DOWN",
-      problemDescription: `HTTP status code ${response.status} received instead of 200`,
+      problemDescription: `Recebeu HTTP ${response.status} em vez de 200`,
     };
   } catch (error) {
     const problemDescription =
       error instanceof Error && error.name === "TimeoutError"
-        ? `Request timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds`
+        ? `Tempo de resposta esgotado após ${REQUEST_TIMEOUT_MS / 1000} segundos`
         : error instanceof Error
           ? error.message
-          : "Unknown error occurred";
+          : "Erro desconhecido";
 
     return { status: "DOWN", problemDescription };
   }

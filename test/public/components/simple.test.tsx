@@ -59,6 +59,18 @@ test("Switch toggles and respects label/disabled", () => {
   expect(screen.queryByText("L")).toBeNull();
 });
 
+test("Modal closes on Escape and is inert while closed", () => {
+  const onClose = mock();
+  const { rerender } = render(
+    <Modal isOpen onClose={onClose} title="T">body</Modal>,
+  );
+  expect(screen.getByRole("dialog", { name: "T" })).toBeTruthy();
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(onClose).toHaveBeenCalledTimes(1);
+  rerender(<Modal isOpen={false} onClose={onClose} title="T">body</Modal>);
+  expect(document.querySelector("[inert]")).toBeTruthy();
+});
+
 test("Modal portals after mount and closes on backdrop only", () => {
   const onClose = mock();
   const { rerender } = render(

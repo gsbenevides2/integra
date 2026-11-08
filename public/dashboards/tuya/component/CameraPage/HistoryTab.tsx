@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 
-import { SpeedVideo } from "./SpeedVideo";
-
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
   PlayCircleIcon,
 } from "@heroicons/react/24/outline";
+
+import { SpeedVideo } from "./SpeedVideo";
 
 interface DaySummary {
   day: string;

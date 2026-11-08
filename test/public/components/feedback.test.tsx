@@ -78,6 +78,17 @@ describe("confirm", () => {
     expect(onResult).toHaveBeenCalledTimes(3);
   });
 
+  test("Escape cancels the confirm dialog", async () => {
+    const onResult = mock();
+    renderWithProviders(<Ask opts={{ message: "esc?" }} onResult={onResult} />);
+    fireEvent.click(screen.getByText("ask"));
+    expect(screen.getByRole("alertdialog", { name: "Confirmar ação" })).toBeTruthy();
+    await act(async () =>
+      fireEvent.keyDown(window, { key: "Escape" }),
+    );
+    expect(onResult).toHaveBeenLastCalledWith(false);
+  });
+
   test("custom labels", () => {
     renderWithProviders(
       <Ask opts={{ title: "T", message: "m", confirmLabel: "Yes", cancelLabel: "No" }} onResult={() => {}} />,

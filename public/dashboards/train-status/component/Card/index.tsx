@@ -20,10 +20,10 @@ const STATUS_DOT: Record<TrainLineStatus, string> = {
 };
 
 const STATUS_LABEL: Record<TrainLineStatus, string> = {
-  OK: "Operational",
-  WARNING: "Warning",
-  CRITICAL: "Critical",
-  UNKNOWN: "Unknown",
+  OK: "Operacional",
+  WARNING: "Atenção",
+  CRITICAL: "Crítico",
+  UNKNOWN: "Desconhecido",
 };
 
 export function Card({
@@ -49,7 +49,7 @@ export function Card({
           style={{ backgroundColor: line?.cssColor }}
         />
         <p>
-          Line {lineCode} - {line?.color}
+          Linha {lineCode} - {line?.color}
         </p>
       </div>
       <p className="text-mist-300">{situation}</p>
@@ -61,7 +61,9 @@ export function Card({
               ${status ? STATUS_DOT[status] : "bg-gray-600"}
             `}
           />
-          <p>Status: {status ? STATUS_LABEL[status] : "Not checked yet"}</p>
+          <p>
+            Status: {status ? STATUS_LABEL[status] : "Ainda não verificado"}
+          </p>
         </div>
         {(status === "WARNING" || status === "CRITICAL") && description && (
           <p

@@ -18,7 +18,7 @@ export function Content() {
 
   const copyRumSessionId = () => {
     navigator.clipboard.writeText(sessionId);
-    toast.showToast("Copiado para área de transferencia", "success");
+    toast.showToast("Copiado para a área de transferência", "success");
   };
 
   return (
@@ -71,7 +71,7 @@ export function Content() {
         v{APP_VERSION}
         <br />
         <span onClick={copyRumSessionId} className="cursor-pointer">
-          RUM Session Id: {sessionId}
+          ID da sessão RUM: {sessionId}
         </span>
       </div>
     </div>

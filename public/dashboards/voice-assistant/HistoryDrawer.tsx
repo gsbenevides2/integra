@@ -100,7 +100,7 @@ export function HistoryDrawer({ isOpen, onClose }: Props) {
                 onClick={() => open(conversation.id)}
                 className="min-w-0 flex-1 cursor-pointer px-3 py-2 text-left"
               >
-                <p className="truncate text-sm text-mist-100">{conversation.title}</p>
+                <p className="truncate text-sm text-mist-100 first-letter:uppercase">{conversation.title}</p>
                 <p className="text-[11px] text-mist-400">
                   {DATE_FORMAT.format(new Date(conversation.updatedAt))}
                 </p>

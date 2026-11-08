@@ -53,6 +53,7 @@ See the [`docs/`](./docs/) folder for detailed documentation:
 | Command | Description |
 |---------|-------------|
 | `bun run dev` | Start with file watching (HMR); cron jobs disabled unless `ENABLE_CRONS=true` |
+| `bun run dev:local` | Same as `dev`, but routes every `*.infra.gui.dev.br` request (`fetch`, `WebSocket`, `Bun.s3`) to `192.168.0.3` (the LAN reverse proxy) through an in-process CONNECT proxy; `DEV_LOCAL_IP` overrides the address |
 | `bun run lint` | Lint with ESLint |
 | `bun run lint:fix` | Lint and auto-fix |
 | `bun run db:sync` | Push the Drizzle schema to PostgreSQL (no migration files) |

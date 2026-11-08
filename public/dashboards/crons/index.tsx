@@ -53,7 +53,7 @@ export function CronsDashboard() {
       const client = getCronsEdenClient();
       const { data, error } = await client.api.crons.list.get();
       if (error) {
-        showToast("Falha ao buscar crons", "error");
+        showToast("Falha ao buscar tarefas agendadas", "error");
       } else {
         const resp = data as unknown as CronListResponse | undefined;
         if (resp?.ok) {
@@ -124,15 +124,15 @@ export function CronsDashboard() {
         >
           <Bars3Icon className="size-5" />
         </IconButton>
-        <h1 className="text-xl">Crons</h1>
+        <h1 className="text-xl">Tarefas agendadas</h1>
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-mist-400">Carregando crons...</p>
+        <p className="text-sm text-mist-400">Carregando tarefas...</p>
       ) : jobs.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-16 text-center">
           <ServerStackIcon className="size-10 text-mist-500" />
-          <p className="text-mist-200">Nenhum cron registrado</p>
+          <p className="text-mist-200">Nenhuma tarefa agendada</p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-md bg-gray-800">
@@ -143,9 +143,14 @@ export function CronsDashboard() {
                   border-b border-gray-700 text-left text-xs text-mist-400
                 "
               >
-                <th className="px-3 py-2 font-normal">Job</th>
-                <th className="px-3 py-2 font-normal">Schedule</th>
-                <th className="px-3 py-2 font-normal">Última execução</th>
+                <th className="px-3 py-2 font-normal">Tarefa</th>
+                <th className="px-3 py-2 font-normal">Agendamento</th>
+                <th className="
+                  hidden px-3 py-2 font-normal
+                  sm:table-cell
+                ">
+                  Última execução
+                </th>
                 <th className="px-3 py-2 font-normal" />
               </tr>
             </thead>
@@ -175,7 +180,10 @@ export function CronsDashboard() {
                       {job.schedule}
                     </span>
                   </td>
-                  <td className="px-3 py-2">
+                  <td className="
+                    hidden px-3 py-2
+                    sm:table-cell
+                  ">
                     {runningJobs.has(job.name) ? (
                       <span className="text-xs text-yellow-300">
                         Executando...
@@ -200,11 +208,16 @@ export function CronsDashboard() {
                   <td className="px-3 py-2 text-right">
                     <Button
                       variant="secondary"
+                      aria-label={`Executar ${job.label}`}
                       isLoading={runningJobs.has(job.name)}
                       disabled={runningJobs.has(job.name)}
                       onClick={() => runJob(job)}
                     >
-                      <PlayIcon className="size-4" /> Executar
+                      <PlayIcon className="size-4" />
+                      <span className="
+                        hidden
+                        sm:inline
+                      ">Executar</span>
                     </Button>
                   </td>
                 </tr>
@@ -221,5 +234,5 @@ export const cronsDashboard: DashboardData = {
   id: "crons",
   content: CronsDashboard,
   icon: ServerStackIcon,
-  name: "Crons",
+  name: "Tarefas agendadas",
 };

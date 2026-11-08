@@ -43,7 +43,7 @@ describe("DeviceDrawerContent", () => {
     ];
     renderWithProviders(<DeviceDrawerContent device={dev()} onChanged={onChanged} />);
     expect(screen.getByText("Carregando histórico...")).toBeTruthy();
-    await screen.findByText("50% online no período");
+    await screen.findByText("50% conectado no período");
     expect(screen.getByText("Cliente")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("switch", { name: "IP fixo" }));
@@ -91,9 +91,9 @@ describe("DeviceDrawerContent", () => {
       <DeviceDrawerContent device={dev({ type: "router", isController: true })} onChanged={() => {}} />,
     );
     await screen.findByText("Sem histórico de conexão no período.");
-    expect(screen.getByText("Controller")).toBeTruthy();
+    expect(screen.getByText("Controlador")).toBeTruthy();
     expect(screen.getByText("Roteador")).toBeTruthy();
-    expect(screen.getByText("Interface do controller não pode ser editada.")).toBeTruthy();
+    expect(screen.getByText("Interface do controlador não pode ser editada.")).toBeTruthy();
     expect(screen.queryByRole("switch")).toBeNull();
     expect(screen.queryByText("Adicionar interface")).toBeNull();
   });

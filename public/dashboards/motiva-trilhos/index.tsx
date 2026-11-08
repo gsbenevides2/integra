@@ -38,7 +38,7 @@ function LegCard({ leg }: { leg: LegStatus }) {
 
 function TripSection({ title, legs }: { title: string; legs: LegStatus[] }) {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex stagger-in flex-col gap-2">
       <p className="text-xs text-mist-400">{title}</p>
       {legs.map((leg) => (
         <LegCard key={leg.id} leg={leg} />
@@ -76,7 +76,7 @@ export function MotivaTrilhosDashboard() {
       {!legs ? (
         <p className="text-mist-400">Buscando próximos trens…</p>
       ) : (
-        <div className="flex flex-col gap-4">
+        <div className="flex stagger-in flex-col gap-4">
           <TripSection title="Indo para o trabalho" legs={legs.filter((l) => l.trip === "to-work")} />
           <TripSection title="Voltando para casa" legs={legs.filter((l) => l.trip === "to-home")} />
         </div>

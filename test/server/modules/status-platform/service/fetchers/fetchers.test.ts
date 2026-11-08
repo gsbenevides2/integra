@@ -48,7 +48,7 @@ describe("atlassian", () => {
       u.includes("status.json") ? json({ status: { indicator: "minor" } }) : json({ incidents: [] }),
     );
     expect((await fetchFromAtlassianStatuspage("https://a.io")) as { problemDescription: string }).toMatchObject({
-      problemDescription: "Unknown incident",
+      problemDescription: "Incidente desconhecido",
     });
   });
 });
@@ -75,7 +75,7 @@ describe("incident.io", () => {
     );
     expect(await fetchFromIncidentIoStatus("https://i.io")).toEqual({
       status: "DOWN",
-      problemDescription: "Unknown incident",
+      problemDescription: "Incidente desconhecido",
     });
   });
 });
@@ -102,18 +102,18 @@ describe("instatus", () => {
     );
     expect(await fetchFromInstatusStatuspage("https://s.io")).toEqual({
       status: "DOWN",
-      problemDescription: "Unknown incident",
+      problemDescription: "Incidente desconhecido",
     });
   });
 });
 
 describe.each([
-  ["cloudflare", fetchFromCloudflareStatus, "Cloudflare", "Request timed out"],
-  ["shopify", fetchFromShopifyStatus, "Shopify", "Request timed out"],
+  ["cloudflare", fetchFromCloudflareStatus, "API da Cloudflare", "Tempo de resposta esgotado"],
+  ["shopify", fetchFromShopifyStatus, "API do Shopify", "Tempo de resposta esgotado"],
 ] as const)("%s", (_n, fetcher, label, timeoutMsg) => {
   test("non-ok", async () => {
     mockFetch(() => new Response("x", { status: 503 }));
-    expect(await fetcher("")).toEqual({ status: "DOWN", problemDescription: `${label} API returned 503` });
+    expect(await fetcher("")).toEqual({ status: "DOWN", problemDescription: `${label} retornou 503` });
   });
   test("OK", async () => {
     mockFetch(() => json({ status: { indicator: "none", description: "" } }));
@@ -135,7 +135,7 @@ describe.each([
     expect(await fetcher("")).toEqual({ status: "DOWN", problemDescription: "net" });
     spy.mockRestore();
     spy = spyOn(globalThis, "fetch").mockRejectedValue("str" as never);
-    expect(await fetcher("")).toEqual({ status: "DOWN", problemDescription: "Unknown error occurred" });
+    expect(await fetcher("")).toEqual({ status: "DOWN", problemDescription: "Erro desconhecido" });
   });
 });
 
@@ -148,7 +148,7 @@ describe("generic", () => {
     mockFetch(() => new Response("no", { status: 500 }));
     expect(await fetchFromGenericHttp("https://x.io")).toEqual({
       status: "DOWN",
-      problemDescription: "HTTP status code 500 received instead of 200",
+      problemDescription: "Recebeu HTTP 500 em vez de 200",
     });
   });
   test("errors", async () => {
@@ -157,7 +157,7 @@ describe("generic", () => {
     spy = spyOn(globalThis, "fetch").mockRejectedValue(t as never);
     expect(await fetchFromGenericHttp("x")).toEqual({
       status: "DOWN",
-      problemDescription: "Request timed out after 20 seconds",
+      problemDescription: "Tempo de resposta esgotado após 20 segundos",
     });
     spy.mockRestore();
     spy = spyOn(globalThis, "fetch").mockRejectedValue(new Error("net") as never);
@@ -166,7 +166,7 @@ describe("generic", () => {
     spy = spyOn(globalThis, "fetch").mockRejectedValue(1 as never);
     expect(await fetchFromGenericHttp("x")).toEqual({
       status: "DOWN",
-      problemDescription: "Unknown error occurred",
+      problemDescription: "Erro desconhecido",
     });
   });
 });
@@ -211,7 +211,7 @@ describe("wake", () => {
     expect(await fetchFromWakeStatuspage("https://w.io")).toEqual({
       status: "DOWN",
       problemDescription:
-        "Two: Outage (investigating - API); Untitled incident; Solo",
+        "Two: Outage (investigating - API); Incidente sem título; Solo",
     });
     expect(f).toHaveBeenCalled();
   });
@@ -236,7 +236,7 @@ describe("wake", () => {
     });
     expect(await fetchFromWakeStatuspage("https://w.io/?tenant=%20")).toEqual({
       status: "DOWN",
-      problemDescription: "Overall status: weird",
+      problemDescription: "Status geral: weird",
     });
   });
   test("summary without overall_status and without components", async () => {
