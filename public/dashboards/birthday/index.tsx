@@ -84,7 +84,7 @@ function BirthdayDashboard() {
   const open = (event?: EventFormValues) => setForm({ open: true, event });
 
   return (
-    <div className="flex flex-col gap-4 p-3">
+    <div className="flex animate-fade-in flex-col gap-4 p-3">
       <EventFormModal
         isOpen={form.open}
         event={form.event}
