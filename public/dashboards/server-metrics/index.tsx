@@ -101,7 +101,7 @@ export function ServerMetricsDashboard() {
   );
 
   return (
-    <div className="flex flex-col gap-4 p-3">
+    <div className="flex animate-fade-in flex-col gap-4 p-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
        <div className="flex items-center gap-2">
         <IconButton
