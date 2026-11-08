@@ -20,4 +20,4 @@ RUN bun run assistant:model
 # Node builds of @opentelemetry); revisit if image size matters.
 RUN bun run build:web
 EXPOSE 3000
-CMD ["bun", "dist/server/index.js"]
+CMD ["bun", "scripts/start-production.ts"]
