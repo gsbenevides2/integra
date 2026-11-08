@@ -128,7 +128,7 @@ export function PlatformFormModal({
             name="ignoreSsl"
             defaultChecked={platform?.ignoreSsl}
           />
-          Ignore SSL/TLS certificate errors
+          Ignorar erros de certificado SSL/TLS
         </label>
         <div className="mt-1 flex justify-end gap-2">
           <Button
