@@ -30,11 +30,20 @@ beforeEach(() => {
 test("renders title, children, classes per direction/size, close handlers", () => {
   const onClose = mock();
   const { rerender, container } = render(
-    <Drawer isOpen onClose={onClose} title="Ttl" size="small" direction="left" removePadding>
+    <Drawer
+      isOpen
+      onClose={onClose}
+      title="Ttl"
+      size="small"
+      direction="left"
+      removePadding
+      headerAction={<span>Ação</span>}
+    >
       <p>kid</p>
     </Drawer>,
   );
   expect(screen.getByText("Ttl")).toBeTruthy();
+  expect(screen.getByText("Ação")).toBeTruthy();
   expect(container.innerHTML).toContain("max-w-90");
   expect(container.innerHTML).toContain("left-0");
   fireEvent.click(screen.getByLabelText("Fechar"));

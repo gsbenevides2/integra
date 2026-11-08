@@ -150,7 +150,15 @@ describe("assistant routes", () => {
 
   test("history lists, opens and deletes only the user's conversations", async () => {
     const updatedAt = new Date("2026-10-11T12:00:00Z");
-    const row = { id: "c1", userId: TEST_USER.id, title: "Oi", endedAt: null, createdAt: updatedAt, updatedAt };
+    const row = {
+      id: "c1",
+      userId: TEST_USER.id,
+      title: "Oi",
+      endedAt: null,
+      usage: null,
+      createdAt: updatedAt,
+      updatedAt,
+    };
     const stored = { key: "k", mediaType: "image/png", source: "camera" as const, label: "frente" };
     spies.push(
       spyOn(ConversationService, "list").mockResolvedValue([row, { ...row, id: "c2", endedAt: updatedAt }]),
@@ -162,8 +170,20 @@ describe("assistant routes", () => {
     );
     const list = await (await call("/conversations")).json();
     expect(list).toEqual([
-      { id: "c1", title: "Oi", updatedAt: updatedAt.toISOString(), ended: false },
-      { id: "c2", title: "Oi", updatedAt: updatedAt.toISOString(), ended: true },
+      {
+        id: "c1",
+        title: "Oi",
+        updatedAt: updatedAt.toISOString(),
+        ended: false,
+        usage: null,
+      },
+      {
+        id: "c2",
+        title: "Oi",
+        updatedAt: updatedAt.toISOString(),
+        ended: true,
+        usage: null,
+      },
     ]);
 
     const detail = await (await call("/conversations/c1")).json();
@@ -185,6 +205,20 @@ describe("assistant routes", () => {
     expect((await call("/conversations/c1", { method: "DELETE" })).status).toBe(200);
     removeImages.mockRejectedValueOnce("raw");
     expect((await call("/conversations/c1", { method: "DELETE" })).status).toBe(200);
+  });
+
+  test("clears the whole history and its images", async () => {
+    const stored = { key: "k", mediaType: "image/png", source: "camera" as const, label: "frente" };
+    const removeAll = spyOn(ConversationService, "removeAll").mockResolvedValue([stored]);
+    const removeImages = spyOn(ImageStorage, "remove").mockResolvedValue(undefined);
+    spies.push(removeAll, removeImages);
+    expect(await (await call("/conversations", { method: "DELETE" })).json()).toEqual({ ok: true });
+    expect(removeAll).toHaveBeenCalledWith(TEST_USER.id);
+    expect(removeImages).toHaveBeenCalledWith([stored]);
+
+    // A bucket failure does not fail the clear: leftovers are swept later.
+    removeImages.mockRejectedValueOnce(new Error("s3 down"));
+    expect((await call("/conversations", { method: "DELETE" })).status).toBe(200);
   });
 
   test("images redirect the owner to a fresh signed URL", async () => {

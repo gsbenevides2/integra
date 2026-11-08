@@ -43,6 +43,7 @@ function toSummary(conversation: Conversation): ConversationSummary {
     title: conversation.title,
     updatedAt: conversation.updatedAt,
     ended: conversation.endedAt !== null,
+    usage: conversation.usage,
   };
 }
 
@@ -183,6 +184,27 @@ export const assistantRoutes = new Elysia({
         description:
           "Closes the user's open conversation, so the next message starts a " +
           "new one. History is kept.",
+      },
+    },
+  )
+  .delete(
+    "/conversations",
+    async (ctx) => {
+      const images = await ConversationService.removeAll(currentUser(ctx).id);
+      // The history is gone either way; images left behind are swept daily.
+      await ImageStorage.remove(images).catch((error: unknown) =>
+        logWarn(log, "[assistant] could not delete history images", {
+          "error.message": error instanceof Error ? error.message : String(error),
+        }),
+      );
+      return { ok: true };
+    },
+    {
+      detail: {
+        summary: "Clear Conversation History",
+        description:
+          "Deletes every conversation of the user and their images. " +
+          "This cannot be undone.",
       },
     },
   )

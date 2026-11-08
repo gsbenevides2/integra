@@ -7,6 +7,7 @@ import {
 } from "@opentelemetry/api";
 
 import { httpClientDuration } from "./metrics";
+import { openRouterLlmSpan } from "./openinference";
 import { recordSpanError } from "./withSpan";
 
 function headerAttributes(
@@ -126,6 +127,15 @@ export function instrumentFetch(): void {
               "http.response.body.size",
               Buffer.byteLength(responseBody),
             );
+          }
+
+          // OpenObserve's AI views read OpenInference attributes. The agent's
+          // OpenRouter calls have no OpenAI SDK to auto-instrument, so the
+          // already-buffered request/response are translated here.
+          const llm = openRouterLlmSpan(url, requestBody, responseBody);
+          if (llm) {
+            span.updateName(llm.name);
+            span.setAttributes(llm.attributes);
           }
 
           return response;

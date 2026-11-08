@@ -8,6 +8,8 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
+  /** Extra action(s) shown in the header, before the close button. */
+  headerAction?: ReactNode;
   children: ReactNode;
   direction?: "left" | "right";
   size?: "meddium" | "large" | "small";
@@ -33,6 +35,7 @@ export function Drawer({
   enableSwipeOpen,
   enableSwipeClose,
   title,
+  headerAction,
   children,
   direction = "right",
   size = "meddium",
@@ -149,9 +152,12 @@ export function Drawer({
           "
         >
           <h2 className="text-base font-semibold first-letter:uppercase">{title}</h2>
-          <IconButton onClick={onClose} aria-label="Fechar">
-            <XMarkIcon className="size-5" />
-          </IconButton>
+          <div className="flex items-center gap-1">
+            {headerAction}
+            <IconButton onClick={onClose} aria-label="Fechar">
+              <XMarkIcon className="size-5" />
+            </IconButton>
+          </div>
         </div>
         <div
           className={`

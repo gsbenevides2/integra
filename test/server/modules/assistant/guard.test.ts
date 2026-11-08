@@ -72,7 +72,17 @@ describe("guardedTool", () => {
     grant(true);
     const { ctx, tools } = build(async () => ({ value: 7 }));
     expect(await runTool(tools, "t")).toEqual({ value: 7 });
-    expect(ctx.actions).toEqual([{ tool: "t", ok: true, summary: "valor 7" }]);
+    expect(ctx.actions).toMatchObject([
+      {
+        tool: "t",
+        ok: true,
+        summary: "valor 7",
+        description: "d",
+        input: {},
+        output: { value: 7 },
+      },
+    ]);
+    expect(ctx.actions[0]!.durationMs).toBeGreaterThanOrEqual(0);
   });
 
   test("streams the tool start, its action and any new images", async () => {
@@ -94,9 +104,19 @@ describe("guardedTool", () => {
       }),
     ];
     await runTool(tools, "t");
-    expect(events).toEqual([
+    expect(events).toMatchObject([
       { type: "tool", tool: "t" },
-      { type: "action", action: { tool: "t", ok: true, summary: "feito" } },
+      {
+        type: "action",
+        action: {
+          tool: "t",
+          ok: true,
+          summary: "feito",
+          description: "d",
+          input: {},
+          output: { value: 1 },
+        },
+      },
       {
         type: "image",
         image: {
@@ -135,6 +155,34 @@ describe("guardedTool", () => {
 
     const returned = build(async () => ({ error: "nope" }));
     await runTool(returned.tools, "t");
-    expect(returned.ctx.actions).toEqual([{ tool: "t", ok: false, summary: "nope" }]);
+    expect(returned.ctx.actions).toMatchObject([
+      { tool: "t", ok: false, summary: "nope", output: { error: "nope" } },
+    ]);
+  });
+
+  test("keeps tool details readable and drops inline image payloads", async () => {
+    grant(true);
+    const ctx = makeContext();
+    const long = "x".repeat(3000);
+    const tools = [
+      guardedTool(ctx, {
+        name: "detalhes",
+        description: "d",
+        routeKeys: [],
+        inputSchema: z.object({}),
+        execute: async () => ({
+          imageDataUrl: "data:image/png;base64,AAAA",
+          long,
+          list: [1, "data:image/jpeg;base64,BBBB"],
+        }),
+        summarize: () => "feito",
+      }),
+    ];
+    await runTool(tools, "detalhes");
+    expect(ctx.actions[0]!.output).toEqual({
+      imageDataUrl: "[imagem]",
+      long: `${"x".repeat(2000)}…`,
+      list: [1, "[imagem]"],
+    });
   });
 });

@@ -6,7 +6,7 @@ import React from "react";
 import { GlobalDrawerProvider } from "@public/components/GlobalDrawerContext";
 import type { Me } from "@public/components/MeContext";
 
-import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterAll, afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
 import { fail, sse, useApi } from "../../../helpers/dash-api";
@@ -20,9 +20,13 @@ const { CHAT_ROUTE_KEY, CHIME_ECHO_MS, VoiceAssistantProvider, useVoiceAssistant
 );
 const { Orb } = await import("@public/components/VoiceAssistantContext/Orb");
 const { VoiceAssistantOverlay } = await import("@public/components/VoiceAssistantOverlay");
-const { SETTINGS_ROUTE_KEY, voiceAssistantDashboard, VoiceAssistantDashboard } = await import(
-  "@public/dashboards/voice-assistant"
-);
+const {
+  ConversationMetrics,
+  pretty,
+  SETTINGS_ROUTE_KEY,
+  voiceAssistantDashboard,
+  VoiceAssistantDashboard,
+} = await import("@public/dashboards/voice-assistant");
 const { getAssistantEdenClient } = await import("@public/dashboards/voice-assistant/client");
 
 const ALLOWED: Me = { ...ME_FIXTURE, routes: [CHAT_ROUTE_KEY] };
@@ -38,11 +42,23 @@ const CAMERA_IMAGE = {
   label: "frente",
 };
 const NOW = new Date("2026-10-11T15:00:00Z").toISOString();
+const USAGE = {
+  model: "openai/gpt-5-mini",
+  inputTokens: 1200,
+  outputTokens: 400,
+  totalTokens: 1600,
+  cachedTokens: 300,
+  reasoningTokens: 50,
+  cost: 0.001234,
+  modelCalls: 2,
+  durationMs: 1500,
+};
 let conversations: unknown = [
   { id: "c1", title: "Luz da sala", updatedAt: NOW, ended: true },
   { id: "c2", title: "Câmera", updatedAt: NOW, ended: false },
 ];
 let deleteReply: unknown = { ok: true };
+let clearReply: unknown = { ok: true };
 let chatImages: unknown[] = [];
 const CONFIGURER: Me = { ...ME_FIXTURE, routes: [CHAT_ROUTE_KEY, SETTINGS_ROUTE_KEY] };
 let config = { wakeWordEnabled: false };
@@ -59,12 +75,21 @@ const calls = useApi({
       replyEvents({
         reply: "Pronto.",
         actions: [
-          { tool: "a", ok: true, summary: "Ligou a luz" },
+          {
+            tool: "a",
+            ok: true,
+            summary: "Ligou a luz",
+            description: "Liga uma luz",
+            input: { room: "sala" },
+            output: { ok: true },
+            durationMs: 12,
+          },
           { tool: "b", ok: false, summary: "Sem permissão" },
         ],
         images: chatImages,
         conversationId: "c2",
         endConversation: false,
+        usage: USAGE,
       } as never),
     ),
   "GET /api/assistant/conversations": () => conversations,
@@ -73,12 +98,14 @@ const calls = useApi({
     title: "Câmera",
     updatedAt: NOW,
     ended: false,
+    usage: USAGE,
     messages: [
       { id: "m1", role: "user", text: "como está a frente?", actions: [], images: [], createdAt: NOW },
       { id: "m2", role: "assistant", text: "Portão fechado.", actions: [], images: [CAMERA_IMAGE], createdAt: NOW },
     ],
   }),
   "DELETE /api/assistant/conversations/:id": () => deleteReply,
+  "DELETE /api/assistant/conversations": () => clearReply,
   "POST /api/assistant/uploads": () => ({
     key: "assistant/u/upload/a.jpg",
     url: "https://signed/a",
@@ -100,6 +127,7 @@ beforeEach(() => {
     { id: "c2", title: "Câmera", updatedAt: NOW, ended: false },
   ];
   deleteReply = { ok: true };
+  clearReply = { ok: true };
   chatImages = [];
 });
 afterEach(cleanup);
@@ -195,6 +223,74 @@ describe("voice assistant dashboard", () => {
     fireEvent.submit(input.closest("form")!);
     expect(input.value).toBe("");
     expect(await screen.findByText("apaga tudo")).toBeTruthy();
+    // The metrics bar accumulates every turn of the conversation.
+    expect(await screen.findByText("4 chamadas")).toBeTruthy();
+    expect(screen.getByText("3,2k tokens")).toBeTruthy();
+  });
+
+  test("opens a modal with the tool details when an action chip is clicked", async () => {
+    renderApp(ALLOWED, <VoiceAssistantDashboard />);
+    await until(() => voice.openTaps.length === 1);
+    fireEvent.click(screen.getByText("Como está a internet?"));
+    expect(await screen.findByText("Pronto.")).toBeTruthy();
+
+    fireEvent.click(screen.getByText("Ligou a luz"));
+    const dialog = await screen.findByRole("dialog", { name: "Detalhes da ferramenta" });
+    expect(within(dialog).getByText("Concluída")).toBeTruthy();
+    expect(within(dialog).getByText("a")).toBeTruthy();
+    expect(within(dialog).getByText("Liga uma luz")).toBeTruthy();
+    expect(within(dialog).getByText("12 ms")).toBeTruthy();
+    expect(within(dialog).getByText(/"room": "sala"/)).toBeTruthy();
+    expect(within(dialog).getByText(/"ok": true/)).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Detalhes da ferramenta" })).toBeNull(),
+    );
+  });
+
+  test("shows the context and metrics when the server resumes a recent conversation", async () => {
+    const chat = holdChat();
+    try {
+      renderApp(ALLOWED, <VoiceAssistantDashboard />);
+      await until(() => voice.openTaps.length === 1);
+      act(() => assistant.sendText("e agora?"));
+      await act(async () => {
+        chat.push({
+          type: "conversation",
+          conversationId: "c9",
+          resumed: true,
+          title: "Luz da sala",
+          usage: USAGE,
+          messages: [
+            { id: "m1", role: "user", text: "liga a luz", actions: [], images: [], createdAt: NOW },
+            { id: "m2", role: "assistant", text: "Liguei.", actions: [], images: [], createdAt: NOW },
+          ],
+        });
+        chat.push({ type: "delta", text: "Feito." });
+        chat.push({
+          type: "done",
+          reply: {
+            conversationId: "c9",
+            reply: "Feito.",
+            actions: [],
+            images: [],
+            endConversation: false,
+            usage: USAGE,
+            conversationUsage: { ...USAGE, totalTokens: 3200, modelCalls: 4 },
+          },
+        });
+        chat.close();
+      });
+      const banner = await screen.findByText(/Conversa anterior retomada/);
+      expect(banner.textContent).toContain("Luz da sala");
+      expect(screen.getByText("liga a luz")).toBeTruthy();
+      expect(screen.getByText("Liguei.")).toBeTruthy();
+      expect(await screen.findByText("3,2k tokens")).toBeTruthy();
+      expect(screen.getByText("4 chamadas")).toBeTruthy();
+    } finally {
+      chat.restore();
+    }
   });
 
   test("arriving mid-reply does not cut it off, and a failed reply offers a retry", async () => {
@@ -321,6 +417,8 @@ describe("history", () => {
     const photo = screen.getByAltText("Câmera frente") as HTMLImageElement;
     expect(photo.src).toBe("https://signed/c");
     expect(screen.getByText("Câmera frente")).toBeTruthy();
+    // The stored conversation restores its accumulated metrics.
+    expect(await screen.findByText("1,6k tokens")).toBeTruthy();
   });
 
   test("deletes a conversation after confirming, resetting it if it is open", async () => {
@@ -346,6 +444,37 @@ describe("history", () => {
     expect(await screen.findByText("Falha ao excluir a conversa")).toBeTruthy();
     expect(screen.getByText("Luz da sala")).toBeTruthy();
   }, 20_000);
+
+  test("clears the whole history after confirmation", async () => {
+    renderApp(FULL, <VoiceAssistantDashboard />);
+    fireEvent.click(screen.getByLabelText("Histórico"));
+    await screen.findByText("Luz da sala");
+    fireEvent.click(screen.getByLabelText("Limpar histórico"));
+    fireEvent.click(await screen.findByText("Apagar tudo", { selector: "button" }));
+    await waitFor(() =>
+      expect(
+        calls.some(
+          (c) => c.method === "DELETE" && c.path === "/api/assistant/conversations",
+        ),
+      ).toBe(true),
+    );
+    expect(
+      calls.some(
+        (c) => c.method === "DELETE" && c.path === "/api/assistant/conversation",
+      ),
+    ).toBe(true);
+    expect(await screen.findByText("Histórico apagado")).toBeTruthy();
+  });
+
+  test("reports a failed history clear", async () => {
+    clearReply = fail(500);
+    renderApp(FULL, <VoiceAssistantDashboard />);
+    fireEvent.click(screen.getByLabelText("Histórico"));
+    await screen.findByText("Luz da sala");
+    fireEvent.click(screen.getByLabelText("Limpar histórico"));
+    fireEvent.click(await screen.findByText("Apagar tudo", { selector: "button" }));
+    expect(await screen.findByText("Falha ao limpar o histórico")).toBeTruthy();
+  });
 
   test("shows empty and error states", async () => {
     conversations = [];
@@ -611,5 +740,56 @@ describe("Orb", () => {
     expect(onClick).toHaveBeenCalled();
     rerender(<Orb state="speaking" size="large" />);
     expect(screen.getByLabelText("Parar").getAttribute("data-state")).toBe("speaking");
+  });
+});
+
+test("pretty prints tool details and survives circular values", () => {
+  expect(pretty(undefined)).toBe("—");
+  expect(pretty({ a: 1 })).toBe('{\n  "a": 1\n}');
+  const circular: Record<string, unknown> = {};
+  circular.self = circular;
+  expect(pretty(circular)).toBe("[object Object]");
+});
+
+describe("conversation metrics", () => {
+  test("shows model, tokens, cache, cost, calls and duration", () => {
+    render(<ConversationMetrics usage={USAGE} />);
+    expect(screen.getByText("openai/gpt-5-mini")).toBeTruthy();
+    expect(screen.getByText("1,6k tokens")).toBeTruthy();
+    expect(screen.getByText("↑ 1,2k · ↓ 400")).toBeTruthy();
+    expect(screen.getByText("300 em cache")).toBeTruthy();
+    expect(screen.getByText(/US\$\s*0,001234/)).toBeTruthy();
+    expect(screen.getByText("2 chamadas")).toBeTruthy();
+    expect(screen.getByText("1,5 s")).toBeTruthy();
+  });
+
+  test("omits unknown cost and cache, and handles one call under a second", () => {
+    render(
+      <ConversationMetrics
+        usage={{
+          ...USAGE,
+          cachedTokens: 0,
+          cost: undefined,
+          modelCalls: 1,
+          durationMs: 500,
+          inputTokens: 6,
+          outputTokens: 4,
+          totalTokens: 10,
+        }}
+      />,
+    );
+    expect(screen.getByText("10 tokens")).toBeTruthy();
+    expect(screen.getByText("↑ 6 · ↓ 4")).toBeTruthy();
+    expect(screen.getByText("1 chamada")).toBeTruthy();
+    expect(screen.getByText("500 ms")).toBeTruthy();
+    expect(screen.queryByText(/em cache/)).toBeNull();
+    expect(screen.queryByText(/US\$/)).toBeNull();
+  });
+
+  test("renders nothing without usage or model calls", () => {
+    const empty = render(<ConversationMetrics usage={null} />);
+    expect(empty.container.firstChild).toBeNull();
+    const zero = render(<ConversationMetrics usage={{ ...USAGE, modelCalls: 0 }} />);
+    expect(zero.container.firstChild).toBeNull();
   });
 });

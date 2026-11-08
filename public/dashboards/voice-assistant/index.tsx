@@ -1,5 +1,9 @@
 import React, { type FormEvent, memo, useEffect, useRef, useState } from "react";
 
+import type {
+  AssistantAction,
+  AssistantUsage,
+} from "@server/modules/assistant/model";
 import { Button } from "@public/components/Button";
 import {
   type DashboardData,
@@ -7,6 +11,7 @@ import {
 } from "@public/components/GlobalDrawerContext";
 import { IconButton } from "@public/components/IconButton";
 import { useMe } from "@public/components/MeContext";
+import { Modal } from "@public/components/Modal";
 import { PermissionDenied } from "@public/components/PermissionDenied";
 import { Switch } from "@public/components/Switch";
 import {
@@ -85,6 +90,108 @@ const SUGGESTIONS = [
   "Como estão as linhas de trem?",
 ];
 
+function formatTokens(tokens: number): string {
+  if (tokens < 1000) return String(tokens);
+  return `${(tokens / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}k`;
+}
+
+function formatCost(cost: number): string {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 4,
+    maximumFractionDigits: 6,
+  }).format(cost);
+}
+
+function formatDuration(ms: number): string {
+  return ms < 1000
+    ? `${Math.round(ms)} ms`
+    : `${(ms / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} s`;
+}
+
+export function pretty(value: unknown): string {
+  if (value === undefined) return "—";
+  try {
+    return JSON.stringify(value, null, 2) ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function DetailBlock({ label, value }: { label: string; value: unknown }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs text-mist-400">{label}</span>
+      <pre className="
+        max-h-48 overflow-auto rounded-md bg-gray-950 p-2 text-[11px]
+        whitespace-pre-wrap
+      ">
+        {pretty(value)}
+      </pre>
+    </div>
+  );
+}
+
+/** Everything a tool call did, opened from its chip under a reply. */
+export function ActionDetails({ action }: { action: AssistantAction }) {
+  return (
+    <div className="flex flex-col gap-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span
+          className={`
+            rounded-full px-2 py-0.5
+            ${action.ok ? "bg-emerald-950 text-emerald-300" : `
+              bg-red-950 text-red-300
+            `}
+          `}
+        >
+          {action.ok ? "Concluída" : "Falhou"}
+        </span>
+        <span className="font-mono text-mist-300">{action.tool}</span>
+        {action.durationMs !== undefined && (
+          <span className="text-mist-500">{formatDuration(action.durationMs)}</span>
+        )}
+      </div>
+      {action.description && (
+        <p className="text-mist-300">{action.description}</p>
+      )}
+      <div className="flex flex-col gap-1">
+        <span className="text-xs text-mist-400">Resumo</span>
+        <p>{action.summary}</p>
+      </div>
+      <DetailBlock label="Entrada" value={action.input} />
+      <DetailBlock label="Saída" value={action.output} />
+    </div>
+  );
+}
+
+/** One thin line under the chat with what the conversation cost so far. */
+export function ConversationMetrics({ usage }: { usage: AssistantUsage | null }) {
+  if (!usage || usage.modelCalls === 0) return null;
+  const parts = [
+    usage.model,
+    `${formatTokens(usage.totalTokens)} tokens`,
+    `↑ ${formatTokens(usage.inputTokens)} · ↓ ${formatTokens(usage.outputTokens)}`,
+    usage.cachedTokens > 0 ? `${formatTokens(usage.cachedTokens)} em cache` : null,
+    usage.cost !== undefined ? formatCost(usage.cost) : null,
+    `${usage.modelCalls} ${usage.modelCalls === 1 ? "chamada" : "chamadas"}`,
+    formatDuration(usage.durationMs),
+  ].filter((part): part is string => part !== null);
+  return (
+    <div className="
+      flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-[11px] text-mist-500
+    ">
+      {parts.map((part, index) => (
+        <span key={part}>
+          {index > 0 && <span className="pr-2 text-mist-700">·</span>}
+          {part}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 /** What a reply still being written shows: a tool's progress. */
 function Activity({ tool }: { tool: string }) {
   if (tool === "gerar_imagem") {
@@ -113,10 +220,16 @@ interface MessageProps {
   message: AssistantMessage;
   onRetry: (replyId: number) => void;
   onTyped: (replyId: number) => void;
+  onOpenAction: (action: AssistantAction) => void;
 }
 
 /** Memoized: while a reply streams in, the other messages do not re-render. */
-const Message = memo(function Message({ message, onRetry, onTyped }: MessageProps) {
+const Message = memo(function Message({
+  message,
+  onRetry,
+  onTyped,
+  onOpenAction,
+}: MessageProps) {
   const isUser = message.role === "user";
   const typing = message.pending && !message.text;
   return (
@@ -170,10 +283,15 @@ const Message = memo(function Message({ message, onRetry, onTyped }: MessageProp
       {message.actions && message.actions.length > 0 && (
         <div className="flex max-w-[85%] flex-wrap gap-1">
           {message.actions.map((action, index) => (
-            <span
+            <button
               key={index}
+              type="button"
+              onClick={() => onOpenAction(action)}
+              aria-label={`Detalhes: ${action.summary}`}
               className={`
-                flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px]
+                flex cursor-pointer items-center gap-1 rounded-full px-2 py-0.5
+                text-[11px]
+                hover:brightness-125
                 ${action.ok ? "bg-emerald-950 text-emerald-300" : `
                   bg-red-950 text-red-300
                 `}
@@ -185,7 +303,7 @@ const Message = memo(function Message({ message, onRetry, onTyped }: MessageProp
                 <ExclamationCircleIcon className="size-3" />
               )}
               {action.summary}
-            </span>
+            </button>
           ))}
         </div>
       )}
@@ -202,6 +320,7 @@ export function VoiceAssistantDashboard() {
   const canUpload = Boolean(me?.routes.includes(UPLOAD_ROUTE_KEY));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [actionDetails, setActionDetails] = useState<AssistantAction | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
@@ -268,6 +387,13 @@ export function VoiceAssistantDashboard() {
           onClose={() => setSettingsOpen(false)}
         />
       )}
+      <Modal
+        isOpen={actionDetails !== null}
+        onClose={() => setActionDetails(null)}
+        title="Detalhes da ferramenta"
+      >
+        {actionDetails && <ActionDetails action={actionDetails} />}
+      </Modal>
 
       {!allowed ? (
         <PermissionDenied label="Peça acesso ao assistente para um administrador." />
@@ -305,6 +431,20 @@ export function VoiceAssistantDashboard() {
               flex min-h-0 flex-1 stagger-in flex-col gap-3 overflow-y-auto
               rounded-md bg-gray-900 p-3
             ">
+              {assistant.resumedConversation && (
+                <div className="
+                  rounded-md border border-blue-900 bg-blue-950/40 px-3 py-2
+                  text-xs text-blue-200
+                ">
+                  Conversa anterior retomada (
+                  {assistant.resumedConversation.title}):{" "}
+                  {assistant.resumedConversation.count}{" "}
+                  {assistant.resumedConversation.count === 1
+                    ? "mensagem abaixo já faz parte"
+                    : "mensagens abaixo já fazem parte"}{" "}
+                  do contexto do assistente.
+                </div>
+              )}
               {assistant.messages.length === 0 ? (
                 <div className="
                   flex flex-1 flex-col items-center justify-center gap-2
@@ -312,7 +452,9 @@ export function VoiceAssistantDashboard() {
                 ">
                   <MicrophoneIcon className="size-8 text-mist-500" />
                   <p className="text-sm text-mist-300">Experimente dizer:</p>
-                  <div className="flex stagger-in flex-wrap justify-center gap-2">
+                  <div className="
+                    flex stagger-in flex-wrap justify-center gap-2
+                  ">
                     {SUGGESTIONS.map((suggestion) => (
                       <button
                         key={suggestion}
@@ -336,6 +478,7 @@ export function VoiceAssistantDashboard() {
                     message={message}
                     onRetry={assistant.retry}
                     onTyped={assistant.markTyped}
+                    onOpenAction={setActionDetails}
                   />
                 ))
               )}
@@ -420,6 +563,7 @@ export function VoiceAssistantDashboard() {
                 <PaperAirplaneIcon className="size-5" />
               </IconButton>
             </form>
+            <ConversationMetrics usage={assistant.conversationUsage} />
           </div>
         </div>
       )}

@@ -37,12 +37,17 @@ setupLoggerProvider();
 instrumentGaxios();
 flushTelemetryOnExit();
 
-// Production images prebuild the frontend (`bun run build:web`); otherwise
-// (dev) Bun bundles public/index.html on the fly.
+// Production images prebuild the frontend (`bun run build:web`). Dev always
+// bundles public/index.html on the fly: `dist/web` is ignored even when an
+// earlier build left it behind, because its asset routes are only mounted as
+// static files in production (in dev the public wildcard shadows them, so the
+// prebuilt HTML loads but its chunks 404 — a blank screen).
 const WEB_DIST = "dist/web";
 // Not a literal: keeps `bun build` from bundling the HTML (and its frontend) into the server.
 const DEV_HTML = "../public/index.html";
-const prebuilt = await Bun.file(`${WEB_DIST}/index.html`).exists();
+const prebuilt =
+  process.env.NODE_ENV === "production" &&
+  (await Bun.file(`${WEB_DIST}/index.html`).exists());
 
 const sw = await Bun.build({ entrypoints: ["public/sw.ts"] });
 const swJs = await sw.outputs[0]!.text();

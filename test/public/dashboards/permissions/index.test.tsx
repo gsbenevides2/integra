@@ -89,6 +89,7 @@ const {
   errorText,
   matchesSearch,
   buildResourceSections,
+  isResourceFullyGranted,
 } = await import("@public/dashboards/permissions/index");
 
 const posts = (suffix: string) =>
@@ -118,6 +119,33 @@ test("matchesSearch ignores case, accents and blank queries", () => {
   expect(matchesSearch("câmera", "List Cameras")).toBe(true);
   expect(matchesSearch("LAMP", "x", "lamp")).toBe(true);
   expect(matchesSearch("fan", "Lamp")).toBe(false);
+});
+
+test("isResourceFullyGranted accounts for every action and implied read", () => {
+  const row = {
+    resourceType: "tuya_device",
+    resourceId: "d1",
+    label: "Lamp",
+    actions: ["read", "write"],
+  };
+  const grant = (action: string) => ({
+    id: action,
+    resourceType: "tuya_device",
+    resourceId: "d1",
+    action,
+    label: "Lamp",
+    status: "ok" as const,
+  });
+  expect(isResourceFullyGranted(row, [])).toBe(false);
+  expect(isResourceFullyGranted(row, [grant("read")])).toBe(false);
+  expect(isResourceFullyGranted(row, [grant("write")])).toBe(true);
+  expect(isResourceFullyGranted(row, [grant("read"), grant("write")])).toBe(true);
+  expect(
+    isResourceFullyGranted(
+      { ...row, actions: ["read"] },
+      [grant("write")],
+    ),
+  ).toBe(true);
 });
 
 test("buildResourceSections orders types and appends orphaned grants", () => {
@@ -316,6 +344,36 @@ test("filters resources by search", async () => {
   expect(screen.queryByRole("region", { name: "Câmeras" })).toBeNull();
 });
 
+test("filters to resources that still have something to grant", async () => {
+  cfg.grants = {
+    routes: [],
+    resources: [
+      {
+        id: "r1",
+        resourceType: "tuya_device",
+        resourceId: "d1",
+        action: "read",
+        label: "Lamp",
+        status: "ok",
+      },
+      {
+        id: "r2",
+        resourceType: "tuya_device",
+        resourceId: "d1",
+        action: "write",
+        label: "Lamp",
+        status: "ok",
+      },
+    ],
+  };
+  await renderLoaded();
+  await screen.findByText("(1/1)");
+  expect(screen.getByText("Lamp")).toBeTruthy();
+  fireEvent.click(screen.getByText("Só não liberadas").previousElementSibling!);
+  expect(screen.queryByText("Lamp")).toBeNull();
+  expect(screen.getByText("frente")).toBeTruthy();
+});
+
 test("shows each device and sensor kind and searches by it", async () => {
   cfg.resources = [
     ...resourceOptions,
@@ -362,6 +420,19 @@ test("routes tab toggles, bulk-grants and filters routes", async () => {
   fireEvent.change(screen.getByLabelText("Buscar"), { target: { value: "odd" } });
   expect(screen.queryByRole("region", { name: "Tuya" })).toBeNull();
   expect(screen.getByRole("region", { name: "Other" })).toBeTruthy();
+});
+
+test("filters to routes that still have something to grant", async () => {
+  cfg.grants = {
+    routes: [{ id: "g1", routeKey: "GET /api/tuya/devices", status: "ok" }],
+    resources: [],
+  };
+  await renderLoaded();
+  fireEvent.click(screen.getByRole("tab", { name: /Rotas/ }));
+  await within(section("Tuya")).findByText("(1/2)");
+  fireEvent.click(screen.getByText("Só não liberadas").previousElementSibling!);
+  expect(screen.queryByText("List Devices")).toBeNull();
+  expect(screen.getByText("Delete Device")).toBeTruthy();
 });
 
 test("removing your own manager grant asks for confirmation", async () => {
