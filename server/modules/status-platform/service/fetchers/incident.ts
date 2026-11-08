@@ -40,7 +40,7 @@ export const fetchFromIncidentIoStatus: StatusFetcher = async (
     (await incidentsResponse.json()) as IncidentIoIncidentsResponse;
   const problemDescription =
     incidentsData.incidents[0]?.updates[0]?.message_string ??
-    "Unknown incident";
+    "Incidente desconhecido";
 
   return { status: "DOWN", problemDescription };
 };

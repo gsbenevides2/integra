@@ -80,6 +80,23 @@ test("peekBody tolerates an unreadable body", async () => {
   expect((await fetch("http://example.com/used")).status).toBe(200);
 });
 
+test("adds OpenInference attributes to OpenRouter LLM responses", async () => {
+  respond = () =>
+    new Response(
+      JSON.stringify({
+        model: "openai/gpt-4o",
+        choices: [{ message: { role: "assistant", content: "oi" } }],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      }),
+      { headers: { "content-type": "application/json" } },
+    );
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    body: JSON.stringify({ model: "openai/gpt-4o", messages: [{ role: "user", content: "oi" }] }),
+  });
+  expect(await res.text()).toContain("choices");
+});
+
 test("preconnect delegates", () => {
   fetch.preconnect("http://example.com", undefined as never);
   expect(preconnected[0]).toBe("http://example.com");

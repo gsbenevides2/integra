@@ -26,12 +26,12 @@ function r(over: Parameters<typeof device>[0], isBusy = false) {
 test("lamp on, white mode: toggle, open, brightness", () => {
   const { onCommand, onOpen } = r({ state: { power: true } });
   expect(screen.getByText("Ligada")).toBeTruthy();
-  expect(screen.getByText("Online")).toBeTruthy();
+  expect(screen.getByText("Conectado")).toBeTruthy();
   fireEvent.click(screen.getByRole("switch"));
   expect(onCommand).toHaveBeenCalledWith({ power: false });
   fireEvent.click(screen.getByText("Sala"));
   expect(onOpen).toHaveBeenCalledTimes(1);
-  fireEvent.click(screen.getByText("Online")); // anywhere else on the card
+  fireEvent.click(screen.getByText("Conectado")); // anywhere else on the card
   expect(onOpen).toHaveBeenCalledTimes(2);
   fireEvent.click(screen.getByRole("switch")); // controls do not open it
   expect(onOpen).toHaveBeenCalledTimes(2);
@@ -45,7 +45,7 @@ test("lamp off, offline, hidden, colour mode", () => {
     state: { power: false, online: false, workMode: "colour", colorHex: "#ff0000" },
   });
   expect(screen.getByText("Desligada")).toBeTruthy();
-  expect(screen.getByText("Offline")).toBeTruthy();
+  expect(screen.getByText("Desconectado")).toBeTruthy();
   expect(screen.getByText("Oculta")).toBeTruthy();
   expect(screen.getByText("#ff0000")).toBeTruthy();
   fireEvent.change(screen.getByRole("slider"), { target: { value: "50" } });

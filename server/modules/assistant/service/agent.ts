@@ -11,7 +11,13 @@ import type { AuthUser } from "@server/shared/authz";
 import { type Item, OpenRouter, stepCountIs } from "@openrouter/agent";
 import { trace } from "@opentelemetry/api";
 
-import type { AssistantAction, ChatReply, EmitStreamEvent } from "../model";
+import type {
+  AssistantAction,
+  AssistantUsage,
+  ChatReply,
+  EmitStreamEvent,
+  MessageView,
+} from "../model";
 import { buildTools, type ToolContext } from "../tools";
 import { conversationTools } from "../tools/conversation";
 import { ACTION_CLAIM, WRITE_TOOLS } from "./claims";
@@ -29,6 +35,45 @@ export const DEFAULT_MODEL = "openai/gpt-5-mini";
 export const MAX_STEPS = 6;
 
 const FALLBACK_REPLY = "Desculpe, não consegui responder agora.";
+
+/** A stored message as the browser sees it (images become presigned URLs). */
+function toMessageView(message: StoredMessage): MessageView {
+  return {
+    id: message.id,
+    role: message.role,
+    text: message.text,
+    actions: message.actions,
+    images: message.images.map((image) => ImageStorage.view(image)),
+    createdAt: message.createdAt,
+  };
+}
+
+/** The SDK's aggregate usage, plus the model and wall-clock time for the turn. */
+function usageSummary(
+  model: string,
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+    cachedTokens: number;
+    reasoningTokens: number;
+    cost?: number;
+    modelCalls: number;
+  },
+  startedAt: number,
+): AssistantUsage {
+  return {
+    model,
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    totalTokens: usage.totalTokens,
+    cachedTokens: usage.cachedTokens,
+    reasoningTokens: usage.reasoningTokens,
+    ...(usage.cost !== undefined && { cost: usage.cost }),
+    modelCalls: usage.modelCalls,
+    durationMs: Math.round(performance.now() - startedAt),
+  };
+}
 
 /**
  * A reply that says a change was made needs a successful write action behind
@@ -188,13 +233,44 @@ export abstract class AssistantAgent {
       "assistant.chat",
       { attributes: { "assistant.model": model, "enduser.id": user.id } },
       async (span) => {
+        const startedAt = performance.now();
         const conversation = await ConversationService.open(
           user.id,
           text,
           request.conversationId,
         );
-        emit({ type: "conversation", conversationId: conversation.id });
+        // OpenInference conventions make this run an agent trace in OpenObserve
+        // (the model and tool spans below are nested under it).
+        span.setAttributes({
+          "openinference.span.kind": "AGENT",
+          "agent.name": "integra",
+          "session.id": conversation.id,
+          "gen_ai.conversation.id": conversation.id,
+          // OpenObserve's Sessions view shows `user.id`; the internal UUID is
+          // meaningless there, so use the login and keep the other ids too.
+          "user.id": user.username,
+          "user.name": user.name,
+          "user.uid": user.uid,
+          "user.db_id": user.id,
+          "input.value": text,
+          "input.mime_type": "text/plain",
+        });
+        const resumed = !request.conversationId && conversation.persisted;
         const history = await ConversationService.context(conversation.id);
+        // A recent conversation is resumed without the caller asking for it: send
+        // the messages already in context so the browser can show them and say
+        // the model is continuing from a previous conversation.
+        emit({
+          type: "conversation",
+          conversationId: conversation.id,
+          resumed,
+          ...(resumed &&
+            history.length > 0 && {
+              title: conversation.title,
+              ...(conversation.usage && { usage: conversation.usage }),
+              messages: history.map(toMessageView),
+            }),
+        });
         const ctx: ToolContext = {
           user,
           actions: [],
@@ -210,6 +286,10 @@ export abstract class AssistantAgent {
         const extraInstructions = await loadExtraInstructions(user.id);
         const result = client.callModel({
           model,
+          // Sticky routing for prompt caching: the instructions carry the
+          // current time, so the opening messages differ every turn and the
+          // default hash-based routing would send each turn to a new provider.
+          sessionId: conversation.id,
           instructions: buildInstructions(user, extraInstructions),
           // Plain role/content messages are accepted by the Responses API; the
           // SDK's Item union only models persisted (id-carrying) assistant items.
@@ -232,6 +312,7 @@ export abstract class AssistantAgent {
         if (silenced) {
           // Not for the assistant: nothing is spoken, nothing is stored.
           logInfo(log, "[assistant] stayed silent", { "assistant.model": model });
+          span.setAttribute("output.value", "");
           const silent: ChatReply = {
             conversationId: conversation.id,
             reply: "",
@@ -239,12 +320,18 @@ export abstract class AssistantAgent {
             images: [],
             endConversation: false,
             silent: true,
+            usage: usageSummary(model, await result.getUsage(), startedAt),
           };
           emit({ type: "done", reply: silent });
           return silent;
         }
         const generated = (await result.getText()).trim() || FALLBACK_REPLY;
         const reply = guardActionClaims(generated, ctx.actions);
+        const usage = usageSummary(model, await result.getUsage(), startedAt);
+        span.setAttributes({
+          "output.value": reply,
+          "output.mime_type": "text/plain",
+        });
         if (reply !== generated) {
           logWarn(log, "[assistant] reply claimed an action without a successful tool call", {
             "assistant.model": model,
@@ -257,11 +344,17 @@ export abstract class AssistantAgent {
         // A failed action keeps the session open, so the user can retry it.
         if (ctx.actions.some((action) => !action.ok)) endConversation = false;
         // A goodbye closes the conversation: the next wake word starts fresh.
-        await ConversationService.addTurn(
+        const conversationUsage = await ConversationService.addTurn(
           conversation,
           [
             { role: "user", text, images: uploads },
-            { role: "assistant", text: reply, actions: ctx.actions, images: ctx.images },
+            {
+              role: "assistant",
+              text: reply,
+              actions: ctx.actions,
+              images: ctx.images,
+              usage,
+            },
           ],
           endConversation,
         );
@@ -278,6 +371,8 @@ export abstract class AssistantAgent {
           actions: ctx.actions,
           images: ctx.images.map((image) => ImageStorage.view(image)),
           endConversation,
+          usage,
+          ...(conversationUsage && { conversationUsage }),
         };
         emit({ type: "done", reply: chatReply });
         return chatReply;

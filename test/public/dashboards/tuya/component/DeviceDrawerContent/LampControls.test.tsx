@@ -25,7 +25,7 @@ const last = (fn: { mock: { lastCall?: unknown[] } }) => fn.mock.lastCall![0] as
 
 test("offline", () => {
   setup({ state: { online: false } });
-  expect(screen.getByText(/está offline/)).toBeTruthy();
+  expect(screen.getByText(/está desconectad/)).toBeTruthy();
 });
 
 test("white-only lamp: ring, power, brightness, temp presets", () => {

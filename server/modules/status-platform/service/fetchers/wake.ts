@@ -85,7 +85,7 @@ function describeProblem(summary: WakeSummaryResponse): string {
   const componentNames = new Map(components.map((c) => [c.id, c.name]));
 
   const incidents = (summary.open_incidents ?? []).map((incident) => {
-    const title = incident.title?.trim() || "Untitled incident";
+    const title = incident.title?.trim() || "Incidente sem título";
     const affected = (incident.affected_component_ids ?? [])
       .map((id) => componentNames.get(id))
       .filter(Boolean);
@@ -105,7 +105,7 @@ function describeProblem(summary: WakeSummaryResponse): string {
 
   if (affectedComponents.length > 0) return affectedComponents.join("; ");
 
-  return `Overall status: ${summary.overall_status}`;
+  return `Status geral: ${summary.overall_status}`;
 }
 
 /**

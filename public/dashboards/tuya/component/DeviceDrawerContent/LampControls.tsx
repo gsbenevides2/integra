@@ -95,7 +95,7 @@ export function LampControls({ device, isBusy, onCommand }: Props) {
   if (!state.online) {
     return (
       <p className="text-sm text-mist-400">
-        A lâmpada está offline. Os controles voltam assim que ela responder.
+        A lâmpada está desconectada. Os controles voltam assim que ela responder.
       </p>
     );
   }

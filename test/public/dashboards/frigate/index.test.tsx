@@ -36,7 +36,7 @@ test("renders cameras, storage, performance and service", async () => {
   renderWithProviders(<FrigateDashboard />);
   expect(screen.getByText("Carregando...")).toBeTruthy();
   await screen.findByText("frente");
-  expect(screen.getAllByRole("status").map((s) => s.getAttribute("aria-label"))).toEqual(["Online", "Sem sinal"]);
+  expect(screen.getAllByRole("status").map((s) => s.getAttribute("aria-label"))).toEqual(["Conectada", "Sem sinal"]);
   expect(screen.getByText("desligada")).toBeTruthy();
   expect(screen.getByText(/950 GB de 1000 GB · 95%/)).toBeTruthy();
   expect(screen.getByText("8.5 ms por inferência")).toBeTruthy();

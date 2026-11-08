@@ -59,6 +59,10 @@ otherwise.
 
 - `@openrouter/agent`'s `callModel` in `server/modules/assistant/service/agent.ts`,
   with up to 6 steps and minimal reasoning, for latency.
+- Every turn sends `sessionId` = the conversation id. The instructions include
+  the current time, so the opening messages change on every turn; without an
+  explicit session, OpenRouter's hash-based sticky routing would land each turn
+  on a different provider and lose the prompt cache.
 - History is kept in memory per user for 10 minutes (`service/conversation.ts`).
 
 ### Streaming replies (SSE)
@@ -238,15 +242,33 @@ deletes them.
   (`DELETE /api/assistant/conversation`) closes it without deleting anything.
 - **Browser side:** the browser keeps the current `conversationId` and drops it
   after 10 minutes idle, so the wake word does not resume an old conversation.
+  When the server does resume one on its own, the `conversation` SSE event
+  carries `resumed: true`, the title, the accumulated usage and the messages
+  already in context. The dashboard prepends those messages and shows a
+  "Conversa anterior retomada" banner, so the context is never invisible.
+- **Metrics:** every turn's tokens, cost, model calls and duration are summed in
+  `assistant.conversations.usage` (JSONB) and returned as `conversationUsage`.
+  The bar under the chat shows that total for the live conversation and for one
+  opened from history.
 - **Context:** the model gets the last 12 messages.
 - **History drawer** (clock button on the "Assistente" dashboard):
   - lists the conversations from `GET /api/assistant/conversations`;
   - opens one with `GET /api/assistant/conversations/:id` to read and continue
     it;
   - deletes one with `DELETE /api/assistant/conversations/:id`, which also
-    removes its images from the bucket.
+    removes its images from the bucket;
+  - clears everything with **Limpar histórico** (`DELETE
+    /api/assistant/conversations`), behind a confirmation: all conversations
+    and their images are deleted from the database/bucket. The route needs its
+    own grant, like every other route.
 
   Every route only ever sees the signed-in user's conversations.
+
+Each assistant message stores its tool calls in `assistant.messages.actions`
+(JSONB): tool name, status, summary, description, input, output and duration.
+The chips under a reply open a modal with those details; inline image data URLs
+are stored as `[imagem]` and long strings are capped, so the message row stays
+small.
 
 ## Images
 

@@ -12,6 +12,7 @@ import {
 } from "@heroicons/react/24/outline";
 
 import { getStatusPlatformEdenClient } from "../../client";
+import { PLATFORM_LABELS } from "../../labels";
 
 interface Props {
   id: string;
@@ -44,9 +45,9 @@ export function Card({
 
   const deletePlatform = useCallback(async () => {
     const confirmed = await confirm({
-      title: "Delete platform",
-      message: `Are you sure you want to delete "${name}"? This action cannot be undone.`,
-      confirmLabel: "Delete",
+      title: "Excluir plataforma",
+      message: `Tem certeza de que deseja excluir "${name}"? Esta ação não pode ser desfeita.`,
+      confirmLabel: "Excluir",
     });
     if (!confirmed) return;
 
@@ -55,11 +56,11 @@ export function Card({
       .api["status-platform"]({ id })
       .delete();
     if (error) {
-      showToast("Failed to delete platform", "error");
+      showToast("Falha ao excluir plataforma", "error");
       setIsDeleting(false);
       return;
     }
-    showToast("Platform deleted successfully", "success");
+    showToast("Plataforma excluída", "success");
     onDeleted();
   }, [confirm, id, name, onDeleted, showToast]);
 
@@ -75,14 +76,15 @@ export function Card({
     >
       <div className="flex justify-between">
         <div>
-          <p>Name: {name}</p>
+          <p>Nome: {name}</p>
           <p>URL: {url}</p>
-          <p>Type: {type}</p>
-          {ignoreSsl && <p className="text-xs text-mist-400">SSL ignored</p>}
+          <p>Tipo: {PLATFORM_LABELS[type] ?? type}</p>
+          {ignoreSsl && <p className="text-xs text-mist-400">SSL ignorado</p>}
         </div>
         <div className="flex flex-col gap-0.5">
           <IconButton
             className="hover:bg-gray-500"
+            aria-label={`Editar ${name}`}
             onClick={(e) => {
               e.stopPropagation();
               onEdit();
@@ -93,6 +95,7 @@ export function Card({
           </IconButton>
           <IconButton
             className="hover:bg-gray-500"
+            aria-label={`Excluir ${name}`}
             onClick={(e) => {
               e.stopPropagation();
               deletePlatform();
@@ -103,6 +106,7 @@ export function Card({
           </IconButton>
           <IconButton
             className="hover:bg-gray-500"
+            aria-label={`Abrir ${name}`}
             onClick={(e) => {
               e.stopPropagation();
               window.open(url);
@@ -130,14 +134,19 @@ export function Card({
           <p>
             Status:{" "}
             {status === "OK"
-              ? "Operational"
+              ? "Operacional"
               : status === "DOWN"
-                ? "Down"
-                : "Not checked yet"}
+                ? "Fora do ar"
+                : "Ainda não verificado"}
           </p>
         </div>
         {status === "DOWN" && problemDescription && (
-          <p className="mt-0.5 text-xs text-red-400">{problemDescription}</p>
+          <p
+            className="mt-0.5 line-clamp-2 text-xs text-red-400"
+            title={problemDescription}
+          >
+            {problemDescription}
+          </p>
         )}
       </div>
     </div>

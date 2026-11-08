@@ -21,7 +21,7 @@ export function SwitchControls({ device, isBusy, onCommand }: Props) {
   if (!state.online) {
     return (
       <p className="text-sm text-mist-400">
-        O interruptor está offline. Os controles voltam assim que ele responder.
+        O interruptor está desconectado. Os controles voltam assim que ele responder.
       </p>
     );
   }

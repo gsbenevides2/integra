@@ -6,7 +6,11 @@ import {
 } from "@public/components/GlobalDrawerContext";
 import { IconButton } from "@public/components/IconButton";
 
-import { Bars3Icon, VideoCameraIcon } from "@heroicons/react/24/outline";
+import {
+  Bars3Icon,
+  VideoCameraIcon,
+  VideoCameraSlashIcon,
+} from "@heroicons/react/24/outline";
 
 import { type Stats, useFrigateStats } from "./useFrigateStats";
 
@@ -48,7 +52,10 @@ function Bar({ label, used, total }: { label: string; used: number; total: numbe
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-gray-700">
         <div
-          className={`h-full ${warn ? "bg-amber-400" : "bg-blue-500"}`}
+          className={`
+            h-full
+            ${warn ? "bg-amber-400" : "bg-blue-500"}
+          `}
           style={{ width: `${Math.round(ratio * 100)}%` }}
         />
       </div>
@@ -80,13 +87,13 @@ function Content({ stats }: { stats: Stats }) {
               <div className="flex items-center gap-2">
                 <span
                   role="status"
-                  aria-label={cam.fps > 0 ? "Online" : "Sem sinal"}
+                  aria-label={cam.fps > 0 ? "Conectada" : "Sem sinal"}
                   className={`
                     size-2.5 rounded-full
                     ${cam.fps > 0 ? "bg-green-500" : "bg-red-500"}
                   `}
                 />
-                <span className="font-medium">{name}</span>
+                <span className="font-medium first-letter:uppercase">{name}</span>
               </div>
               <dl className="flex flex-col gap-0.5 pl-4.5">
                 <Row term="Captura" value={`${cam.fps} fps`} />
@@ -174,10 +181,17 @@ export function FrigateDashboard() {
       </div>
       {stats ? (
         <Content stats={stats} />
+      ) : failed ? (
+        <div className="flex flex-col items-center gap-2 py-16 text-center">
+          <VideoCameraSlashIcon className="size-10 text-mist-500" />
+          <p className="text-mist-200">Frigate indisponível</p>
+          <p className="max-w-sm text-sm text-mist-400">
+            O serviço não respondeu. Esta tela tenta de novo automaticamente a
+            cada 15 segundos.
+          </p>
+        </div>
       ) : (
-        <p className="text-sm text-mist-400">
-          {failed ? "Frigate indisponível" : "Carregando..."}
-        </p>
+        <p className="text-sm text-mist-400">Carregando...</p>
       )}
     </div>
   );

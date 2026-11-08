@@ -31,6 +31,17 @@ Because this plugin wraps every mounted route automatically, a module's `index.t
 
 Because this patches the global `fetch`, **no module needs to reach for a special "traced fetch" helper** — a plain `fetch(url)` anywhere in the codebase is already traced.
 
+### AI / LLM observability — `server/instrumentation/openinference.ts`
+
+OpenObserve's AI views read [OpenInference](https://arize-ai.github.io/openinference/spec/) attributes. The official OpenAI instrumentor only patches the `openai` SDK, which this app does not use: the voice assistant calls OpenRouter through `@openrouter/agent` (its own SDK), and the Google jobs call the Chat Completions HTTP API directly. So the conventions are applied manually (no extra dependency):
+
+- **Agent:** the `assistant.chat` span is marked `openinference.span.kind = "AGENT"`, with `agent.name`, `session.id`/`gen_ai.conversation.id` (the assistant conversation id), `input.value`/`output.value`, and the user identity. OpenObserve's Sessions view reads `user.id`, so it carries the login (`username`) rather than the internal UUID; the display name, Authentik UID and database id go in `user.name`, `user.uid` and `user.db_id`.
+- **LLM:** `instrumentFetch` translates the already-captured OpenRouter `/responses` and `/chat/completions` bodies (JSON or SSE) into `openinference.span.kind = "LLM"` spans: `llm.model_name`, input/output messages, advertised tools, token counts (including cache and reasoning), cost and finish reason. The same code also covers `chatJson` calls from Google jobs, which have no agent parent.
+- **Cost:** OpenObserve only reads a self-reported cost from `gen_ai.usage.cost` (it ignores `llm.cost.total` and would otherwise estimate from its price table), so both shapes are emitted. The per-direction breakdown comes from OpenRouter's `cost_details` (`upstream_inference_input_cost`/`output_cost` on Responses, `upstream_inference_prompt_cost`/`completions_cost` on Chat Completions).
+- **Tool:** every `guardedTool` execution gets a `TOOL` span with `tool.name`, `tool.description`, and JSON `input.value`/`output.value` (capped at `MAX_ATTRIBUTE_CHARS`).
+
+Other OpenRouter endpoints (speech-to-text, text-to-speech, image generation) remain plain HTTP spans.
+
 ### Database queries — `server/instrumentation/instrumentDb.ts`
 
 `instrumentDb(client, connectionUrl)` wraps Bun's `SQL` client (used by `server/db/index.ts`) in a `Proxy` that intercepts every query's `.then()`, opening a `<OPERATION> <table>` span (e.g. `SELECT users`) with `db.query.text`, `db.query.parameters`, `db.operation.name`, `db.collection.name` and the row count/body of the result, and recording `db.client.operation.duration`. Drizzle's chained `.values()`/`.raw()` calls are unaffected since the same query instance is returned.

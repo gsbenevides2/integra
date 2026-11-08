@@ -76,8 +76,8 @@ test("loads and renders every section; hidden toggles", async () => {
   expect(screen.getByText("Carregando...")).toBeTruthy();
   await screen.findByText("Iluminação (1)");
   expect(screen.getByText("Câmeras (1)")).toBeTruthy();
-  await screen.findByRole("status", { name: "Câmera online" });
-  expect(screen.getByRole("status", { name: "Câmera online" })).toBeTruthy();
+  await screen.findByRole("status", { name: "Câmera conectada" });
+  expect(screen.getByRole("status", { name: "Câmera conectada" })).toBeTruthy();
   expect(screen.getByText("Modos (1)")).toBeTruthy();
   expect(screen.getByText("Sensores (1)")).toBeTruthy();
   expect(screen.getByText("Interruptores (1)")).toBeTruthy();
@@ -261,19 +261,19 @@ test("new device / sensor / preset forms create and refetch", async () => {
   const type = (label: string, value: string, i = 0) =>
     fireEvent.change(screen.getAllByText(label)[i]!.parentElement!.querySelector("input")!, { target: { value } });
 
-  fireEvent.click(screen.getByText("Novo dispositivo", { selector: "button" }));
+  fireEvent.click(screen.getByRole("button", { name: "Novo dispositivo" }));
   type("Nome", "L");
-  type("Device ID (Tuya)", "x");
+  type("ID do dispositivo (Tuya)", "x");
   fireEvent.click(btn("Cadastrar"));
   await screen.findByText("Dispositivo cadastrado");
 
-  fireEvent.click(screen.getByText("Novo sensor", { selector: "button" }));
+  fireEvent.click(screen.getByRole("button", { name: "Novo sensor" }));
   type("Nome", "S", 1);
-  type("Device ID (Tuya)", "y", 1);
+  type("ID do dispositivo (Tuya)", "y", 1);
   fireEvent.click(screen.getAllByText("Cadastrar")[1]!);
   await screen.findByText("Sensor cadastrado");
 
-  fireEvent.click(screen.getByText("Novo modo", { selector: "button" }));
+  fireEvent.click(screen.getByRole("button", { name: "Novo modo" }));
   type("Nome", "M", 2);
   fireEvent.click(screen.getAllByText("Cadastrar")[2]!);
   await screen.findByText("Modo cadastrado");

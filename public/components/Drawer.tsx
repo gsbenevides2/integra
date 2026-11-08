@@ -1,4 +1,4 @@
-import React, { ReactNode, useEffect } from "react";
+import React, { ReactNode, useEffect, useRef } from "react";
 
 import { XMarkIcon } from "@heroicons/react/24/outline";
 
@@ -8,6 +8,8 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
+  /** Extra action(s) shown in the header, before the close button. */
+  headerAction?: ReactNode;
   children: ReactNode;
   direction?: "left" | "right";
   size?: "meddium" | "large" | "small";
@@ -33,14 +35,33 @@ export function Drawer({
   enableSwipeOpen,
   enableSwipeClose,
   title,
+  headerAction,
   children,
   direction = "right",
   size = "meddium",
   removePadding,
   customContainerClassNames,
 }: Props) {
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     if (isOpen) return () => void (lastClosedAt = Date.now());
+  }, [isOpen]);
+
+  // While open, Escape closes it and the page behind stays put.
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCloseRef.current();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [isOpen]);
 
   useEffect(() => {
@@ -86,6 +107,7 @@ export function Drawer({
   return (
     <div
       data-drawer-open={isOpen || undefined}
+      inert={!isOpen}
       className={`
         fixed inset-0 z-40
         ${isOpen ? "" : "pointer-events-none"}
@@ -99,6 +121,9 @@ export function Drawer({
         onClick={onClose}
       />
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={isOpen ? title : undefined}
         className={`
           absolute top-0
           ${direction === "right" ? "right-0" : "left-0"}
@@ -126,10 +151,13 @@ export function Drawer({
             border-gray-700 bg-gray-900 p-4
           "
         >
-          <h2 className="text-base font-semibold">{title}</h2>
-          <IconButton onClick={onClose} aria-label="Fechar">
-            <XMarkIcon className="size-5" />
-          </IconButton>
+          <h2 className="text-base font-semibold first-letter:uppercase">{title}</h2>
+          <div className="flex items-center gap-1">
+            {headerAction}
+            <IconButton onClick={onClose} aria-label="Fechar">
+              <XMarkIcon className="size-5" />
+            </IconButton>
+          </div>
         </div>
         <div
           className={`

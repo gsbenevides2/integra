@@ -98,7 +98,7 @@ export function SensorCard({
           ) : (
             <SignalIcon className="size-5 shrink-0 text-mist-400" />
           )}
-          <span className="truncate">{sensor.name}</span>
+          <span className="truncate first-letter:uppercase">{sensor.name}</span>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {sensor.hidden && (
@@ -120,7 +120,7 @@ export function SensorCard({
               }
             `}
           >
-            {sensor.online ? "Online" : "Offline"}
+            {sensor.online ? "Conectado" : "Desconectado"}
           </span>
         </div>
       </div>

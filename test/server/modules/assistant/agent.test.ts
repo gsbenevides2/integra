@@ -30,6 +30,15 @@ class FakeOpenRouter {
         yield replyText.slice(half);
       },
       getText: async () => replyText,
+      getUsage: async () => ({
+        inputTokens: 10,
+        outputTokens: 5,
+        totalTokens: 15,
+        cachedTokens: 3,
+        reasoningTokens: 1,
+        cost: 0.001,
+        modelCalls: 2,
+      }),
     };
   };
 }
@@ -62,6 +71,7 @@ const spy = (obj: object, key: string): any => {
   return s;
 };
 let settings: ReturnType<typeof spyOn>;
+let open: ReturnType<typeof spyOn>;
 let history: Message[];
 let addTurn: ReturnType<typeof spyOn>;
 
@@ -72,9 +82,19 @@ beforeEach(() => {
   history = [];
   delete process.env.ASSISTANT_MODEL;
   settings = spy(AssistantSettingsService, "get").mockResolvedValue({ extraInstructions: "" });
-  spy(ConversationService, "open").mockResolvedValue({ id: "c1", persisted: true });
+  open = spy(ConversationService, "open").mockResolvedValue({ id: "c1", persisted: true });
   spy(ConversationService, "context").mockImplementation(async () => history);
-  addTurn = spy(ConversationService, "addTurn").mockResolvedValue(undefined);
+  addTurn = spy(ConversationService, "addTurn").mockResolvedValue({
+    model: DEFAULT_MODEL,
+    inputTokens: 20,
+    outputTokens: 10,
+    totalTokens: 30,
+    cachedTokens: 6,
+    reasoningTokens: 2,
+    cost: 0.002,
+    modelCalls: 4,
+    durationMs: 42,
+  });
   spy(ImageStorage, "dataUrl").mockImplementation(async (i: { key: string }) => `data:${i.key}`);
   spy(ImageStorage, "view").mockImplementation((i: object) => ({ ...i, url: "https://signed" }));
 });
@@ -147,17 +167,30 @@ describe("AssistantAgent", () => {
     settings.mockResolvedValue({ extraInstructions: "Fale como pirata." });
     history = [message("user", "Oi"), message("assistant", "Olá!")];
     const reply = await AssistantAgent.run(TEST_USER, { text: "E agora?", conversationId: "c1" });
-    expect(reply).toEqual({
+    expect(reply).toMatchObject({
       conversationId: "c1",
       reply: "Pronto.",
       actions: [],
       images: [],
       endConversation: false,
+      usage: {
+        model: DEFAULT_MODEL,
+        inputTokens: 10,
+        outputTokens: 5,
+        totalTokens: 15,
+        cachedTokens: 3,
+        reasoningTokens: 1,
+        cost: 0.001,
+        modelCalls: 2,
+      },
     });
+    expect(reply.usage!.durationMs).toBeGreaterThanOrEqual(0);
     expect(ConversationService.open).toHaveBeenCalledWith(TEST_USER.id, "E agora?", "c1");
     expect(settings).toHaveBeenCalledWith(TEST_USER.id);
     expect(requests[0]).toMatchObject({
       model: DEFAULT_MODEL,
+      // Same key every turn, so OpenRouter keeps the prompt cache warm.
+      sessionId: "c1",
       input: [
         { role: "user", content: "Oi" },
         { role: "assistant", content: "Olá!" },
@@ -172,10 +205,61 @@ describe("AssistantAgent", () => {
       { id: "c1", persisted: true },
       [
         { role: "user", text: "E agora?", images: [] },
-        { role: "assistant", text: "Pronto.", actions: [], images: [] },
+        expect.objectContaining({
+          role: "assistant",
+          text: "Pronto.",
+          actions: [],
+          images: [],
+          usage: expect.objectContaining({
+            inputTokens: 10,
+            outputTokens: 5,
+            totalTokens: 15,
+            cost: 0.001,
+            modelCalls: 2,
+          }),
+        }),
       ],
       false,
     );
+    expect(reply.conversationUsage).toMatchObject({
+      inputTokens: 20,
+      totalTokens: 30,
+      cost: 0.002,
+    });
+  });
+
+  test("sends the previous messages when it resumes a recent conversation", async () => {
+    const resumedUsage = {
+      model: DEFAULT_MODEL,
+      inputTokens: 1,
+      outputTokens: 2,
+      totalTokens: 3,
+      cachedTokens: 0,
+      reasoningTokens: 0,
+      cost: 0.01,
+      modelCalls: 1,
+      durationMs: 5,
+    };
+    open.mockResolvedValue({
+      id: "c1",
+      persisted: true,
+      title: "Luz da sala",
+      usage: resumedUsage,
+    });
+    history = [message("user", "liga a luz"), message("assistant", "Liguei.")];
+    const events: StreamEvent[] = [];
+    await AssistantAgent.run(TEST_USER, { text: "e agora?" }, (event) => events.push(event));
+    expect(events[0]).toMatchObject({
+      type: "conversation",
+      conversationId: "c1",
+      resumed: true,
+      title: "Luz da sala",
+      usage: resumedUsage,
+      messages: [
+        { role: "user", text: "liga a luz", actions: [], images: [] },
+        { role: "assistant", text: "Liguei.", actions: [], images: [] },
+      ],
+    });
   });
 
   test("uploads go to the model and to history; produced images come back signed", async () => {
@@ -216,6 +300,25 @@ describe("AssistantAgent", () => {
       { ...image("assistant/test-user-id/generated/g.png", "generated"), url: "https://signed" },
     ] as never);
     expect(addTurn.mock.calls[0]![1][1].images).toHaveLength(1);
+    // Tool details are part of the assistant message saved in the database.
+    expect(addTurn.mock.calls[0]![1][1].actions).toMatchObject([
+      {
+        tool: "controlar_dispositivo",
+        ok: false,
+        description: expect.any(String),
+        input: {},
+        output: { error: expect.any(String) },
+        durationMs: expect.any(Number),
+      },
+      {
+        tool: "gerar_imagem",
+        ok: true,
+        description: expect.any(String),
+        input: { descricao: "um gato" },
+        output: { gerada: true, editada: false },
+        durationMs: expect.any(Number),
+      },
+    ]);
   });
 
   test("the encerrar_conversa tool ends (closes) the conversation", async () => {
@@ -261,7 +364,7 @@ describe("AssistantAgent", () => {
       "delta",
       "done",
     ]);
-    expect(events[0]).toEqual({ type: "conversation", conversationId: "c1" });
+    expect(events[0]).toEqual({ type: "conversation", conversationId: "c1", resumed: true });
     expect(events[1]).toEqual({ type: "tool", tool: "gerar_imagem" });
     expect(events[3]).toMatchObject({ type: "image", image: { url: "https://signed" } });
     expect(events.flatMap((e) => (e.type === "delta" ? [e.text] : [])).join("")).toBe(

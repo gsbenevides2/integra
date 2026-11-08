@@ -9,7 +9,7 @@ import type { CameraState } from ".";
 const LABELS: Record<string, string> = {
   detect: "Detecção de objetos",
   recordings: "Gravação",
-  snapshots: "Snapshots",
+  snapshots: "Capturas",
   audio: "Detecção de áudio",
   ptz_autotracker: "Rastreamento automático (PTZ)",
 };

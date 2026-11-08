@@ -25,7 +25,7 @@ test("reveals the video once data loads and shows the online status", () => {
   expect(video.className).toContain("opacity-0");
   fireEvent(video, new Event("loadeddata"));
   expect(video.className).toContain("opacity-100");
-  expect(getByRole("status").getAttribute("aria-label")).toBe("Câmera online");
+  expect(getByRole("status").getAttribute("aria-label")).toBe("Câmera conectada");
   rerender(<CameraCard name="garagem" online={false} onOpen={() => {}} />);
   expect(getByRole("status").getAttribute("aria-label")).toBe("Câmera sem sinal");
 });

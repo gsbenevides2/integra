@@ -58,6 +58,30 @@ export interface AssistantAction {
   tool: string;
   ok: boolean;
   summary: string;
+  /** Tool description, shown in the details modal. */
+  description?: string;
+  /** Arguments the model sent. */
+  input?: unknown;
+  /** Sanitized tool result, shown in the details modal. */
+  output?: unknown;
+  /** Wall-clock time spent in the tool. */
+  durationMs?: number;
+}
+
+/** What one turn cost, across every model call it made (tools included). */
+export interface AssistantUsage {
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  /** Prompt tokens served from the provider's cache. */
+  cachedTokens: number;
+  reasoningTokens: number;
+  /** USD, when OpenRouter reported cost accounting. */
+  cost?: number;
+  /** Model round-trips (one per LLM call, not per tool). */
+  modelCalls: number;
+  durationMs: number;
 }
 
 export interface ChatReply {
@@ -70,6 +94,10 @@ export interface ChatReply {
   endConversation: boolean;
   /** The utterance was not for the assistant: no reply is spoken, only a chime. */
   silent?: boolean;
+  /** Token and cost accounting for this turn. */
+  usage?: AssistantUsage;
+  /** Same accounting accumulated over the whole conversation. */
+  conversationUsage?: AssistantUsage;
 }
 
 /**
@@ -77,7 +105,18 @@ export interface ChatReply {
  * order: conversation, then any tool/action/image/delta, then done (or error).
  */
 export type StreamEvent =
-  | { type: "conversation"; conversationId: string }
+  | {
+      type: "conversation";
+      conversationId: string;
+      /** The server continued a recent conversation instead of starting one. */
+      resumed?: boolean;
+      /** Title of the resumed conversation, for the context banner. */
+      title?: string;
+      /** Usage accumulated before this turn, when the conversation was resumed. */
+      usage?: AssistantUsage | null;
+      /** Messages already in the model's context (only when resumed). */
+      messages?: MessageView[];
+    }
   /** A tool started; the browser shows what is happening ("Gerando imagem…"). */
   | { type: "tool"; tool: string }
   | { type: "action"; action: AssistantAction }
@@ -95,6 +134,8 @@ export interface ConversationSummary {
   title: string;
   updatedAt: Date;
   ended: boolean;
+  /** Usage accumulated over the whole conversation, when it was recorded. */
+  usage: AssistantUsage | null;
 }
 
 export interface MessageView {

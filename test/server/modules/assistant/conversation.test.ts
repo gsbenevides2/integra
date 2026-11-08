@@ -5,9 +5,8 @@ import { makeFakeDb } from "../../../helpers/modules-db";
 let fake = makeFakeDb();
 mock.module("@server/db", () => ({ db: new Proxy({}, { get: (_t, p) => (fake.db as never)[p] }) }));
 
-const { ConversationService, MAX_HISTORY_MESSAGES, TITLE_LENGTH, titleFrom } = await import(
-  "@server/modules/assistant/service/conversation"
-);
+const { addUsage, ConversationService, MAX_HISTORY_MESSAGES, TITLE_LENGTH, titleFrom } =
+  await import("@server/modules/assistant/service/conversation");
 
 beforeEach(() => {
   fake = makeFakeDb();
@@ -18,8 +17,21 @@ const conversation = (id: string) => ({
   userId: "u1",
   title: "t",
   endedAt: null,
+  usage: null,
   createdAt: new Date(),
   updatedAt: new Date(),
+});
+const usage = (overrides = {}) => ({
+  model: "m",
+  inputTokens: 1,
+  outputTokens: 2,
+  totalTokens: 3,
+  cachedTokens: 4,
+  reasoningTokens: 5,
+  cost: 0.1,
+  modelCalls: 1,
+  durationMs: 10,
+  ...overrides,
 });
 const image = (key: string) => ({ key, mediaType: "image/png", source: "upload" as const });
 
@@ -29,6 +41,27 @@ describe("titleFrom", () => {
     const title = titleFrom("a".repeat(100));
     expect(title).toHaveLength(TITLE_LENGTH);
     expect(title.endsWith("…")).toBe(true);
+  });
+});
+
+describe("addUsage", () => {
+  test("adds each turn and never invents a cost", () => {
+    expect(addUsage(null, undefined)).toBeNull();
+    const first = usage({ cost: undefined });
+    expect(addUsage(null, first)).toEqual(first);
+    const second = usage({ inputTokens: 10, outputTokens: 20, totalTokens: 30, cost: 0.2 });
+    expect(addUsage(first, second)).toMatchObject({
+      inputTokens: 11,
+      outputTokens: 22,
+      totalTokens: 33,
+      cachedTokens: 8,
+      reasoningTokens: 10,
+      cost: 0.2,
+      modelCalls: 2,
+      durationMs: 20,
+    });
+    expect(addUsage(usage(), usage({ cost: undefined }))).toMatchObject({ cost: 0.1 });
+    expect(addUsage(first, { ...second, cost: undefined })).not.toHaveProperty("cost");
   });
 });
 
@@ -102,6 +135,12 @@ describe("ConversationService", () => {
     await ConversationService.endAll("u1");
     expect((await ConversationService.list("u1")).map((c) => c.id)).toEqual(["c1"]);
     expect(await ConversationService.messages("c1")).toEqual([{ id: "m1" }] as never);
+  });
+
+  test("removeAll deletes every conversation and returns all images", async () => {
+    fake.push([{ images: [image("a")] }, { images: [image("b")] }], undefined);
+    expect(await ConversationService.removeAll("u1")).toEqual([image("a"), image("b")]);
+    expect(fake.calls).toContain("delete");
   });
 
   test("remove deletes the conversation and returns its images", async () => {

@@ -80,7 +80,7 @@ export abstract class StatusPlatformService {
             problemDescription:
               error instanceof Error
                 ? error.message
-                : "Unknown error occurred",
+                : "Erro desconhecido",
             checkedAt,
           };
         }

@@ -3,15 +3,42 @@ import {
   getLogger,
   logWarn,
 } from "@server/instrumentation/instrumentLogger";
+import {
+  jsonValue,
+  OPENINFERENCE_SPAN_KIND,
+} from "@server/instrumentation/openinference";
+import { withSpan } from "@server/instrumentation/withSpan";
 import { type AuthUser, hasRouteGrant } from "@server/shared/authz";
 
 import { type ToModelOutputResult,tool } from "@openrouter/agent";
+import { SpanKind, trace } from "@opentelemetry/api";
 import type { z } from "zod";
 
 import type { AssistantAction, EmitStreamEvent } from "../model";
 import { ImageStorage } from "../service/images";
 
 const log = getLogger("assistant");
+const tracer = trace.getTracer("assistant");
+
+/** Tool details are persisted with the message; keep one call from bloating it. */
+const MAX_DETAIL_STRING = 2000;
+
+/** JSON-safe detail value: inline images become a marker and long strings are cut. */
+function detailValue(value: unknown): unknown {
+  if (typeof value === "string") {
+    if (value.startsWith("data:")) return "[imagem]";
+    return value.length > MAX_DETAIL_STRING
+      ? `${value.slice(0, MAX_DETAIL_STRING)}…`
+      : value;
+  }
+  if (Array.isArray(value)) return value.map(detailValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, detailValue(item)]),
+    );
+  }
+  return value;
+}
 
 /** What every tool gets: who is asking, and where to record what it did. */
 export interface ToolContext {
@@ -74,10 +101,43 @@ export function guardedTool<TInput extends z.ZodObject, TOutput>(
     execute: async (input: z.infer<TInput>) => {
       ctx.emit?.({ type: "tool", tool: config.name });
       const imagesBefore = ctx.images.length;
-      const result = await runGuarded(ctx, config, input);
+      const startedAt = performance.now();
+      const result = await withSpan(
+        tracer,
+        `tool ${config.name}`,
+        {
+          kind: SpanKind.INTERNAL,
+          attributes: {
+            [OPENINFERENCE_SPAN_KIND]: "TOOL",
+            "tool.name": config.name,
+            "tool.description": config.description,
+            "input.value": jsonValue(input),
+            "input.mime_type": "application/json",
+          },
+        },
+        async (span) => {
+          const output = await runGuarded(ctx, config, input);
+          span.setAttributes({
+            "output.value": jsonValue(output),
+            "output.mime_type": "application/json",
+          });
+          return output;
+        },
+      );
+      const details = {
+        description: config.description,
+        input: detailValue(input),
+        output: detailValue(result),
+        durationMs: Math.round(performance.now() - startedAt),
+      };
       const action: AssistantAction = isToolError(result)
-        ? { tool: config.name, ok: false, summary: result.error }
-        : { tool: config.name, ok: true, summary: config.summarize(input, result) };
+        ? { tool: config.name, ok: false, summary: result.error, ...details }
+        : {
+            tool: config.name,
+            ok: true,
+            summary: config.summarize(input, result),
+            ...details,
+          };
       ctx.actions.push(action);
       ctx.emit?.({ type: "action", action });
       for (const image of ctx.images.slice(imagesBefore)) {

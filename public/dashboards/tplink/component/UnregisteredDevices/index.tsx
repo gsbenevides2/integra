@@ -136,10 +136,25 @@ export function UnregisteredDevices({ onlineDevices, devices, onChanged }: Props
               border-b border-gray-700 text-left text-xs text-mist-400
             ">
               <th className="px-3 py-2 font-normal">Nome</th>
-              <th className="px-3 py-2 font-normal">Fabricante</th>
-              <th className="px-3 py-2 font-normal">MAC</th>
+              <th className="
+                hidden px-3 py-2 font-normal
+                md:table-cell
+              ">
+                Fabricante
+              </th>
+              <th className="
+                hidden px-3 py-2 font-normal
+                sm:table-cell
+              ">
+                MAC
+              </th>
               <th className="px-3 py-2 font-normal">IP</th>
-              <th className="px-3 py-2 font-normal">Roteador</th>
+              <th className="
+                hidden px-3 py-2 font-normal
+                lg:table-cell
+              ">
+                Roteador
+              </th>
               <th className="px-3 py-2 font-normal" />
             </tr>
           </thead>
@@ -149,18 +164,55 @@ export function UnregisteredDevices({ onlineDevices, devices, onChanged }: Props
                 border-b border-gray-700
                 last:border-0
               ">
-                <td className="px-3 py-2">{device.name}</td>
-                <td className="px-3 py-2 text-mist-300">{device.vendor}</td>
-                <td className="px-3 py-2 font-mono text-xs">{device.mac}</td>
+                <td className="px-3 py-2">
+                  <span className="first-letter:uppercase">
+                    {device.name === "Unknown" ? "Desconhecido" : device.name}
+                  </span>
+                </td>
+                <td className="
+                  hidden px-3 py-2 text-mist-300
+                  md:table-cell
+                ">
+                  <span className="first-letter:uppercase">
+                    {device.vendor === "Unknown" ? "Desconhecido" : device.vendor}
+                  </span>
+                </td>
+                <td className="
+                  hidden px-3 py-2 font-mono text-xs
+                  sm:table-cell
+                ">
+                  {device.mac}
+                </td>
                 <td className="px-3 py-2 font-mono text-xs">{device.ip || "-"}</td>
-                <td className="px-3 py-2 text-xs text-mist-400">{device.routerInterface || "-"}</td>
+                <td className="
+                  hidden px-3 py-2 text-xs text-mist-400
+                  lg:table-cell
+                ">
+                  {device.routerInterface || "-"}
+                </td>
                 <td className="px-3 py-2">
                   <div className="flex justify-end gap-1">
-                    <Button variant="secondary" onClick={() => openLink(device)}>
-                      <LinkIcon className="size-3.5" /> Vincular
+                    <Button
+                      variant="secondary"
+                      aria-label={`Vincular ${device.name}`}
+                      onClick={() => openLink(device)}
+                    >
+                      <LinkIcon className="size-3.5" />
+                      <span className="
+                        hidden
+                        sm:inline
+                      ">Vincular</span>
                     </Button>
-                    <Button variant="secondary" onClick={() => openCreate(device)}>
-                      <PlusIcon className="size-3.5" /> Criar
+                    <Button
+                      variant="secondary"
+                      aria-label={`Criar ${device.name}`}
+                      onClick={() => openCreate(device)}
+                    >
+                      <PlusIcon className="size-3.5" />
+                      <span className="
+                        hidden
+                        sm:inline
+                      ">Criar</span>
                     </Button>
                   </div>
                 </td>

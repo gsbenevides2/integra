@@ -73,7 +73,7 @@ export const RESOURCE_TYPE_LABELS: Record<string, string> = {
   tuya_device: "Dispositivos Tuya",
   tuya_sensor: "Sensores Tuya",
   tuya_preset: "Modos Tuya",
-  cron_job: "Crons",
+  cron_job: "Tarefas agendadas",
 };
 
 /** Section order on the resources tab; unknown types are appended after these. */
@@ -146,6 +146,30 @@ interface ResourceRow {
   kind?: string;
   /** Set when the resource only exists as a grant (no longer in the catalog). */
   flag?: string;
+}
+
+/**
+ * True when every action a resource supports is already granted. Any grant
+ * implies read (the server treats it that way), so a write/apply/execute grant
+ * also covers the read action.
+ */
+export function isResourceFullyGranted(
+  row: ResourceRow,
+  grants: ResourceGrant[],
+): boolean {
+  const actions = new Set(
+    grants
+      .filter(
+        (grant) =>
+          grant.resourceType === row.resourceType &&
+          grant.resourceId === row.resourceId,
+      )
+      .map((grant) => grant.action),
+  );
+  if (actions.size === 0) return false;
+  return row.actions.every(
+    (action) => action === "read" || actions.has(action),
+  );
 }
 
 /**
@@ -231,6 +255,8 @@ export function PermissionsDashboard() {
   const [grantsFailed, setGrantsFailed] = useState(false);
   const [tab, setTab] = useState<Tab>("resources");
   const [search, setSearch] = useState("");
+  /** Only rows that still have something to grant. */
+  const [pendingOnly, setPendingOnly] = useState(false);
   const [pending, setPending] = useState<Set<string>>(new Set());
 
   const selectedUser = users.find((user) => user.id === selectedUserId);
@@ -555,6 +581,11 @@ export function PermissionsDashboard() {
             className="min-w-0 flex-1 bg-transparent py-2 text-sm outline-0"
           />
         </label>
+        <Switch
+          checked={pendingOnly}
+          onChange={setPendingOnly}
+          label="Só não liberadas"
+        />
       </div>
 
       {grantsFailed ? (
@@ -583,13 +614,16 @@ export function PermissionsDashboard() {
             </p>
           )}
           {sections.map(({ type, rows }) => {
-            const visible = rows.filter((row) =>
-              matchesSearch(
-                search,
-                row.label,
-                row.resourceId,
-                row.kind ? (KIND_LABELS[row.kind] ?? row.kind) : "",
-              ),
+            const visible = rows.filter(
+              (row) =>
+                matchesSearch(
+                  search,
+                  row.label,
+                  row.resourceId,
+                  row.kind ? (KIND_LABELS[row.kind] ?? row.kind) : "",
+                ) &&
+                (!pendingOnly ||
+                  !isResourceFullyGranted(row, grants.resources)),
             );
             if (visible.length === 0) return null;
             const typeLabel = RESOURCE_TYPE_LABELS[type] ?? type;
@@ -668,7 +702,9 @@ export function PermissionsDashboard() {
                           flex flex-wrap items-center justify-between gap-2 py-2
                         "
                       >
-                        <span className="min-w-0 text-sm text-mist-100">
+                        <span className="
+                          min-w-0 text-sm text-mist-100 first-letter:uppercase
+                        ">
                           {row.label}
                           <KindBadge kind={row.kind} />
                           <FlagText flag={row.flag} />
@@ -754,8 +790,10 @@ export function PermissionsDashboard() {
           "
         >
           {[...routeGroups.entries()].map(([tag, tagRoutes]) => {
-            const visible = tagRoutes.filter((route) =>
-              matchesSearch(search, route.summary, route.key, tag),
+            const visible = tagRoutes.filter(
+              (route) =>
+                matchesSearch(search, route.summary, route.key, tag) &&
+                (!pendingOnly || !routeGrantByKey.has(route.key)),
             );
             if (visible.length === 0) return null;
             const granted = tagRoutes.filter((route) =>
@@ -840,7 +878,7 @@ export function PermissionsDashboard() {
             );
           })}
 
-          {orphanRouteGrants.length > 0 && (
+          {!pendingOnly && orphanRouteGrants.length > 0 && (
             <section
               aria-label="Rotas órfãs"
               className="mb-3 break-inside-avoid rounded-lg bg-gray-800 p-3"

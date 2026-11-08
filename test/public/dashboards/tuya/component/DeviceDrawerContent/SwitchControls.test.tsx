@@ -19,7 +19,7 @@ const r = (over: Parameters<typeof device>[0]) => {
 
 test("offline", () => {
   r({ state: { online: false } });
-  expect(screen.getByText(/está offline/)).toBeTruthy();
+  expect(screen.getByText(/está desconectad/)).toBeTruthy();
 });
 
 test("no channels", () => {

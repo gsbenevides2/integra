@@ -2,7 +2,7 @@ import "@public/components/GlobalDrawerContext"; // load order: avoids dashboard
 
 import React from "react";
 
-import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterAll, afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 
 import { fail, fakeRecharts, malformed, useApi } from "../../../helpers/dash-api";
@@ -71,8 +71,10 @@ afterEach(() => {
 });
 
 const field = (label: string) =>
-  screen.getByText(label).parentElement!.querySelector("input,select") as HTMLInputElement;
-const submit = () => fireEvent.submit(screen.getByText("Save").closest("form")!);
+  screen.getByText(label).parentElement!.querySelector("input,select") as
+    | HTMLInputElement
+    | HTMLSelectElement;
+const submit = () => fireEvent.submit(screen.getByText("Salvar").closest("form")!);
 const ctrlBtns = (card: string) =>
   Array.from(screen.getByText(card).closest(".cursor-pointer")!.querySelectorAll("button"));
 
@@ -80,102 +82,122 @@ describe("StatusPlatformDashboard", () => {
   test("metadata, skeleton and cards", async () => {
     const { container } = renderWithProviders(<Dashboard />);
     expect(container.querySelectorAll(".animate-pulse").length).toBe(6);
-    await screen.findByText("Name: Plat 1");
+    await screen.findByText("Nome: Plat 1");
     fireEvent.click(screen.getByLabelText("Abrir menu"));
-    expect(screen.getByText("Status: Operational")).toBeTruthy();
-    expect(screen.getByText("Status: Down")).toBeTruthy();
-    expect(screen.getByText("Status: Not checked yet")).toBeTruthy();
+    expect(screen.getByText("Status: Operacional")).toBeTruthy();
+    expect(screen.getByText("Status: Fora do ar")).toBeTruthy();
+    expect(screen.getByText("Status: Ainda não verificado")).toBeTruthy();
     expect(screen.getByText("it broke")).toBeTruthy();
   });
 
   test("list failure and empty state with add button", async () => {
     listReply = fail();
     const { unmount } = renderWithProviders(<Dashboard />);
-    await screen.findByText("Failed to fetch platforms");
+    await screen.findByText("Falha ao buscar plataformas");
     unmount();
     listReply = [];
     renderWithProviders(<Dashboard />);
-    await screen.findByText("No platforms registered yet");
-    fireEvent.click(screen.getAllByText("Add Platform")[1]!.closest("button")!);
-    await screen.findByText("Cancel");
+    await screen.findByText("Nenhuma plataforma cadastrada ainda");
+    fireEvent.click(screen.getAllByText("Adicionar plataforma")[1]!.closest("button")!);
+    const form = await screen.findByRole("dialog", {
+      name: "Adicionar plataforma",
+    });
+    within(form).getByText("Cancelar");
+  });
+
+  test("sorts platforms by name in the frontend", async () => {
+    listReply = [
+      { ...row("2", "OK"), name: "Zulu" },
+      { ...row("1", "OK"), name: "alfa" },
+      { ...row("3", "OK"), name: "Beta" },
+    ];
+    renderWithProviders(<Dashboard />);
+    await screen.findByText("Nome: alfa");
+    expect(
+      screen.getAllByText(/^Nome: /).map((element) => element.textContent),
+    ).toEqual(["Nome: alfa", "Nome: Beta", "Nome: Zulu"]);
   });
 
   test("create validation and success", async () => {
     renderWithProviders(<Dashboard />);
-    await screen.findByText("Name: Plat 1");
-    fireEvent.click(screen.getAllByText("Add Platform")[0]!.closest("button")!);
+    await screen.findByText("Nome: Plat 1");
+    fireEvent.click(screen.getAllByText("Adicionar plataforma")[0]!.closest("button")!);
     submit();
-    await screen.findByText("Missing name!");
-    field("Name").value = "N";
+    await screen.findByText("Informe o nome");
+    field("Nome").value = "N";
     submit();
-    await screen.findByText("Missing type");
-    field("Type").value = PLATFORMS[0];
+    await screen.findByText("Informe o tipo");
+    field("Tipo").value = PLATFORMS[0];
     submit();
-    await screen.findByText("Missing url");
+    await screen.findByText("Informe a URL");
     // inject an option the app does not know about
-    const select = field("Type");
+    const select = field("Tipo") as HTMLSelectElement;
     select.add(Object.assign(document.createElement("option"), { value: "bogus", text: "bogus" }));
     select.value = "bogus";
-    field("Url").value = "https://n.test";
+    field("URL").value = "https://n.test";
     submit();
-    await screen.findByText("Invalid type");
+    await screen.findByText("Tipo inválido");
     select.value = PLATFORMS[0];
     submit();
-    await screen.findByText("Saved successfully");
+    await screen.findByText("Plataforma salva");
     expect(calls.find((c) => c.method === "POST")!.body).toEqual({ name: "N", type: PLATFORMS[0], url: "https://n.test", ignoreSsl: false });
 
     writeFail = true;
-    fireEvent.click(screen.getAllByText("Add Platform")[0]!.closest("button")!);
-    field("Name").value = "N";
-    field("Type").value = PLATFORMS[0];
-    field("Url").value = "u";
+    fireEvent.click(screen.getAllByText("Adicionar plataforma")[0]!.closest("button")!);
+    field("Nome").value = "N";
+    field("Tipo").value = PLATFORMS[0];
+    field("URL").value = "u";
     submit();
-    await screen.findByText("Failed to save");
+    await screen.findByText("Falha ao salvar");
     writeFail = false;
     writeThrow = true;
     submit();
-    await waitFor(() => expect(screen.getAllByText("Failed to save").length).toBe(2));
-    fireEvent.click(screen.getByText("Cancel"));
+    await waitFor(() => expect(screen.getAllByText("Falha ao salvar").length).toBe(2));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "Adicionar plataforma" })).getByText("Cancelar"),
+    );
   });
 
   test("edit flow success and failure", async () => {
     renderWithProviders(<Dashboard />);
-    await screen.findByText("Name: Plat 1");
-    fireEvent.click(ctrlBtns("Name: Plat 1")[0]!);
-    expect(field("Name").value).toBe("Plat 1");
-    field("Name").value = "Renamed";
+    await screen.findByText("Nome: Plat 1");
+    fireEvent.click(ctrlBtns("Nome: Plat 1")[0]!);
+    expect(field("Nome").value).toBe("Plat 1");
+    field("Nome").value = "Renamed";
     submit();
-    await screen.findByText("Platform updated successfully");
+    await screen.findByText("Plataforma atualizada");
     expect(calls.some((c) => c.method === "PATCH" && c.body.name === "Renamed")).toBe(true);
     writeFail = true;
-    fireEvent.click(ctrlBtns("Name: Plat 1")[0]!);
+    fireEvent.click(ctrlBtns("Nome: Plat 1")[0]!);
     submit();
-    await screen.findByText("Failed to update");
+    await screen.findByText("Falha ao atualizar");
   });
 
   test("delete flow: cancel, fail, success", async () => {
     renderWithProviders(<Dashboard />);
-    await screen.findByText("Name: Plat 1");
-    fireEvent.click(ctrlBtns("Name: Plat 1")[1]!);
-    fireEvent.click(await screen.findByText("Cancelar"));
+    await screen.findByText("Nome: Plat 1");
+    fireEvent.click(ctrlBtns("Nome: Plat 1")[1]!);
+    fireEvent.click(
+      within(await screen.findByRole("alertdialog")).getByText("Cancelar"),
+    );
     await act(async () => {});
     expect(calls.some((c) => c.method === "DELETE")).toBe(false);
 
     writeFail = true;
-    fireEvent.click(ctrlBtns("Name: Plat 1")[1]!);
-    fireEvent.click(await screen.findByText("Delete"));
-    await screen.findByText("Failed to delete platform");
+    fireEvent.click(ctrlBtns("Nome: Plat 1")[1]!);
+    fireEvent.click(await screen.findByText("Excluir"));
+    await screen.findByText("Falha ao excluir plataforma");
     writeFail = false;
-    fireEvent.click(ctrlBtns("Name: Plat 1")[1]!);
-    fireEvent.click(await screen.findByText("Delete"));
-    await screen.findByText("Platform deleted successfully");
+    fireEvent.click(ctrlBtns("Nome: Plat 1")[1]!);
+    fireEvent.click(await screen.findByText("Excluir"));
+    await screen.findByText("Plataforma excluída");
   });
 
   test("external link opens url without opening history", async () => {
     const open = spyOn(window, "open").mockImplementation((() => null) as any);
     renderWithProviders(<Dashboard />);
-    await screen.findByText("Name: Plat 1");
-    fireEvent.click(ctrlBtns("Name: Plat 1")[2]!);
+    await screen.findByText("Nome: Plat 1");
+    fireEvent.click(ctrlBtns("Nome: Plat 1")[2]!);
     expect(open).toHaveBeenCalledWith("https://1.test");
     expect(calls.some((c) => c.path.endsWith("/history"))).toBe(false);
     open.mockRestore();
@@ -183,11 +205,11 @@ describe("StatusPlatformDashboard", () => {
 
   test("history modal paginates and closes", async () => {
     renderWithProviders(<Dashboard />);
-    await screen.findByText("Name: Plat 1");
-    fireEvent.click(screen.getByText("Name: Plat 1"));
-    await screen.findByText("History - Plat 1");
-    await waitFor(() => expect(screen.queryByText("Loading history...")).toBeNull());
-    for (const t of ["3d", "3h", "4min", "30s"]) expect(screen.getAllByText(new RegExp(`for ${t}`)).length).toBeGreaterThan(0);
+    await screen.findByText("Nome: Plat 1");
+    fireEvent.click(screen.getByText("Nome: Plat 1"));
+    await screen.findByText("Histórico - Plat 1");
+    await waitFor(() => expect(screen.queryByText("Carregando histórico...")).toBeNull());
+    for (const t of ["3d", "3h", "4min", "30s"]) expect(screen.getAllByText(new RegExp(`por ${t}`)).length).toBeGreaterThan(0);
     const [newer, older] = screen.getAllByRole("button").filter((b) => b.className.includes("disabled:opacity-30")) as HTMLButtonElement[];
     historyFn = (q) => (q.before ? history({ hasMore: false, nextCursor: null }) : history());
     fireEvent.click(older!);
@@ -196,8 +218,8 @@ describe("StatusPlatformDashboard", () => {
     fireEvent.click(newer!);
     await waitFor(() => expect(newer!.disabled).toBe(true));
 
-    const modal = screen.getByText("History - Plat 1").closest(".fixed") as HTMLElement;
-    fireEvent.click(screen.getByText("History - Plat 1"));
+    const modal = screen.getByText("Histórico - Plat 1").closest(".fixed") as HTMLElement;
+    fireEvent.click(screen.getByText("Histórico - Plat 1"));
     fireEvent.click(modal);
     await waitFor(() => expect(modal.className).toContain("opacity-0"));
   });
@@ -205,12 +227,12 @@ describe("StatusPlatformDashboard", () => {
   test("history empty, error and no-cursor older", async () => {
     historyFn = () => fail();
     renderWithProviders(<Dashboard />);
-    await screen.findByText("Name: Plat 1");
-    fireEvent.click(screen.getByText("Name: Plat 1"));
-    await screen.findByText("Failed to fetch history");
+    await screen.findByText("Nome: Plat 1");
+    fireEvent.click(screen.getByText("Nome: Plat 1"));
+    await screen.findByText("Falha ao buscar histórico");
     historyFn = () => history({ checks: [], segments: [], hasMore: true, nextCursor: null });
-    fireEvent.click(screen.getByText("Name: Plat 2"));
-    await screen.findByText("No history available for this period.");
+    fireEvent.click(screen.getByText("Nome: Plat 2"));
+    await screen.findByText("Nenhum histórico disponível para este período.");
     const before = calls.length;
     fireEvent.click(screen.getAllByRole("button").filter((b) => b.className.includes("disabled:opacity-30"))[1]!);
     await act(async () => {});
@@ -225,7 +247,7 @@ describe("StatusPlatformDashboard", () => {
     await waitFor(() => expect(screen.getByText("Atualizar").closest("button")!.disabled).toBe(false));
     writeFail = true;
     fireEvent.click(screen.getByText("Atualizar"));
-    await screen.findByText("Failed to refresh");
+    await screen.findByText("Falha ao atualizar");
   });
 
   test("polling refreshes", async () => {
@@ -234,9 +256,9 @@ describe("StatusPlatformDashboard", () => {
     globalThis.setInterval = ((fn: () => void) => ((tick ??= fn), 1)) as any;
     renderWithProviders(<Dashboard />);
     globalThis.setInterval = orig;
-    await screen.findByText("Name: Plat 1");
+    await screen.findByText("Nome: Plat 1");
     listReply = [row("9", "OK")];
     await act(async () => tick!());
-    await screen.findByText("Name: Plat 9");
+    await screen.findByText("Nome: Plat 9");
   });
 });

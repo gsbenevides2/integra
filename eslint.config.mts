@@ -34,7 +34,7 @@ const REACT_FIRST_IMPORT_GROUPS = [
 ];
 
 export default defineConfig([
-  globalIgnores(["dist/**"]),
+  globalIgnores(["dist/**", ".opencode/**", "graphify-out/**"]),
   {
     files: ["**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
     plugins: { js, "simple-import-sort": simpleImportSort },

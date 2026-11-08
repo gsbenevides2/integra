@@ -8,6 +8,8 @@ import {
 
 import { and, desc, eq, gte, isNull, sql } from "drizzle-orm";
 
+import type { AssistantUsage } from "../model";
+
 /** Most recent messages sent back to the model as context. */
 export const MAX_HISTORY_MESSAGES = 12;
 /** A conversation idle for longer than this is not resumed by the wake word. */
@@ -30,6 +32,30 @@ export interface NewMessage {
   text: string;
   actions?: StoredAction[];
   images?: StoredImage[];
+  /** Token and cost accounting for the assistant reply, when available. */
+  usage?: AssistantUsage;
+}
+
+/** Adds one turn's usage to a conversation total. */
+export function addUsage(
+  previous: AssistantUsage | null | undefined,
+  next: AssistantUsage | null | undefined,
+): AssistantUsage | null {
+  if (!next) return previous ?? null;
+  if (!previous) return { ...next };
+  return {
+    model: next.model,
+    inputTokens: previous.inputTokens + next.inputTokens,
+    outputTokens: previous.outputTokens + next.outputTokens,
+    totalTokens: previous.totalTokens + next.totalTokens,
+    cachedTokens: previous.cachedTokens + next.cachedTokens,
+    reasoningTokens: previous.reasoningTokens + next.reasoningTokens,
+    ...((previous.cost !== undefined || next.cost !== undefined) && {
+      cost: (previous.cost ?? 0) + (next.cost ?? 0),
+    }),
+    modelCalls: previous.modelCalls + next.modelCalls,
+    durationMs: previous.durationMs + next.durationMs,
+  };
 }
 
 export function titleFrom(text: string): string {
@@ -90,6 +116,7 @@ export abstract class ConversationService {
       userId,
       title: titleFrom(firstText),
       endedAt: null,
+      usage: null,
       createdAt: now,
       updatedAt: now,
       persisted: false,
@@ -116,18 +143,23 @@ export abstract class ConversationService {
     messages: NewMessage[],
     ended: boolean,
     now = new Date(),
-  ): Promise<void> {
+  ): Promise<AssistantUsage | null> {
     const endedAt = ended ? now : null;
+    const turnUsage = messages.reduce<AssistantUsage | null>(
+      (total, message) => addUsage(total, message.usage),
+      null,
+    );
+    const usage = addUsage(conversation.usage, turnUsage);
     await db.transaction(async (tx) => {
       if (!conversation.persisted) {
         const { id, userId, title, createdAt } = conversation;
         await tx
           .insert(assistantConversations)
-          .values({ id, userId, title, createdAt, updatedAt: now, endedAt });
+          .values({ id, userId, title, createdAt, updatedAt: now, endedAt, usage });
       } else {
         await tx
           .update(assistantConversations)
-          .set({ updatedAt: now, endedAt })
+          .set({ updatedAt: now, endedAt, usage })
           .where(eq(assistantConversations.id, conversation.id));
       }
       await tx.insert(assistantMessages).values(
@@ -142,6 +174,7 @@ export abstract class ConversationService {
         })),
       );
     });
+    return usage;
   }
 
   /** Closes the user's open conversations so the next one starts fresh. */
@@ -167,6 +200,26 @@ export abstract class ConversationService {
       .from(assistantMessages)
       .where(eq(assistantMessages.conversationId, conversationId))
       .orderBy(assistantMessages.createdAt);
+  }
+
+  /**
+   * Deletes every conversation of the user, returning all images first so the
+   * caller can remove them from the bucket.
+   */
+  static async removeAll(userId: string): Promise<StoredImage[]> {
+    const rows = await db
+      .select({ images: assistantMessages.images })
+      .from(assistantMessages)
+      .innerJoin(
+        assistantConversations,
+        eq(assistantMessages.conversationId, assistantConversations.id),
+      )
+      .where(eq(assistantConversations.userId, userId));
+    const images = rows.flatMap((row) => row.images);
+    await db
+      .delete(assistantConversations)
+      .where(eq(assistantConversations.userId, userId));
+    return images;
   }
 
   /** Deletes the conversation; returns its images so the caller removes them. */

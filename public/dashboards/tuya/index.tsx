@@ -12,9 +12,9 @@ import { useToast } from "@public/components/Toast";
 
 import { Bars3Icon, HomeIcon, PlusIcon } from "@heroicons/react/24/outline";
 
+import { useFrigateStats } from "../frigate/useFrigateStats";
 import { getFrigateEdenClient, getTuyaEdenClient } from "./client";
 import { ApplyPresetModal } from "./component/ApplyPresetModal";
-import { useFrigateStats } from "../frigate/useFrigateStats";
 import { CameraCard } from "./component/CameraCard";
 import { CameraPage } from "./component/CameraPage";
 import { DeviceCard } from "./component/DeviceCard";
@@ -209,21 +209,39 @@ export function TuyaDashboard() {
         <div className="flex gap-2">
           <Button
             variant="secondary"
+            aria-label="Novo modo"
             onClick={() => setShowNewPresetForm(true)}
           >
-            <PlusIcon className="size-4" /> Novo modo
+            <PlusIcon className="size-4" />
+            <span className="sm:hidden">Modo</span>
+            <span className="
+              hidden
+              sm:inline
+            ">Novo modo</span>
           </Button>
           <Button
             variant="secondary"
+            aria-label="Novo sensor"
             onClick={() => setShowNewSensorForm(true)}
           >
-            <PlusIcon className="size-4" /> Novo sensor
+            <PlusIcon className="size-4" />
+            <span className="sm:hidden">Sensor</span>
+            <span className="
+              hidden
+              sm:inline
+            ">Novo sensor</span>
           </Button>
           <Button
             variant="secondary"
+            aria-label="Novo dispositivo"
             onClick={() => setShowNewDeviceForm(true)}
           >
-            <PlusIcon className="size-4" /> Novo dispositivo
+            <PlusIcon className="size-4" />
+            <span className="sm:hidden">Dispositivo</span>
+            <span className="
+              hidden
+              sm:inline
+            ">Novo dispositivo</span>
           </Button>
         </div>
       </div>

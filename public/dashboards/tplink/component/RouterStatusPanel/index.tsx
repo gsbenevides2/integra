@@ -13,6 +13,12 @@ interface RouterStatus {
   totalUpload: string | null;
 }
 
+const CONNECTION_LABEL: Record<string, string> = {
+  Connected: "Conectado",
+  Disconnected: "Desconectado",
+  Unknown: "Desconhecido",
+};
+
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-0.5">
@@ -38,15 +44,21 @@ export function RouterStatusPanel({ status }: { status: RouterStatus | null }) {
       lg:grid-cols-5
     ">
       <Stat label="WAN IP" value={status.wanIp || "-"} />
-      <Stat label="Conexão" value={status.connectionStatus || "-"} />
-      <Stat label="Uptime Conexão" value={status.connectionUptime || "-"} />
-      <Stat label="Uptime Roteador" value={status.routerUptime || "-"} />
+      <Stat
+        label="Conexão"
+        value={
+          (CONNECTION_LABEL[status.connectionStatus] ?? status.connectionStatus) ||
+          "-"
+        }
+      />
+      <Stat label="Tempo conectado" value={status.connectionUptime || "-"} />
+      <Stat label="Tempo do roteador" value={status.routerUptime || "-"} />
       <Stat label="Firmware" value={status.firmwareVersion || "-"} />
       <Stat label="Hardware" value={status.hardwareVersion || "-"} />
       <Stat label="CPU" value={status.cpuUsage != null ? `${status.cpuUsage}%` : "-"} />
       <Stat label="Memória" value={status.memoryUsage != null ? `${status.memoryUsage}%` : "-"} />
-      <Stat label="Download Total" value={status.totalDownload ?? "-"} />
-      <Stat label="Upload Total" value={status.totalUpload ?? "-"} />
+      <Stat label="Total baixado" value={status.totalDownload ?? "-"} />
+      <Stat label="Total enviado" value={status.totalUpload ?? "-"} />
     </div>
   );
 }

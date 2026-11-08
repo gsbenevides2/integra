@@ -42,7 +42,8 @@ test("menu lists dashboards, navigates, closes", () => {
 
   // copy session id
   const writeText = spyOn(navigator.clipboard, "writeText").mockResolvedValue();
-  fireEvent.click(screen.getByText("RUM Session Id: sess-1"));
+  expect(screen.getByText("ID da sessão RUM:")).toBeTruthy();
+  fireEvent.click(screen.getByText("sess-1"));
   expect(writeText).toHaveBeenCalledWith("sess-1");
   expect(screen.getByText(/Copiado para/)).toBeTruthy();
   ctx.mockRestore();
@@ -52,7 +53,7 @@ test("menu lists dashboards, navigates, closes", () => {
 test("session id falls back to empty; swipe opens drawer", () => {
   const ctx = spyOn(openobserveRum, "getInternalContext").mockReturnValue(undefined as any);
   const { container } = renderWithProviders(<GlobalDrawerProvider>{null}</GlobalDrawerProvider>);
-  expect(screen.getByText("RUM Session Id:", { exact: false })).toBeTruthy();
+  expect(screen.getByText("ID da sessão RUM:")).toBeTruthy();
   expect(container.querySelector("[data-drawer-open]")).toBeNull();
   const list = [{ clientX: 50, clientY: 100 }];
   const s: any = new Event("touchstart");

@@ -9,6 +9,10 @@ import React, {
   useState,
 } from "react";
 
+import type {
+  AssistantAction,
+  AssistantUsage,
+} from "@server/modules/assistant/model";
 import { WRITE_TOOLS } from "@server/modules/assistant/service/claims";
 import { useMe } from "@public/components/MeContext";
 import { useToast } from "@public/components/Toast";
@@ -24,13 +28,15 @@ import { startWakeWord, type WakeWordEngine } from "./wakeWord";
 
 export type AssistantState = "idle" | "listening" | "thinking" | "speaking";
 
-export interface AssistantAction {
-  tool: string;
-  ok: boolean;
-  summary: string;
-}
-
 export type { AssistantImage } from "./imageUpload";
+export type { AssistantAction } from "@server/modules/assistant/model";
+
+/** A recent conversation the assistant continued without being asked to. */
+export interface ResumedConversation {
+  title: string;
+  /** How many previous messages are already in the model's context. */
+  count: number;
+}
 
 export interface AssistantMessage {
   id: number;
@@ -70,6 +76,10 @@ export interface VoiceAssistantValue {
   reset: () => Promise<void>;
   /** The conversation being continued, if any. */
   conversationId: string | null;
+  /** Tokens, cost and time accumulated for the conversation on screen. */
+  conversationUsage: AssistantUsage | null;
+  /** Set when the assistant picked up a recent conversation on its own. */
+  resumedConversation: ResumedConversation | null;
   /** Loads a past conversation so it can be read and continued. */
   openConversation: (id: string) => Promise<void>;
   /** Sends the message behind a failed reply again. */
@@ -115,6 +125,8 @@ const NOOP_VALUE: VoiceAssistantValue = {
   stop: () => {},
   reset: async () => {},
   conversationId: null,
+  conversationUsage: null,
+  resumedConversation: null,
   openConversation: async () => {},
   retry: () => {},
   markTyped: () => {},
@@ -142,6 +154,28 @@ function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
+/** Adds one turn's usage to the conversation total. */
+function addUsage(
+  previous: AssistantUsage | null,
+  next: AssistantUsage | undefined,
+): AssistantUsage | null {
+  if (!next) return previous;
+  if (!previous) return { ...next };
+  return {
+    model: next.model,
+    inputTokens: previous.inputTokens + next.inputTokens,
+    outputTokens: previous.outputTokens + next.outputTokens,
+    totalTokens: previous.totalTokens + next.totalTokens,
+    cachedTokens: previous.cachedTokens + next.cachedTokens,
+    reasoningTokens: previous.reasoningTokens + next.reasoningTokens,
+    ...((previous.cost !== undefined || next.cost !== undefined) && {
+      cost: (previous.cost ?? 0) + (next.cost ?? 0),
+    }),
+    modelCalls: previous.modelCalls + next.modelCalls,
+    durationMs: previous.durationMs + next.durationMs,
+  };
+}
+
 function writeWakePreference(enabled: boolean): void {
   try {
     localStorage.setItem(WAKE_PREFERENCE_KEY, String(enabled));
@@ -161,6 +195,9 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
   const [wakeModel, setWakeModel] = useState(false);
   const [wakeEnabled, setWakeEnabledState] = useState(readWakePreference);
   const [conversationId, setConversationIdState] = useState<string | null>(null);
+  const [conversationUsage, setConversationUsage] = useState<AssistantUsage | null>(null);
+  const [resumedConversation, setResumedConversation] =
+    useState<ResumedConversation | null>(null);
   const [attachments, setAttachmentsState] = useState<AssistantImage[]>([]);
   const [uploading, setUploading] = useState(false);
 
@@ -221,6 +258,8 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
     if (conversationEndedRef.current) {
       conversationEndedRef.current = false;
       setMessages([]);
+      setConversationUsage(null);
+      setResumedConversation(null);
     }
     listeningRef.current?.cancel();
     listeningRef.current = null;
@@ -282,6 +321,8 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
       if (conversationIdRef.current && Date.now() - lastActivityRef.current > RESUME_WINDOW_MS) {
         setConversationId(null);
         setMessages([]);
+        setConversationUsage(null);
+        setResumedConversation(null);
       }
       // Pending attachments go with whatever is said or typed next.
       const images = retryImages ?? attachmentsRef.current;
@@ -327,7 +368,25 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
           },
           (event) => {
             if (!live()) return;
-            if (event.type === "delta") {
+            if (event.type === "conversation") {
+              // The server continued a recent conversation on its own: show the
+              // messages already in context, and say so above them.
+              if (event.resumed && event.messages?.length) {
+                const previous = event.messages.map((message) => ({
+                  id: nextIdRef.current++,
+                  role: message.role,
+                  text: message.text,
+                  actions: message.actions,
+                  images: message.images as AssistantImage[],
+                }));
+                setMessages((current) => [...previous, ...current]);
+                setResumedConversation({
+                  title: event.title ?? "conversa anterior",
+                  count: event.messages.length,
+                });
+                setConversationUsage(event.usage ?? null);
+              }
+            } else if (event.type === "delta") {
               firstDeltaAt ||= performance.now();
               sentencer.push(event.text);
               updateMessage(replyId, (m) => ({ ...m, text: m.text + event.text, activity: undefined }));
@@ -382,7 +441,15 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
         setMessages((prev) => prev.filter((m) => m.id !== userMessageId && m.id !== replyId));
         return "silent";
       }
+      // The server may have started a new conversation after the idle window.
+      if (conversationIdRef.current && conversationIdRef.current !== data.conversationId) {
+        setConversationUsage(null);
+        setResumedConversation(null);
+      }
       setConversationId(data.endConversation ? null : data.conversationId);
+      setConversationUsage(
+        data.conversationUsage ?? ((previous) => addUsage(previous, data.usage)),
+      );
       lastActivityRef.current = Date.now();
       updateMessage(replyId, (m) => ({
         id: replyId,
@@ -507,6 +574,8 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
     stop();
     setMessages([]);
     setConversationId(null);
+    setConversationUsage(null);
+    setResumedConversation(null);
     await getAssistantEdenClient().api.assistant.conversation.delete();
   }, [setConversationId, stop]);
 
@@ -526,6 +595,9 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
       conversationEndedRef.current = false;
       lastActivityRef.current = Date.now();
       setConversationId(data.id);
+      // The stored conversation carries its accumulated usage.
+      setConversationUsage(data.usage ?? null);
+      setResumedConversation(null);
       setMessages(
         data.messages.map((message) => ({
           id: nextIdRef.current++,
@@ -643,6 +715,8 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
       stop,
       reset,
       conversationId,
+      conversationUsage,
+      resumedConversation,
       openConversation,
       retry,
       markTyped,
@@ -664,6 +738,8 @@ export function VoiceAssistantProvider({ children }: { children: ReactNode }) {
       stop,
       reset,
       conversationId,
+      conversationUsage,
+      resumedConversation,
       openConversation,
       retry,
       markTyped,

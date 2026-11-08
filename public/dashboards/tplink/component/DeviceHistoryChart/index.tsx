@@ -31,7 +31,7 @@ export function DeviceHistoryChart({ history }: { history: HistoryEntry[] }) {
         {sorted.map((entry) => (
           <div
             key={entry.checkId}
-            title={`${formatTime(entry.createdAt)} · ${entry.online ? "Online" : "Offline"}`}
+            title={`${formatTime(entry.createdAt)} · ${entry.online ? "Conectado" : "Desconectado"}`}
             className={`
               min-w-[2px] flex-1 rounded-[2px]
               ${entry.online ? `bg-green-500` : `bg-red-600`}
@@ -41,7 +41,7 @@ export function DeviceHistoryChart({ history }: { history: HistoryEntry[] }) {
       </div>
       <div className="flex items-center justify-between text-xs text-mist-400">
         <span>{formatTime(sorted[0]!.createdAt)}</span>
-        <span>{onlinePercent}% online no período</span>
+        <span>{onlinePercent}% conectado no período</span>
         <span>{formatTime(sorted[sorted.length - 1]!.createdAt)}</span>
       </div>
     </div>

@@ -30,11 +30,20 @@ beforeEach(() => {
 test("renders title, children, classes per direction/size, close handlers", () => {
   const onClose = mock();
   const { rerender, container } = render(
-    <Drawer isOpen onClose={onClose} title="Ttl" size="small" direction="left" removePadding>
+    <Drawer
+      isOpen
+      onClose={onClose}
+      title="Ttl"
+      size="small"
+      direction="left"
+      removePadding
+      headerAction={<span>Ação</span>}
+    >
       <p>kid</p>
     </Drawer>,
   );
   expect(screen.getByText("Ttl")).toBeTruthy();
+  expect(screen.getByText("Ação")).toBeTruthy();
   expect(container.innerHTML).toContain("max-w-90");
   expect(container.innerHTML).toContain("left-0");
   fireEvent.click(screen.getByLabelText("Fechar"));
@@ -47,6 +56,23 @@ test("renders title, children, classes per direction/size, close handlers", () =
   rerender(<Drawer isOpen={false} onClose={onClose} direction="left">x</Drawer>);
   expect(container.innerHTML).toContain("-translate-x-full");
   expect(container.innerHTML).toContain("max-w-md");
+});
+
+test("Escape closes only while open and locks the page scroll", () => {
+  const onClose = mock();
+  const { rerender, unmount } = render(
+    <Drawer isOpen onClose={onClose} title="T">x</Drawer>,
+  );
+  expect(screen.getByRole("dialog", { name: "T" })).toBeTruthy();
+  expect(document.body.style.overflow).toBe("hidden");
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(onClose).toHaveBeenCalledTimes(1);
+
+  rerender(<Drawer isOpen={false} onClose={onClose} title="T">x</Drawer>);
+  expect(document.body.style.overflow).toBe("");
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(onClose).toHaveBeenCalledTimes(1);
+  unmount();
 });
 
 test("no listeners without swipe props", () => {

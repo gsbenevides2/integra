@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 
+import { Button } from "@public/components/Button";
 import { useConfirm } from "@public/components/ConfirmContext";
 import { Drawer } from "@public/components/Drawer";
 import { IconButton } from "@public/components/IconButton";
@@ -35,6 +36,7 @@ export function HistoryDrawer({ isOpen, onClose }: Props) {
   const { showToast } = useToast();
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const load = useCallback(async () => {
     setIsLoading(true);
@@ -74,8 +76,52 @@ export function HistoryDrawer({ isOpen, onClose }: Props) {
     setConversations((prev) => prev.filter((c) => c.id !== conversation.id));
   };
 
+  const clear = async () => {
+    const ok = await confirm({
+      title: "Limpar histórico",
+      message:
+        "Apagar todas as conversas e imagens do histórico? Não dá para desfazer.",
+      confirmLabel: "Apagar tudo",
+    });
+    if (!ok) return;
+    setClearing(true);
+    try {
+      const { error } = await getAssistantEdenClient().api.assistant.conversations.delete();
+      if (error) {
+        showToast("Falha ao limpar o histórico", "error");
+        return;
+      }
+      setConversations([]);
+      await assistant.reset();
+      onClose();
+      showToast("Histórico apagado", "success");
+    } finally {
+      setClearing(false);
+    }
+  };
+
   return (
-    <Drawer isOpen={isOpen} onClose={onClose} title="Histórico" direction="right" size="small">
+    <Drawer
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Histórico"
+      direction="right"
+      size="small"
+      headerAction={
+        conversations.length > 0 ? (
+          <Button
+            variant="secondary"
+            className="px-2 py-1 text-xs text-red-300"
+            isLoading={clearing}
+            aria-label="Limpar histórico"
+            onClick={() => void clear()}
+          >
+            <TrashIcon className="size-4" />
+            Limpar
+          </Button>
+        ) : undefined
+      }
+    >
       {isLoading && conversations.length === 0 ? (
         <p className="text-sm text-mist-400">Carregando...</p>
       ) : conversations.length === 0 ? (
@@ -100,7 +146,7 @@ export function HistoryDrawer({ isOpen, onClose }: Props) {
                 onClick={() => open(conversation.id)}
                 className="min-w-0 flex-1 cursor-pointer px-3 py-2 text-left"
               >
-                <p className="truncate text-sm text-mist-100">{conversation.title}</p>
+                <p className="truncate text-sm text-mist-100 first-letter:uppercase">{conversation.title}</p>
                 <p className="text-[11px] text-mist-400">
                   {DATE_FORMAT.format(new Date(conversation.updatedAt))}
                 </p>

@@ -44,6 +44,7 @@ function StatusPlatformDashboard() {
   const [historyPlatform, setHistoryPlatform] = useState<{
     id: string;
     name: string;
+    url: string;
   }>();
   const [platforms, setPlatforms] = useState<PlatformRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -57,7 +58,7 @@ function StatusPlatformDashboard() {
         "status-platform"
       ].list.get();
       if (error) {
-        showToast("Failed to fetch platforms", "error");
+        showToast("Falha ao buscar plataformas", "error");
       } else {
         setPlatforms(data ?? []);
       }
@@ -77,7 +78,7 @@ function StatusPlatformDashboard() {
     const { error } = await getStatusPlatformEdenClient().api[
       "status-platform"
     ].refresh.post();
-    if (error) showToast("Failed to refresh", "error");
+    if (error) showToast("Falha ao atualizar", "error");
     else await fetchPlatforms(false);
     setIsRefreshing(false);
   }, [fetchPlatforms, showToast]);
@@ -112,6 +113,7 @@ function StatusPlatformDashboard() {
         onClose={() => setHistoryPlatform(undefined)}
         platformId={historyPlatform?.id}
         platformName={historyPlatform?.name}
+        platformUrl={historyPlatform?.url}
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -122,7 +124,7 @@ function StatusPlatformDashboard() {
           >
             <Bars3Icon className="size-5" />
           </IconButton>
-          <h1 className="text-xl">Status Platform</h1>
+          <h1 className="text-xl">Status das plataformas</h1>
         </div>
         <div className="flex items-center gap-2">
           {lastChecked > 0 && (
@@ -138,9 +140,12 @@ function StatusPlatformDashboard() {
           <ArrowPathIcon className="size-4.5" />
           <span>Atualizar</span>
         </Button>
-          <Button onClick={openCreateModal}>
+          <Button aria-label="Adicionar plataforma" onClick={openCreateModal}>
             <PlusIcon className="size-4.5" />
-            <span>Add Platform</span>
+            <span className="
+              hidden
+              sm:inline
+            ">Adicionar plataforma</span>
           </Button>
         </div>
       </div>
@@ -157,13 +162,13 @@ function StatusPlatformDashboard() {
       ) : platforms.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-16 text-center">
           <ServerStackIcon className="size-10 text-mist-500" />
-          <p className="text-mist-200">No platforms registered yet</p>
+          <p className="text-mist-200">Nenhuma plataforma cadastrada ainda</p>
           <p className="text-sm text-mist-400">
-            Add a platform to start tracking its status here.
+            Adicione uma plataforma para acompanhar o status dela aqui.
           </p>
           <Button className="mt-2" onClick={openCreateModal}>
             <PlusIcon className="size-4.5" />
-            <span>Add Platform</span>
+            <span>Adicionar plataforma</span>
           </Button>
         </div>
       ) : (
@@ -172,7 +177,15 @@ function StatusPlatformDashboard() {
           sm:grid-cols-2
           lg:grid-cols-3
         ">
-          {platforms.map((platform) => (
+          {platforms
+            .slice()
+            .sort((a, b) =>
+              a.name.localeCompare(b.name, "pt-BR", {
+                sensitivity: "base",
+                numeric: true,
+              }),
+            )
+            .map((platform) => (
             <Card
               key={platform.id}
               id={platform.id}
@@ -185,7 +198,11 @@ function StatusPlatformDashboard() {
               onDeleted={() => fetchPlatforms(true)}
               onEdit={() => openEditModal(platform)}
               onOpenHistory={() =>
-                setHistoryPlatform({ id: platform.id, name: platform.name })
+                setHistoryPlatform({
+                  id: platform.id,
+                  name: platform.name,
+                  url: platform.url,
+                })
               }
             />
           ))}
@@ -199,5 +216,5 @@ export const statusPlatformDashboard: DashboardData = {
   id: "status-platform",
   content: StatusPlatformDashboard,
   icon: ShieldCheckIcon,
-  name: "Status Platform",
+  name: "Status das plataformas",
 };

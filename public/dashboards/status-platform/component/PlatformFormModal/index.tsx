@@ -8,6 +8,7 @@ import { Select } from "@public/components/Select";
 import { useToast } from "@public/components/Toast";
 
 import { getStatusPlatformEdenClient } from "../../client";
+import { PLATFORM_LABELS } from "../../labels";
 
 export interface PlatformFormValues {
   id: string;
@@ -46,10 +47,10 @@ export function PlatformFormModal({
       const type = formData.get("type")?.toString();
       const url = formData.get("url")?.toString();
       const ignoreSsl = formData.get("ignoreSsl") === "on";
-      if (!name) return showToast("Missing name!", "error");
-      if (!type) return showToast("Missing type", "error");
-      if (!url) return showToast("Missing url", "error");
-      if (!isValidPlatform(type)) return showToast("Invalid type", "error");
+      if (!name) return showToast("Informe o nome", "error");
+      if (!type) return showToast("Informe o tipo", "error");
+      if (!url) return showToast("Informe a URL", "error");
+      if (!isValidPlatform(type)) return showToast("Tipo inválido", "error");
 
       const client = getStatusPlatformEdenClient();
 
@@ -66,18 +67,18 @@ export function PlatformFormModal({
       request
         .then(({ error }) => {
           if (error) {
-            showToast(isEditing ? "Failed to update" : "Failed to save", "error");
+            showToast(isEditing ? "Falha ao atualizar" : "Falha ao salvar", "error");
             return;
           }
           showToast(
-            isEditing ? "Platform updated successfully" : "Saved successfully",
+            isEditing ? "Plataforma atualizada" : "Plataforma salva",
             "success",
           );
           onSaved();
           onClose();
         })
         .catch(() => {
-          showToast(isEditing ? "Failed to update" : "Failed to save", "error");
+          showToast(isEditing ? "Falha ao atualizar" : "Falha ao salvar", "error");
         })
         .finally(() => {
           setIsSaving(false);
@@ -90,7 +91,7 @@ export function PlatformFormModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={isEditing ? "Edit Platform" : "Add Platform"}
+      title={isEditing ? "Editar plataforma" : "Adicionar plataforma"}
     >
       <form
         className="flex flex-col gap-3"
@@ -98,26 +99,26 @@ export function PlatformFormModal({
         key={platform?.id ?? "new"}
       >
         <Input
-          label="Name"
+          label="Nome"
           type="text"
           id="name"
-          placeholder="Type the platform name"
+          placeholder="Digite o nome da plataforma"
           defaultValue={platform?.name}
         />
         <Input
-          label="Url"
+          label="URL"
           type="text"
           id="url"
-          placeholder="Type the platform url"
+          placeholder="Digite a URL da plataforma"
           defaultValue={platform?.url}
         />
         <Select
-          label="Type"
+          label="Tipo"
           id="type"
           defaultValue={platform?.type ?? ""}
-          placeholder="Select the platform type"
+          placeholder="Selecione o tipo da plataforma"
           options={PLATFORMS.map((option) => ({
-            label: option,
+            label: PLATFORM_LABELS[option],
             value: option,
           }))}
         />
@@ -136,10 +137,10 @@ export function PlatformFormModal({
             onClick={onClose}
             disabled={isSaving}
           >
-            Cancel
+            Cancelar
           </Button>
           <Button type="submit" variant="primary" isLoading={isSaving}>
-            Save
+            Salvar
           </Button>
         </div>
       </form>

@@ -8,13 +8,13 @@ rest are kept here for reference only.
 
 ## Host and authentication
 
-```
+```text
 https://apim-appsitemobilidade-prd-brazilsouth-001.azure-api.net
 ```
 
 Every route requires this header:
 
-```
+```text
 apim-api-key: 8b197e2fd3ed4508b8f0bbb695d9b08f
 ```
 

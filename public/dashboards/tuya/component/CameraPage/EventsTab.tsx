@@ -106,9 +106,11 @@ export function EventsTab({ name }: { name: string }) {
       {!isLoading && events.length === 0 && (
         <p className="text-sm text-mist-400">Nenhum evento.</p>
       )}
-      <div className="
-        grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2
-      ">
+      <div
+        className="
+          grid stagger-in grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2
+        "
+      >
         {events.map((event) => (
           <button
             key={event.id}

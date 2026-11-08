@@ -41,7 +41,7 @@ export function TrainStatusDashboard() {
       const client = getTrainStatusEdenClient();
       const { data, error } = await client.api["train-status"].lines.get();
       if (error) {
-        showToast("Failed to fetch train lines", "error");
+        showToast("Falha ao buscar as linhas de trem", "error");
       } else {
         setLines((data as unknown as TrainLineRow[]) ?? []);
       }
@@ -53,7 +53,7 @@ export function TrainStatusDashboard() {
   const refresh = async () => {
     setIsRefreshing(true);
     const { error } = await getTrainStatusEdenClient().api["train-status"].refresh.post();
-    if (error) showToast("Failed to refresh", "error");
+    if (error) showToast("Falha ao atualizar", "error");
     else await fetchLines(false);
     setIsRefreshing(false);
   };
@@ -84,7 +84,7 @@ export function TrainStatusDashboard() {
         >
           <Bars3Icon className="size-5" />
         </IconButton>
-        <h1 className="text-xl">Train Status</h1>
+        <h1 className="text-xl">Status dos trens</h1>
        </div>
         <div className="flex items-center gap-2">
           {lastChecked > 0 && (
@@ -116,9 +116,12 @@ export function TrainStatusDashboard() {
       ) : lines.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-16 text-center">
           <TruckIcon className="size-10 text-mist-500" />
-          <p className="text-mist-200">No train lines tracked yet</p>
+          <p className="text-mist-200">
+            Nenhuma linha de trem acompanhada ainda
+          </p>
           <p className="text-sm text-mist-400">
-            Data will appear here once the first status check runs.
+            Os dados aparecerão aqui assim que a primeira verificação de status
+            rodar.
           </p>
         </div>
       ) : (
@@ -147,5 +150,5 @@ export const trainStatusDashboard: DashboardData = {
   id: "train-status",
   content: TrainStatusDashboard,
   icon: TruckIcon,
-  name: "Train Status",
+  name: "Status dos trens",
 };

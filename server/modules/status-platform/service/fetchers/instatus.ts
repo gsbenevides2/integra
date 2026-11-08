@@ -30,7 +30,7 @@ export const fetchFromInstatusStatuspage: StatusFetcher = async (
 
   if (isDown) {
     const problemDescription =
-      data.activeIncidents?.[0]?.name ?? "Unknown incident";
+      data.activeIncidents?.[0]?.name ?? "Incidente desconhecido";
     return { status: "DOWN", problemDescription };
   }
 

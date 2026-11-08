@@ -1,3 +1,8 @@
+import type {
+  AssistantAction,
+  AssistantUsage,
+} from "@server/modules/assistant/model";
+
 import { index, jsonb, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
 
 import { authUsers } from "./auth";
@@ -24,12 +29,11 @@ export interface StoredImage {
   label?: string;
 }
 
-/** One action chip shown under an assistant reply. */
-export interface StoredAction {
-  tool: string;
-  ok: boolean;
-  summary: string;
-}
+/**
+ * One action chip shown under an assistant reply. Stored as JSONB, including
+ * the input/output/duration shown by the details modal.
+ */
+export type StoredAction = AssistantAction;
 
 /** A conversation with the assistant; kept until the user deletes it. */
 export const assistantConversations = assistant.table(
@@ -44,6 +48,8 @@ export const assistantConversations = assistant.table(
     title: text().notNull(),
     /** Set by a goodbye: the next wake word starts a new conversation. */
     endedAt: timestamp({ withTimezone: true }),
+    /** Tokens, cost and time accumulated over every turn of this conversation. */
+    usage: jsonb().$type<AssistantUsage | null>(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

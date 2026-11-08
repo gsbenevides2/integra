@@ -51,7 +51,7 @@ export function CameraPage({
           <IconButton onClick={onBack} aria-label="Voltar">
             <ArrowLeftIcon className="size-5" />
           </IconButton>
-          <h1 className="text-xl">{name}</h1>
+          <h1 className="text-xl first-letter:uppercase">{name}</h1>
         </div>
         <a
           href={`/api/frigate/cameras/${name}/goToFrigate`}

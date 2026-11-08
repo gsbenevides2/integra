@@ -208,7 +208,7 @@ export function DeviceDrawerContent({
         </p>
         <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-mist-400">
           <div>
-            <dt className="inline">Device ID: </dt>
+            <dt className="inline">ID do dispositivo: </dt>
             <dd className="inline font-mono">{device.tuyaDeviceId}</dd>
           </div>
           <div>
