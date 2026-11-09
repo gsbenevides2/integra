@@ -129,18 +129,26 @@ export function ServerMetricsDashboard() {
         </div>
       </div>
       {isLoading ? (
-        <p className="text-sm text-mist-400">Carregando métricas...</p>
+        <p className="animate-pulse text-sm text-mist-400">Carregando métricas...</p>
       ) : (
-        <>
-          <div className="flex flex-col gap-3">
+        <div className="
+          grid stagger-in grid-cols-1 gap-3
+          lg:grid-cols-2
+        ">
+          <div className="lg:col-span-2">
             <SpeedtestLatest latest={latestSpeedtest} />
-            {speedtestSnapshots.length > 0 && (
-              <SpeedtestChart data={speedtestSnapshots} />
-            )}
           </div>
+          {speedtestSnapshots.length > 0 && (
+            <div className="lg:col-span-2">
+              <SpeedtestChart data={speedtestSnapshots} />
+            </div>
+          )}
 
           {snapshots.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-16 text-center">
+            <div className="
+              flex animate-fade-up flex-col items-center gap-2 py-16 text-center
+              lg:col-span-2
+            ">
               <ServerIcon className="size-10 text-mist-500" />
               <p className="text-mist-200">Ainda não há métricas coletadas</p>
               <p className="text-sm text-mist-400">
@@ -148,18 +156,15 @@ export function ServerMetricsDashboard() {
               </p>
             </div>
           ) : (
-            <div className="
-              grid stagger-in grid-cols-1 gap-3
-              lg:grid-cols-2
-            ">
+            <>
               <MemoryChart data={snapshots} />
               <NetworkChart data={snapshots} />
               <div className="lg:col-span-2">
                 <DiskUsage disks={latest?.disks ?? []} />
               </div>
-            </div>
+            </>
           )}
-        </>
+        </div>
       )}
     </div>
   );

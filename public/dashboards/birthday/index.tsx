@@ -81,6 +81,10 @@ function BirthdayDashboard() {
     })
     .sort((a, b) => a.inDays - b.inDays)
     .slice(0, 6);
+  // Diagonal wave: each cell starts a bit after its top/left neighbours.
+  const wave = (i: number) => ({
+    animationDelay: `${((i % 7) + Math.floor(i / 7)) * 30 + 150}ms`,
+  });
   const open = (event?: EventFormValues) => setForm({ open: true, event });
 
   return (
@@ -111,7 +115,9 @@ function BirthdayDashboard() {
       ">
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-3xl font-semibold">
+            <h2 key={cursor.month} className="
+              animate-fade-up text-3xl font-semibold
+            ">
               {MONTHS[cursor.month - 1]}
             </h2>
             <div className="
@@ -138,8 +144,8 @@ function BirthdayDashboard() {
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setIsPickerOpen(false)} />
                   <div className="
-                    absolute top-full right-0 z-20 mt-2 w-64 rounded-xl border
-                    border-mist-700 bg-gray-950 p-3 shadow-2xl
+                    absolute top-full right-0 z-20 mt-2 w-64 animate-fade-up
+                    rounded-xl border border-mist-700 bg-gray-950 p-3 shadow-2xl
                   ">
                     <div className="grid grid-cols-3 gap-1.5">
                       {MONTHS.map((name, i) => (
@@ -169,7 +175,7 @@ function BirthdayDashboard() {
             </div>
           </div>
 
-          <div className="
+          <div key={`${cursor.year}-${cursor.month}`} className="
             grid grid-cols-7 gap-1.5
             sm:gap-2.5
           ">
@@ -189,8 +195,10 @@ function BirthdayDashboard() {
                 return (
                   <div
                     key={`out-${i}`}
+                    style={wave(i)}
                     className="
-                      min-h-16 rounded-xl p-2 text-xs text-mist-700
+                      min-h-16 animate-fade-up rounded-xl p-2 text-xs
+                      text-mist-700
                       sm:min-h-28
                       xl:min-h-32
                     "
@@ -205,9 +213,10 @@ function BirthdayDashboard() {
                 <div
                   key={cell.day}
                   data-testid={`day-${cell.day}`}
+                  style={wave(i)}
                   className={`
-                    group flex min-h-16 cursor-pointer flex-col gap-1.5
-                    rounded-xl border p-2 transition-all
+                    group flex min-h-16 animate-fade-up cursor-pointer flex-col
+                    gap-1.5 rounded-xl border p-2 transition-all
                     hover:-translate-y-0.5 hover:border-mist-400
                     hover:bg-gray-900 hover:shadow-lg
                     sm:min-h-28
@@ -258,7 +267,10 @@ function BirthdayDashboard() {
                       <CakeIcon className="
                         mt-px size-3.5 shrink-0 text-mist-300
                       " />
-                      <span className="line-clamp-2 wrap-break-word first-letter:uppercase">{e.title}</span>
+                      <span className="
+                        line-clamp-2 wrap-break-word
+                        first-letter:uppercase
+                      ">{e.title}</span>
                     </button>
                   ))}
                 </div>
@@ -274,7 +286,8 @@ function BirthdayDashboard() {
         </div>
 
         <aside className="
-          flex h-fit flex-col gap-2 rounded-xl border border-mist-700 p-3
+          flex h-fit stagger-in flex-col gap-2 rounded-xl border border-mist-700
+          p-3
         ">
           <h3 className="text-sm font-medium text-mist-300">
             Próximos aniversários
@@ -303,7 +316,10 @@ function BirthdayDashboard() {
                 </span>
               </span>
               <span className="flex min-w-0 flex-col">
-                <span className="truncate first-letter:uppercase" title={e.title}>
+                <span className="
+                  truncate
+                  first-letter:uppercase
+                " title={e.title}>
                   {e.title}
                 </span>
                 <span className="text-xs text-mist-400">

@@ -86,6 +86,30 @@ body {
 @utility stagger-in {
   & > * {
     animation: var(--animate-fade-up);
-    animation-delay: calc(min(sibling-index(), 8) * 50ms - 50ms);
+    animation-delay: 420ms; /* nth-child fallback; sibling-index() isn't supported everywhere */
+  }
+  & > :nth-child(1) {
+    animation-delay: 0ms;
+  }
+  & > :nth-child(2) {
+    animation-delay: 60ms;
+  }
+  & > :nth-child(3) {
+    animation-delay: 120ms;
+  }
+  & > :nth-child(4) {
+    animation-delay: 180ms;
+  }
+  & > :nth-child(5) {
+    animation-delay: 240ms;
+  }
+  & > :nth-child(6) {
+    animation-delay: 300ms;
+  }
+  & > :nth-child(7) {
+    animation-delay: 360ms;
+  }
+  & > :nth-child(8) {
+    animation-delay: 420ms;
   }
 }

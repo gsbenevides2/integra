@@ -323,9 +323,9 @@ function TplinkDashboard() {
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-mist-400">Carregando...</p>
+        <p className="animate-pulse text-sm text-mist-400">Carregando...</p>
       ) : (
-        <>
+        <div className="flex stagger-in flex-col gap-4">
           <RouterStatusPanel status={routerStatus} />
 
           {routerStatusHistory.length > 0 && (
@@ -382,6 +382,7 @@ function TplinkDashboard() {
                       key={device.id}
                       className="
                         cursor-pointer border-b border-gray-700
+                        transition-colors
                         last:border-0
                         hover:bg-gray-700/40
                       "
@@ -463,7 +464,7 @@ function TplinkDashboard() {
             devices={devices}
             onChanged={() => fetchAll(false)}
           />
-        </>
+        </div>
       )}
 
       <Drawer
