@@ -1,3 +1,4 @@
+import { tlsInit } from "./tls";
 import type { StatusFetcher } from "./types";
 
 interface InstatusSummaryResponse {
@@ -15,10 +16,11 @@ interface InstatusSummaryResponse {
  */
 export const fetchFromInstatusStatuspage: StatusFetcher = async (
   endpoint,
+  options,
 ) => {
   const endpointUrl = new URL(endpoint);
   const url = `https://${endpointUrl.host}/summary.json`;
-  const response = await fetch(url);
+  const response = await fetch(url, tlsInit(options));
   const data = (await response.json()) as InstatusSummaryResponse;
 
   const isDown =

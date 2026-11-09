@@ -31,6 +31,7 @@ interface PlatformRow {
   name: string;
   url: string;
   type: Platform;
+  ignoreSsl: boolean;
   status: "OK" | "DOWN" | null;
   problemDescription: string | null;
   lastCheckedAt: Date | string | null;
@@ -191,6 +192,7 @@ function StatusPlatformDashboard() {
               name={platform.name}
               url={platform.url}
               type={platform.type}
+              ignoreSsl={platform.ignoreSsl}
               status={platform.status}
               problemDescription={platform.problemDescription}
               onDeleted={() => fetchPlatforms(true)}

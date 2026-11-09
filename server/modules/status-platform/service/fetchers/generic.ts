@@ -1,3 +1,4 @@
+import { tlsInit } from "./tls";
 import type { StatusFetcher } from "./types";
 
 const REQUEST_TIMEOUT_MS = 20000;
@@ -5,10 +6,11 @@ const REQUEST_TIMEOUT_MS = 20000;
 /**
  * Fetches the status of a generic HTTP endpoint by testing if it returns a 200 status code.
  */
-export const fetchFromGenericHttp: StatusFetcher = async (endpoint) => {
+export const fetchFromGenericHttp: StatusFetcher = async (endpoint, options) => {
   try {
     const response = await fetch(endpoint, {
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      ...tlsInit(options),
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",

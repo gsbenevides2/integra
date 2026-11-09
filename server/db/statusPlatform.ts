@@ -1,6 +1,6 @@
 import { PLATFORMS } from "@server/modules/status-platform/model";
 
-import { index, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, index, pgSchema, text, timestamp } from "drizzle-orm/pg-core";
 
 export const statusPlatform = pgSchema("status_platform");
 
@@ -20,6 +20,7 @@ export const platforms = statusPlatform.table("platforms", {
   name: text().notNull(),
   url: text().notNull(),
   type: platformTypeEnum().notNull(),
+  ignoreSsl: boolean().notNull().default(false),
 });
 
 export const platformStatusChecks = statusPlatform.table(

@@ -1,3 +1,4 @@
+import { tlsInit } from "./tls";
 import type { StatusFetcher } from "./types";
 
 interface AtlassianStatusResponse {
@@ -19,10 +20,11 @@ interface AtlassianIncidentResponse {
  */
 export const fetchFromAtlassianStatuspage: StatusFetcher = async (
   endpoint,
+  options,
 ) => {
   const endpointUrl = new URL(endpoint);
   const url = `https://${endpointUrl.host}/api/v2/status.json`;
-  const response = await fetch(url);
+  const response = await fetch(url, tlsInit(options));
   const data = (await response.json()) as AtlassianStatusResponse;
 
   if (data.status.indicator === "none") {
@@ -31,6 +33,7 @@ export const fetchFromAtlassianStatuspage: StatusFetcher = async (
 
   const incidentsResponse = await fetch(
     `https://${endpointUrl.host}/api/v2/incidents/unresolved.json`,
+    tlsInit(options),
   );
   const incidentsData =
     (await incidentsResponse.json()) as AtlassianIncidentResponse;

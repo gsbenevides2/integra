@@ -19,6 +19,7 @@ interface Props {
   name: string;
   url: string;
   type: Platform;
+  ignoreSsl: boolean;
   status: "OK" | "DOWN" | null;
   problemDescription: string | null;
   onDeleted: () => void;
@@ -31,6 +32,7 @@ export function Card({
   name,
   url,
   type,
+  ignoreSsl,
   status,
   problemDescription,
   onDeleted,
@@ -77,6 +79,7 @@ export function Card({
           <p>Nome: {name}</p>
           <p>URL: {url}</p>
           <p>Tipo: {PLATFORM_LABELS[type] ?? type}</p>
+          {ignoreSsl && <p className="text-xs text-mist-400">SSL ignorado</p>}
         </div>
         <div className="flex flex-col gap-0.5">
           <IconButton
