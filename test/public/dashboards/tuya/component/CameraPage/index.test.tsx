@@ -79,6 +79,20 @@ test("live tab lists the last events, plays one and goes back to live", async ()
   expect(document.querySelector("video")!.getAttribute("src")).toBe(`${BASE}/stream?audio=1`);
 });
 
+test("live tab keeps the last events in the right column, not under the video", async () => {
+  open({
+    [`GET ${BASE}/events`]: () => [event("a", "person")],
+  });
+  const thumbnail = await screen.findByAltText("person");
+  expect(thumbnail.closest("aside")).toBeTruthy();
+  expect(screen.getByText("Últimos eventos")).toBeTruthy();
+});
+
+test("live tab shows an empty events panel when the camera has no events", async () => {
+  open({ [`GET ${BASE}/events`]: () => [] });
+  await screen.findByText("Nenhum evento recente.");
+});
+
 test("live tab renders a ptz camera that has no presets", async () => {
   m = mockTuyaFetch({
     [`GET ${BASE}/state`]: () => ({ ptz: { features: ["pt"] }, features: {} }),
