@@ -79,6 +79,15 @@ test("live tab lists the last events, plays one and goes back to live", async ()
   expect(document.querySelector("video")!.getAttribute("src")).toBe(`${BASE}/stream?audio=1`);
 });
 
+test("live tab renders a ptz camera that has no presets", async () => {
+  m = mockTuyaFetch({
+    [`GET ${BASE}/state`]: () => ({ ptz: { features: ["pt"] }, features: {} }),
+  });
+  renderTuya(<CameraPage name="cam" onBack={() => {}} />);
+  await screen.findByText("Controle PTZ");
+  expect(screen.queryByText("Posições salvas")).toBeNull();
+});
+
 test("live tab hides ptz when the state fails", async () => {
   m = mockTuyaFetch({ [`GET ${BASE}/state`]: fail });
   renderTuya(<CameraPage name="cam" onBack={() => {}} />);

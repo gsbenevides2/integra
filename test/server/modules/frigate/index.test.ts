@@ -191,6 +191,18 @@ test("state combines ptz info and live feature switches", async () => {
   expect(upstream()).toBe("http://frigate.local/api/cam/ptz/info");
 });
 
+test("state reads an empty ptz payload as no ptz, and a missing presets key as none", async () => {
+  // Frigate answers `{}` (200) for a camera it can't reach.
+  fetchSpy = spyOn(globalThis, "fetch").mockResolvedValue(Response.json({}));
+  expect((await (await get("/api/frigate/cameras/cam/state")).json()).ptz).toBeNull();
+
+  fetchSpy.mockResolvedValue(Response.json({ name: "cam", features: ["pt"] }));
+  expect((await (await get("/api/frigate/cameras/cam/state")).json()).ptz).toEqual({
+    features: ["pt"],
+    presets: [],
+  });
+});
+
 test("state without ptz or unknown camera, and 502 when frigate is down", async () => {
   fetchSpy = spyOn(globalThis, "fetch").mockResolvedValue(new Response("x", { status: 404 }));
   const res = await get("/api/frigate/cameras/other/state");
