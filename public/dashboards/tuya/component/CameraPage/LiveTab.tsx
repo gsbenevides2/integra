@@ -77,6 +77,10 @@ export function LiveTab({
         if (error) showToast("Falha ao enviar comando PTZ", "error");
       });
 
+  // A camera without presets (or an offline one) still has to render: reading
+  // `ptz.presets.length` straight from the API threw and blanked the dashboard.
+  const presets = ptz?.presets ?? [];
+
   return (
     <div
       className="
@@ -246,11 +250,11 @@ export function LiveTab({
             ))}
           </div>
           <p className="text-center text-xs text-mist-500">Segure para mover</p>
-          {ptz.presets.length > 0 && (
+          {presets.length > 0 && (
             <div className="flex flex-col gap-2">
               <h3 className="text-xs text-mist-400">Posições salvas</h3>
               <div className="flex flex-wrap gap-2">
-                {ptz.presets.map((preset) => (
+                {presets.map((preset) => (
                   <Button
                     key={preset}
                     variant="secondary"

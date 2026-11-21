@@ -142,10 +142,13 @@ export const frigateRoutes = new Elysia({
   .get(
     "/cameras/:name/state",
     async ({ params }) => {
-      const [ptz, config] = await Promise.all([
+      const [ptzInfo, config] = await Promise.all([
         frigateFetch(`/api/${params.name}/ptz/info`).then(async (res) =>
           res.ok
-            ? ((await res.json()) as { features: string[]; presets: string[] })
+            ? ((await res.json()) as {
+                features?: string[];
+                presets?: string[];
+              })
             : null,
         ),
         cameraLiveConfig(params.name),
@@ -158,6 +161,13 @@ export const frigateRoutes = new Elysia({
           config?.[key] === true,
         ]),
       );
+      // A camera Frigate can't reach answers 200 with `{}` (no keys at all), and
+      // presets are optional even when the PTZ features are there. Both used to
+      // reach the live tab as `{ ptz: {} }` and crash it on `ptz.presets.length`.
+      const ptzFeatures = ptzInfo?.features ?? [];
+      const ptz = ptzFeatures.length
+        ? { features: ptzFeatures, presets: ptzInfo?.presets ?? [] }
+        : null;
       return { ptz, features };
     },
     {
