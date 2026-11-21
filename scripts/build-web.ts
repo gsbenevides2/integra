@@ -82,9 +82,9 @@ const server = await Bun.build({
   outdir: "dist/server",
   target: "bun",
   minify: true,
-  // Loaded once at startup, from node_modules: bundling drizzle-kit (a
-  // devDependency, and the only thing `server/db/sync.ts` needs from it) would
-  // add megabytes to the bundle for one call.
+  // Loaded once at startup, from node_modules: bundling drizzle-kit (the only
+  // thing `server/db/sync.ts` needs from it) would add megabytes to the bundle
+  // for one call.
   external: ["drizzle-kit/*"],
 });
 if (!server.success) {

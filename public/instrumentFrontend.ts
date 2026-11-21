@@ -83,7 +83,15 @@ export function reportError(
     // so this should not happen — but the crash screen is the last resort, and
     // it must not fail because telemetry did.
   }
-  return { sessionId: getRumSessionId(), traceId };
+  const sessionId = getRumSessionId();
+  if (sessionId === undefined && traceId === undefined) {
+    // Nothing was recorded anywhere: no RUM session to attach the error to and
+    // no tracer to export the span. The console is the only place left (and the
+    // one `createRoot`'s `onCaughtError` keeps quiet when telemetry *is* up, so
+    // a failure is never reported twice).
+    console.error(name, error, context?.component_stack ?? "");
+  }
+  return { sessionId, traceId };
 }
 
 /** RUM settings come from the server at runtime, so the bundle can be prebuilt. */

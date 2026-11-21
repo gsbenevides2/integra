@@ -6,8 +6,9 @@ const log = getLogger("db.sync");
 
 /**
  * Drizzle-kit's programmatic schema push, typed without importing the package:
- * it is a devDependency, loaded on demand at runtime (see `drizzle-kit` in the
- * `external` list of `scripts/build-web.ts`).
+ * it is loaded on demand, at startup, and kept out of the server bundle (see
+ * `drizzle-kit` in the `external` list of `scripts/build-web.ts`). It is a
+ * regular dependency for that reason — this module imports it at runtime.
  */
 export type PushSchema = typeof import("drizzle-kit/api-postgres").pushSchema;
 
