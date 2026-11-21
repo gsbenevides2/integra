@@ -56,8 +56,9 @@ See the [`docs/`](./docs/) folder for detailed documentation:
 | `bun run dev:local` | Same as `dev`, but routes every `*.infra.gui.dev.br` request (`fetch`, `WebSocket`, `Bun.s3`) to `192.168.0.3` (the LAN reverse proxy) through an in-process CONNECT proxy; `DEV_LOCAL_IP` overrides the address |
 | `bun run lint` | Lint with ESLint |
 | `bun run lint:fix` | Lint and auto-fix |
-| `bun run db:sync` | Push the Drizzle schema to PostgreSQL (no migration files) |
+| `bun run db:sync` | Push the Drizzle schema to PostgreSQL (no migration files); the daemon does the same at startup |
 | `bun run db:studio` | Open Drizzle Studio |
+| `bun run sourcemaps:upload` | Send the frontend source maps to OpenObserve (the daemon does it at startup in production) |
 
 ## Tech Stack
 

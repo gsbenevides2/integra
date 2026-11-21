@@ -24,10 +24,12 @@ If nothing in the repo is close, that's a signal to ask the user how they want i
 
 ## 2. Database changes
 
-- ORM is Drizzle over PostgreSQL, **schema-push, no migration files**. Edit `server/db/<domain>.ts` and run `bun run db:sync` (wraps `drizzle-kit push`) — there is nothing to write in a `migrations/` folder.
+- ORM is Drizzle over PostgreSQL, **schema-push, no migration files**. Edit `server/db/<domain>.ts` and run `bun run db:sync` (wraps `drizzle-kit push`) — there is nothing to write in a `migrations/` folder and nothing to commit: the schema files are the source of truth.
+- The daemon does that push by itself at startup, before the first request (`server/db/sync.ts`) — in production, and in dev with `ENABLE_DB_SYNC=true`. Nothing is applied when drizzle-kit raises a hint (that is how a destructive change shows up): run `bun run db:sync` for those, the CLI asks before applying.
 - One `pgSchema("<domain>")` per module, in its own file. `server/db/schema.ts` re-exports every domain file with `export * from "./<domain>"` — a new table needs no wiring beyond being exported from its domain file.
 - Match the column conventions already in use: `id: text().primaryKey().$defaultFn(() => crypto.randomUUID())`, `createdAt: timestamp({ withTimezone: true }).notNull().defaultNow()`. Only add `updatedAt`/soft-delete flags (`hidden`) if the feature actually needs them.
-- **If the tables already exist in the live database** (a schema shared with another app, or one you're deliberately not altering), match the existing column names/types exactly and skip `db:sync` entirely — pushing against a schema that already matches is a needless risk, not a needless no-op.
+- **If the tables already exist in the live database** (a schema shared with another app, or one you're deliberately not altering), match the existing column names/types exactly and skip `db:sync` entirely — pushing against a schema that already matches is a needless risk, not a needless no-op. Remember the daemon pushes on boot in production, so a table it should not touch belongs to a schema it does not describe.
+- Pushing is idempotent and stateless: nothing but the database records what was applied, so a boot after a manual `db:sync` finds nothing to do.
 
 ## 3. Service layer
 
@@ -76,5 +78,5 @@ This daemon controls real devices (a router, smart-home devices), talks to a sha
 
 - **`bun run dev` disables cron jobs by default** (`server/cron.ts`, gated on `NODE_ENV`/`ENABLE_CRONS`) — leave it that way. Set `ENABLE_CRONS=true` only when you deliberately want to exercise one job locally, and expect it to actually hit the real router/SSH box/Discord channel/etc. when you do.
 - **Never trigger an action with a real-world side effect** (sending a command to a physical device, sending a Gotify notification, posting to an external API) while testing, unless the user explicitly asks you to verify that specific action.
-- **Ask before running `bun run db:sync`** against the shared Postgres instance, even for an additive, non-destructive change.
+- **Ask before running `bun run db:sync`** against the shared Postgres instance, even for an additive, non-destructive change — and remember the daemon pushes the schema by itself on boot in production (and in dev with `ENABLE_DB_SYNC=true`).
 - Prefer read-only checks (`curl` a GET route, read a table via `db:studio`) over the corresponding write action whenever a read-only check answers the same question.

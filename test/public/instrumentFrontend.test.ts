@@ -1,4 +1,8 @@
-import { getRumSessionId, instrumentFrontend } from "@public/instrumentFrontend";
+import {
+  getRumSessionId,
+  instrumentFrontend,
+  reportError,
+} from "@public/instrumentFrontend";
 
 import { openobserveLogs } from "@openobserve/browser-logs";
 import { openobserveRum } from "@openobserve/browser-rum";
@@ -84,6 +88,65 @@ test("instrumentFrontend wires RUM, logs, tracing and error capture", async () =
   const processors = (trace.getTracerProvider() as any).getDelegate()._activeSpanProcessor._spanProcessors;
   await processors[0].forceFlush();
   await processors[0].shutdown();
+});
+
+test("reportError reports a handled error to RUM with its trace id", () => {
+  const addError = spyOn(openobserveRum, "addError").mockImplementation(() => {});
+  const ctx = spyOn(openobserveRum, "getInternalContext").mockReturnValue({
+    session_id: "sess-2",
+  } as any);
+  spies.push(addError, ctx);
+
+  const ids = reportError("react.error_boundary", new Error("boom"), {
+    component_stack: "at Boom",
+  });
+
+  expect(ids.sessionId).toBe("sess-2");
+  expect(ids.traceId).toMatch(/^[0-9a-f]{32}$/);
+  expect(addError).toHaveBeenCalledWith(expect.any(Error), {
+    component_stack: "at Boom",
+    trace_id: ids.traceId,
+  });
+
+  // Anything thrown that is not an Error is stringified, and a report with no
+  // context still carries the trace of its own span.
+  reportError("manual.report", "sem stack");
+  const [thrown, context] = addError.mock.calls.at(-1) as [
+    unknown,
+    Record<string, string>,
+  ];
+  expect(thrown).toBe("sem stack");
+  expect(Object.keys(context)).toEqual(["trace_id"]);
+  expect(context.trace_id).toMatch(/^[0-9a-f]{32}$/);
+});
+
+test("reportError falls back to the console when telemetry is down", () => {
+  // No RUM session and no provider: nothing would be recorded anywhere, so the
+  // error (and the component stack) has to reach the console — `createRoot`
+  // keeps React's own console.error quiet, precisely to avoid reporting twice
+  // when telemetry *is* there.
+  const ctx = spyOn(openobserveRum, "getInternalContext").mockReturnValue(
+    undefined as any,
+  );
+  const consoleError = spyOn(console, "error").mockImplementation(() => {});
+  spies.push(ctx, consoleError);
+  trace.disable();
+
+  const ids = reportError("react.error_boundary", new Error("boom"), {
+    component_stack: "at Boom",
+  });
+
+  expect(ids).toEqual({ sessionId: undefined, traceId: undefined });
+  expect(consoleError).toHaveBeenCalledWith(
+    "react.error_boundary",
+    expect.any(Error),
+    "at Boom",
+  );
+  consoleError.mockClear();
+
+  // Without a component stack the third argument is still there, empty.
+  reportError("manual.report", "sem stack");
+  expect(consoleError).toHaveBeenCalledWith("manual.report", "sem stack", "");
 });
 
 test("instrumentFrontend does nothing without RUM config", async () => {

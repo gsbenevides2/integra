@@ -2,6 +2,7 @@ import staticPlugin from "@elysia/static";
 import { Elysia, redirect } from "elysia";
 
 import { registerCrons } from "./cron";
+import { syncSchemaOnStartup } from "./db/sync";
 import { instrumentFetch } from "./instrumentation/instrumentFetch";
 import { instrumentGaxios } from "./instrumentation/instrumentGaxios";
 import { elysiaOtel } from "./instrumentation/instrumentHttpServer";
@@ -11,6 +12,7 @@ import {
   setupLoggerProvider,
 } from "./instrumentation/instrumentLogger";
 import { flushTelemetryOnExit } from "./instrumentation/shutdown";
+import { uploadSourceMapsOnStartup } from "./instrumentation/sourceMaps";
 import { assistantRoutes, voskAssetRoutes } from "./modules/assistant";
 import { authentikRoutes } from "./modules/authentik";
 import { birthdayRoutes } from "./modules/birthday";
@@ -36,6 +38,13 @@ instrumentFetch();
 setupLoggerProvider();
 instrumentGaxios();
 flushTelemetryOnExit();
+
+// The schema sync and the source map upload run before the first request, so
+// neither a route nor a stack trace is ever behind the deployment. Both swallow
+// their own failures and log them (see the modules): the daemon still starts
+// when the database or OpenObserve is unreachable.
+await syncSchemaOnStartup();
+void uploadSourceMapsOnStartup();
 
 // Production images prebuild the frontend (`bun run build:web`). Dev always
 // bundles public/index.html on the fly: `dist/web` is ignored even when an

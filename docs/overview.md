@@ -11,7 +11,7 @@ It is a from-scratch rewrite of an older project (`integra`) that used a heavier
 | **Name** | `@gsbenevides2/integra` (`displayName`: Integra) |
 | **Runtime** | Bun |
 | **HTTP Framework** | Elysia |
-| **Database** | PostgreSQL (Drizzle ORM, schema-push, no migrations) |
+| **Database** | PostgreSQL (Drizzle ORM, schema-push, synced at startup) |
 | **Validation** | Zod v4 |
 | **Frontend** | React 19 + Tailwind CSS 4, served as one SPA |
 | **Tracing** | OpenTelemetry (OTLP), exported to an external collector |
@@ -36,6 +36,7 @@ server/
 │   └── authentik.ts             # loginInAuthentik() — Authentik OAuth client-credentials login
 ├── db/
 │   ├── index.ts                 # drizzle() instance over Bun's SQL client
+│   ├── sync.ts                  # Pushes the schema at startup (drizzle-kit's programmatic push)
 │   ├── schema.ts                # Barrel: `export * from "./<domain>"` per module
 │   ├── drizzle.config.ts        # drizzle-kit config (schema-push target)
 │   └── <domain>.ts              # One pgSchema(<domain>) per module (google, tuya, tplink, ...)
@@ -123,6 +124,7 @@ There is no custom CLI argument parser (no `--only-run`, `--debug`, `--disableCr
 |----------|---------|
 | `NODE_ENV` | `production` enables crons and disables Bun's dev/HMR mode |
 | `ENABLE_CRONS` | `true` runs crons even when `NODE_ENV !== "production"` |
+| `ENABLE_DB_SYNC` | `true` pushes the schema at startup even when `NODE_ENV !== "production"` |
 
 ## Development Commands
 

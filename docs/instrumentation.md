@@ -66,14 +66,28 @@ Use `withSpan(tracer, name, { kind, attributes }, async (span) => ...)` when nei
 
 `flushTelemetryOnExit()` flushes spans, logs and metrics on SIGTERM/SIGINT so the last batch isn't lost on restart.
 
+## Database — `server/db/sync.ts`
+
+`await syncSchemaOnStartup()` runs before the first request and does what `bun run db:sync` does, without the CLI: drizzle-kit's programmatic push (`drizzle-kit/api-postgres`, loaded on demand and left out of the server bundle) diffs `server/db/schema.ts` against the live schema and applies the difference — no files generated, nothing committed, no journal, the schema files are the source of truth. It runs in production, or in dev with `ENABLE_DB_SYNC=true`. When drizzle-kit raises a hint — how a destructive change surfaces — nothing is applied and the operator is told to run `bun run db:sync`, which asks before touching data. A failure is logged and the daemon keeps starting.
+
 ## Frontend — `public/instrumentFrontend.ts`
 
 Wires up:
 
-- **OpenTelemetry web SDK** (`WebTracerProvider` + `FetchInstrumentation`, `DocumentLoadInstrumentation`, `UserInteractionInstrumentation`), the single owner of `traceparent` propagation (same-origin only); every span carries the RUM `session.id`, and uncaught errors / unhandled rejections become spans. Exporting to `/v1/traces` on this app's own origin — which the backend then proxies to the real collector (see above).
+- **OpenTelemetry web SDK** (`WebTracerProvider` + `DocumentLoadInstrumentation`, `UserInteractionInstrumentation`); every span carries the RUM `session.id`, and uncaught errors / unhandled rejections become spans. Exporting to `/v1/traces` on this app's own origin — which the backend then proxies to the real collector (see above). There is deliberately no `FetchInstrumentation`: RUM already injects `traceparent` on `/api` requests, and two injectors would put two trace ids on the same request.
 - **OpenObserve RUM + logs** (`@openobserve/browser-rum`/`browser-logs`) — session replay, resource/long-task tracking, forwarded console errors. Configured via `PUBLIC_RUM_TOKEN`, `PUBLIC_RUM_SITE`, `PUBLIC_OTEL_ORGANIZATION`.
 - **RUM ↔ trace correlation**: join on the `session.id` span attribute (front) and on `trace_id` (front → backend). RUM does not inject its own trace headers.
 - Session persistence is deliberately `"memory"` (not cookie/localStorage) — a page reload always starts a fresh RUM session.
+- **Handled errors** — `reportError(name, error, context)` records the error as a span (a child of the active one, so it lands in the trace that caused it) *and* as a RUM error carrying the same `trace_id`, and returns the ids it reported. Uncaught window errors do not go through it: the RUM SDK already collects those, and reporting them twice would duplicate every one of them.
+- **Error screen** — `public/components/ErrorBoundary.tsx` wraps the app in `public/index.tsx` and every dashboard in `GlobalDrawerProvider`, so a render error shows a friendly screen with the RUM session id and the trace instead of a blank page (and a broken dashboard no longer takes the menu down with it: a `resetKey` drops the failure when another page is picked). `createRoot` sets `onCaughtError` to a no-op because `forwardErrorsToLogs` would turn React's own `console.error` for that same failure into a second RUM error event.
+
+### Source maps — `scripts/build-web.ts`, `scripts/upload-sourcemaps.ts`
+
+`bun run build:web` builds the frontend with `sourcemap: "external"` and moves the maps into `dist/sourcemaps` — never into `dist/web`, which `@elysia/static` serves as-is, because source maps should not be downloadable from the browser. Each map is rewritten for OpenObserve along the way: `sources` become repo-relative (`public/components/Foo.tsx` instead of `../../public/components/Foo.tsx`), and `sourcesContent` keeps only the files this repo owns — `node_modules` is 5.1 of the 7.8 MB of a map here, its frames only need to resolve to file/line/column, and Error Tracking renders the code snippet it shows next to a frame from `sourcesContent`. The result is ~2.5 MB, under every documented upload limit.
+
+In production the daemon uploads them itself on startup (`uploadSourceMapsOnStartup` in `server/instrumentation/sourceMaps.ts`, called from `server/index.ts` before serving): it zips what is in `dist/sourcemaps` and posts it to `POST /api/<org>/sourcemaps`, tagged with the `service`/`env`/`version` the RUM SDK reports (`integra-web` from `public/telemetry.ts`, `production`/`development` from `NODE_ENV`, and the `package.json` version — the same triple RUM sends with every event, which is what OpenObserve matches a stack trace against). A failed upload only logs a warning (the daemon still starts) and can be retried with `bun run sourcemaps:upload`, which does exactly the same by hand.
+
+The endpoint wants an explicit `Content-Length` and a token with the `sourcemaps` RBAC permission ([Configuration](./configuration.md)); the ZIP carries only the `.js.map` files, since a `.js` whose map is missing makes OpenObserve reject the whole archive.
 
 ## What replaced the old repo's tracer
 

@@ -42,6 +42,6 @@ There is no `format`/`format:fix` script. Tests run with `bun run test` (also in
 - **Runtime**: Bun only — no Node.js APIs assumed to work the same way, prefer Bun built-ins (`Bun.serve`, `Bun.cron`, `Bun.redis`, `Bun.s3`) over npm packages that reimplement them.
 - **HTTP Framework**: Elysia.
 - **Validation**: Zod v4.
-- **Database**: PostgreSQL via Drizzle ORM, schema-push only (`bun run db:sync`) — no `migrations/` folder.
+- **Database**: PostgreSQL via Drizzle ORM, schema-push only (`bun run db:sync`, and at startup by the daemon) — no `migrations/` folder.
 - **Module System**: ESM (`"type": "module"`).
 - **Import Style**: path aliases `@server/*` and `@public/*` (see `tsconfig.json`), not bare `baseUrl` specifiers.
