@@ -10,6 +10,7 @@ There is no CLI argument parser (no `--only-run`, `--debug`, `--only`) — the o
 |----------|---------|---------|
 | `NODE_ENV` | `production` enables cron jobs and disables Bun's dev/HMR mode | unset |
 | `ENABLE_CRONS` | `true` runs cron jobs even when `NODE_ENV !== "production"` — use to test one job locally | unset |
+| `ENABLE_DB_SYNC` | `true` pushes the schema at startup even when `NODE_ENV !== "production"` — in production it always runs, before the first request | unset |
 | `USER_UID` | Development-only identity override: the Authentik UID to act as. Both this and `USER_NAME` must be set; only honored when `NODE_ENV` is `development` or `test` (Bun reports an unset `NODE_ENV` as `development`), and ignored whenever a request carries `x-authentik-uid` | unset |
 | `USER_NAME` | Development-only identity override: the username paired with `USER_UID` | unset |
 
@@ -48,18 +49,16 @@ The app trusts the headers the Authentik proxy outpost injects. It never validat
 
 The HTTP port is hardcoded to `3000` in `server/index.ts` — unlike the old repo, there is no `PORT` env var override.
 
-## Frontend source maps (build/deploy only)
+## Frontend source maps (startup / deploy only)
 
-`bun run sourcemaps:upload` sends the maps written by `bun run build:web` to OpenObserve, so RUM Error Tracking resolves minified stack traces (see [Instrumentation](./instrumentation.md)). Nothing at runtime reads these:
+In production the daemon uploads the maps written by `bun run build:web` to OpenObserve on startup, so RUM Error Tracking resolves minified stack traces (see [Instrumentation](./instrumentation.md)); `bun run sourcemaps:upload` does the same by hand. Both read:
 
 | Variable | Purpose |
 |----------|---------|
 | `PUBLIC_RUM_SITE`, `PUBLIC_OTEL_ORGANIZATION` | The same values the app runs with: the upload goes to `https://<PUBLIC_RUM_SITE>/api/<PUBLIC_OTEL_ORGANIZATION>/sourcemaps` |
-| `OPENOBSERVE_SOURCEMAP_TOKEN` | OpenObserve **API token with the `sourcemaps` RBAC permission** — the RUM client token shipped to browsers cannot write them |
+| `OPENOBSERVE_SOURCEMAP_TOKEN` | OpenObserve **API token with the `sourcemaps` RBAC permission** — the RUM client token shipped to browsers cannot write them. Without it the startup upload logs a warning and skips itself |
 | `OPENOBSERVE_SOURCEMAP_USER` | Login paired with that token in the `Basic` auth header; defaults to `default` |
-| `NODE_ENV` | Decides the `env` the maps are tagged with (`production`/`development`), exactly like `GET /client-config` reports it to the browser, so set it the way the deployment runs |
-
-The release workflow runs the upload on the released commit before pushing the image, gated on `OPENOBSERVE_SOURCEMAP_TOKEN` (secret) plus the `PUBLIC_RUM_SITE`/`PUBLIC_OTEL_ORGANIZATION` repository variables: when any of the three is absent the step skips itself and says so.
+| `NODE_ENV` | Decides the `env` the maps are tagged with (`production`/`development`), exactly like `GET /client-config` reports it to the browser, and whether the startup upload happens at all |
 
 ## Per-module
 

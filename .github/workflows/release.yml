@@ -71,25 +71,6 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-      # Uploads the source maps of the released bundle, so RUM Error Tracking
-      # resolves the minified stack traces back to public/… (docs/instrumentation.md).
-      - name: Upload frontend source maps to OpenObserve
-        env:
-          NODE_ENV: production
-          PUBLIC_RUM_SITE: ${{ vars.PUBLIC_RUM_SITE }}
-          PUBLIC_OTEL_ORGANIZATION: ${{ vars.PUBLIC_OTEL_ORGANIZATION }}
-          OPENOBSERVE_SOURCEMAP_TOKEN: ${{ secrets.OPENOBSERVE_SOURCEMAP_TOKEN }}
-        run: |
-          if [ -z "${OPENOBSERVE_SOURCEMAP_TOKEN}" ] || [ -z "${PUBLIC_RUM_SITE}" ] || [ -z "${PUBLIC_OTEL_ORGANIZATION}" ]; then
-            echo "Source map upload skipped: set the OPENOBSERVE_SOURCEMAP_TOKEN secret and the"
-            echo "PUBLIC_RUM_SITE / PUBLIC_OTEL_ORGANIZATION repository variables to enable it."
-            exit 0
-          fi
-          bun install --frozen-lockfile
-          bun run build:web
-          bun run sourcemaps:upload
       - name: Run Build and Push Docker Image
         env:
           VERSION: ${{ needs.prepare-release.outputs.version }}

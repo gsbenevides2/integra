@@ -3,17 +3,24 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inflateRawSync } from "node:zlib";
 
-import { expect, spyOn, test } from "bun:test";
-
 import {
+  appVersion,
   buildZip,
-  main,
   readSourceMaps,
   resolveSettings,
-  run,
   type UploadSettings,
   uploadSourceMaps,
-} from "../../scripts/upload-sourcemaps";
+  uploadSourceMapsOnStartup,
+} from "@server/instrumentation/sourceMaps";
+
+import { afterAll, expect, spyOn, test } from "bun:test";
+
+const log = spyOn(console, "log").mockImplementation(() => {});
+const warn = spyOn(console, "warn").mockImplementation(() => {});
+afterAll(() => {
+  log.mockRestore();
+  warn.mockRestore();
+});
 
 const MAP = '{"version":3,"mappings":"AAAA"}';
 // CRC32 of MAP, from an independent implementation (zlib).
@@ -29,7 +36,7 @@ function settings(overrides: Partial<UploadSettings> = {}): UploadSettings {
     authorization: "Basic abc",
     service: "integra-web",
     env: "production",
-    version: "2.3.0",
+    version: "2.2.31",
     ...overrides,
   };
 }
@@ -40,12 +47,12 @@ test("resolveSettings maps the RUM config onto the upload triple", () => {
     PUBLIC_OTEL_ORGANIZATION: "acme",
     OPENOBSERVE_SOURCEMAP_TOKEN: "o2oi_secret",
   };
-  expect(resolveSettings(env, "2.3.0")).toEqual({
+  expect(resolveSettings(env, "2.2.31")).toEqual({
     endpoint: "https://openobserve.example.com/api/acme/sourcemaps",
     authorization: `Basic ${Buffer.from("default:o2oi_secret").toString("base64")}`,
     service: "integra-web",
     env: "development",
-    version: "2.3.0",
+    version: "2.2.31",
   });
 
   // A site that already carries a scheme is used as-is, and so is a custom user.
@@ -57,7 +64,7 @@ test("resolveSettings maps the RUM config onto the upload triple", () => {
         OPENOBSERVE_SOURCEMAP_USER: "gui@gui.dev.br",
         NODE_ENV: "production",
       },
-      "2.3.0",
+      "2.2.31",
     ),
   ).toMatchObject({
     endpoint: "http://localhost:5080/api/acme/sourcemaps",
@@ -67,8 +74,8 @@ test("resolveSettings maps the RUM config onto the upload triple", () => {
 });
 
 test("resolveSettings names every missing variable at once", () => {
-  expect(() => resolveSettings({}, "2.3.0")).toThrow(
-    "missing environment: PUBLIC_RUM_SITE, PUBLIC_OTEL_ORGANIZATION, OPENOBSERVE_SOURCEMAP_TOKEN",
+  expect(() => resolveSettings({}, "2.2.31")).toThrow(
+    "variáveis de ambiente ausentes: PUBLIC_RUM_SITE, PUBLIC_OTEL_ORGANIZATION, OPENOBSERVE_SOURCEMAP_TOKEN",
   );
 });
 
@@ -106,7 +113,9 @@ test("buildZip writes a readable, deflated archive", () => {
   expect(header.getUint16(8, true)).toBe(8); // deflate
   expect(header.getUint32(14, true)).toBe(MAP_CRC32);
   expect(header.getUint32(22, true)).toBe(MAP.length);
-  expect(centralOffset).toBe(30 + header.getUint16(26, true) + header.getUint32(18, true));
+  expect(centralOffset).toBe(
+    30 + header.getUint16(26, true) + header.getUint32(18, true),
+  );
   const nameLength = header.getUint16(26, true);
   expect(decoder.decode(zip.subarray(30, 30 + nameLength))).toBe(
     "chunk-abc.js.map",
@@ -134,7 +143,9 @@ test("uploadSourceMaps posts the fields OpenObserve matches on", async () => {
   const zip = buildZip(FILES);
 
   const message = await uploadSourceMaps(
-    settings({ endpoint: "https://openobserve.example.com/api/acme/sourcemaps" }),
+    settings({
+      endpoint: "https://openobserve.example.com/api/acme/sourcemaps",
+    }),
     zip,
     post,
   );
@@ -155,7 +166,7 @@ test("uploadSourceMaps posts the fields OpenObserve matches on", async () => {
   const fields = decoder.decode(body.subarray(0, zipStart));
   expect(fields).toContain('name="service"\r\n\r\nintegra-web');
   expect(fields).toContain('name="env"\r\n\r\nproduction');
-  expect(fields).toContain('name="version"\r\n\r\n2.3.0');
+  expect(fields).toContain('name="version"\r\n\r\n2.2.31');
   expect(fields).toContain('name="file"; filename="sourcemaps.zip"');
   expect(body.subarray(zipStart, zipStart + zip.length)).toEqual(zip);
   expect(decoder.decode(body.subarray(zipStart + zip.length))).toBe(
@@ -171,71 +182,93 @@ test("a refusal surfaces OpenObserve's own message", async () => {
   ).rejects.toThrow("400 File is missing or empty");
 });
 
-/** The env `main` reads, set only for the duration of one test. */
-function useUploadEnv(): () => void {
-  const names = [
-    "PUBLIC_RUM_SITE",
-    "PUBLIC_OTEL_ORGANIZATION",
-    "OPENOBSERVE_SOURCEMAP_TOKEN",
-  ];
-  const previous = names.map((name) => [name, process.env[name]] as const);
-  process.env.PUBLIC_RUM_SITE = "openobserve.example.com";
-  process.env.PUBLIC_OTEL_ORGANIZATION = "acme";
-  process.env.OPENOBSERVE_SOURCEMAP_TOKEN = "o2oi_test";
-  return () => {
-    for (const [name, value] of previous) {
-      if (value === undefined) delete process.env[name];
-      else process.env[name] = value;
-    }
-  };
+/** A build output with one map in it. */
+async function mapsFolder(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "integra-maps-"));
+  await Bun.write(join(dir, "chunk-abc.js.map"), MAP);
+  return dir;
 }
 
-test("main uploads what build:web wrote, and asks for it when empty", async () => {
-  const restoreEnv = useUploadEnv();
-  const log = spyOn(console, "log").mockImplementation(() => {});
+test("startup uploads the build's maps in production", async () => {
+  const dir = await mapsFolder();
   const post = spyOn(globalThis, "fetch").mockResolvedValue(
     new Response("successfully stored sourcemaps", { status: 201 }),
   );
-  const empty = await mkdtemp(join(tmpdir(), "integra-maps-empty-"));
-  const dir = await mkdtemp(join(tmpdir(), "integra-maps-"));
 
   try {
-    await expect(main(empty)).rejects.toThrow("run `bun run build:web` first");
-    expect(post).not.toHaveBeenCalled();
-
-    await Bun.write(join(dir, "chunk-abc.js.map"), MAP);
-    await main(dir);
+    await uploadSourceMapsOnStartup(
+      {
+        NODE_ENV: "production",
+        PUBLIC_RUM_SITE: "openobserve.example.com",
+        PUBLIC_OTEL_ORGANIZATION: "acme",
+        OPENOBSERVE_SOURCEMAP_TOKEN: "o2oi_secret",
+      },
+      dir,
+    );
 
     expect(post).toHaveBeenCalledTimes(1);
-    const [url, init] = post.mock.calls[0]!;
-    expect(url).toBe("https://openobserve.example.com/api/acme/sourcemaps");
-    expect(init!.method).toBe("POST");
-    expect(log.mock.calls.at(-1)![0]).toBe("successfully stored sourcemaps");
+    expect(String(post.mock.calls[0]![0])).toBe(
+      "https://openobserve.example.com/api/acme/sourcemaps",
+    );
+    expect(log).toHaveBeenCalledWith("Source maps enviados ao OpenObserve.", {
+      service: "integra-web",
+      env: "production",
+      version: await appVersion(),
+      files: 1,
+      response: "successfully stored sourcemaps",
+    });
   } finally {
-    log.mockRestore();
     post.mockRestore();
-    restoreEnv();
-    await rm(empty, { recursive: true, force: true });
     await rm(dir, { recursive: true, force: true });
   }
 });
 
-test("run turns a failure into a message and a non-zero exit code", async () => {
-  const error = spyOn(console, "error").mockImplementation(() => {});
-  const empty = await mkdtemp(join(tmpdir(), "integra-maps-none-"));
+test("startup stays quiet in dev and warns instead of failing", async () => {
+  const dir = await mapsFolder();
+  const empty = await mkdtemp(join(tmpdir(), "integra-maps-empty-"));
+  const post = spyOn(globalThis, "fetch").mockResolvedValue(
+    new Response("successfully stored sourcemaps", { status: 201 }),
+  );
+  const production = {
+    NODE_ENV: "production",
+    PUBLIC_RUM_SITE: "openobserve.example.com",
+    PUBLIC_OTEL_ORGANIZATION: "acme",
+    OPENOBSERVE_SOURCEMAP_TOKEN: "o2oi_secret",
+  };
 
   try {
-    await run(empty);
+    // Dev: no upload at all.
+    await uploadSourceMapsOnStartup({ NODE_ENV: "development" }, dir);
+    expect(post).not.toHaveBeenCalled();
 
-    expect(error).toHaveBeenCalledWith(
-      expect.stringContaining("missing environment: PUBLIC_RUM_SITE"),
+    // Production without credentials: the operator is told what is missing.
+    await uploadSourceMapsOnStartup({ NODE_ENV: "production" }, dir);
+    const [missing, missingAttrs] = warn.mock.calls.at(-1) as [
+      string,
+      Record<string, string>,
+    ];
+    expect(missing).toContain("Não foi possível enviar os source maps");
+    expect(missingAttrs["error.message"]).toContain(
+      "OPENOBSERVE_SOURCEMAP_TOKEN",
     );
-    expect(process.exitCode).toBe(1);
+
+    // Production with no build to upload (a source checkout, not the image).
+    await uploadSourceMapsOnStartup(production, empty);
+    expect(warn).toHaveBeenCalledWith(
+      "Nenhum source map encontrado para enviar.",
+      { dir: empty },
+    );
+
+    // Production whose OpenObserve is unreachable: a warning, never a throw.
+    post.mockRejectedValue(new Error("openobserve fora do ar"));
+    await uploadSourceMapsOnStartup(production, dir);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("Não foi possível enviar os source maps"),
+      { "error.message": "openobserve fora do ar" },
+    );
   } finally {
-    // Bun latches a non-zero exit code until the process ends, so leaving it
-    // set would fail the whole suite instead of just this test.
-    process.exitCode = 0;
-    error.mockRestore();
+    post.mockRestore();
+    await rm(dir, { recursive: true, force: true });
     await rm(empty, { recursive: true, force: true });
   }
 });

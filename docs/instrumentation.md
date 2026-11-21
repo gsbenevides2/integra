@@ -66,6 +66,10 @@ Use `withSpan(tracer, name, { kind, attributes }, async (span) => ...)` when nei
 
 `flushTelemetryOnExit()` flushes spans, logs and metrics on SIGTERM/SIGINT so the last batch isn't lost on restart.
 
+## Database — `server/db/sync.ts`
+
+`await syncSchemaOnStartup()` runs before the first request and does what `bun run db:sync` does, without the CLI: drizzle-kit's programmatic push (`drizzle-kit/api-postgres`, loaded on demand and left out of the server bundle) diffs `server/db/schema.ts` against the live schema and applies the difference — no files generated, nothing committed, no journal, the schema files are the source of truth. It runs in production, or in dev with `ENABLE_DB_SYNC=true`. When drizzle-kit raises a hint — how a destructive change surfaces — nothing is applied and the operator is told to run `bun run db:sync`, which asks before touching data. A failure is logged and the daemon keeps starting.
+
 ## Frontend — `public/instrumentFrontend.ts`
 
 Wires up:
@@ -81,7 +85,9 @@ Wires up:
 
 `bun run build:web` builds the frontend with `sourcemap: "external"` and moves the maps into `dist/sourcemaps` — never into `dist/web`, which `@elysia/static` serves as-is, because source maps should not be downloadable from the browser. Each map is rewritten for OpenObserve along the way: `sources` become repo-relative (`public/components/Foo.tsx` instead of `../../public/components/Foo.tsx`), and `sourcesContent` keeps only the files this repo owns — `node_modules` is 5.1 of the 7.8 MB of a map here, its frames only need to resolve to file/line/column, and Error Tracking renders the code snippet it shows next to a frame from `sourcesContent`. The result is ~2.5 MB, under every documented upload limit.
 
-`bun run sourcemaps:upload` then zips what is in `dist/sourcemaps` and posts it to `POST /api/<org>/sourcemaps`, tagged with the `service`/`env`/`version` the RUM SDK reports (`integra-web` from `public/telemetry.ts`, `production`/`development` from `NODE_ENV`, and the `package.json` version — the same triple RUM sends with every event, which is what OpenObserve matches a stack trace against). The endpoint wants an explicit `Content-Length` and a token with the `sourcemaps` RBAC permission ([Configuration](./configuration.md)); the ZIP carries only the `.js.map` files, since a `.js` whose map is missing makes OpenObserve reject the whole archive. The release workflow runs it on the released commit, before pushing the image (see the same page).
+In production the daemon uploads them itself on startup (`uploadSourceMapsOnStartup` in `server/instrumentation/sourceMaps.ts`, called from `server/index.ts` before serving): it zips what is in `dist/sourcemaps` and posts it to `POST /api/<org>/sourcemaps`, tagged with the `service`/`env`/`version` the RUM SDK reports (`integra-web` from `public/telemetry.ts`, `production`/`development` from `NODE_ENV`, and the `package.json` version — the same triple RUM sends with every event, which is what OpenObserve matches a stack trace against). A failed upload only logs a warning (the daemon still starts) and can be retried with `bun run sourcemaps:upload`, which does exactly the same by hand.
+
+The endpoint wants an explicit `Content-Length` and a token with the `sourcemaps` RBAC permission ([Configuration](./configuration.md)); the ZIP carries only the `.js.map` files, since a `.js` whose map is missing makes OpenObserve reject the whole archive.
 
 ## What replaced the old repo's tracer
 

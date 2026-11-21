@@ -332,8 +332,9 @@ tone or room names. Use the gear button ("Minhas preferências") on the
 
 ## Setup
 
-1. **Database:** run `bun run db:sync` to create the `assistant` schema
-   (`assistant.user_settings`, `assistant.conversations`, `assistant.messages`).
+1. **Database:** the `assistant` schema (`assistant.user_settings`,
+   `assistant.conversations`, `assistant.messages`) is created by the schema push
+   the daemon runs on startup — `bun run db:sync` pushes it by hand.
 2. **Wake word model:** run `bun run assistant:model`. It downloads
    `vosk-model-small-pt-0.3` (~32 MB, Apache 2.0) and repackages it as
    `public/vosk/vosk-model-small-pt.tar.gz`.
