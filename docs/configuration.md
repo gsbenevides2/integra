@@ -48,6 +48,19 @@ The app trusts the headers the Authentik proxy outpost injects. It never validat
 
 The HTTP port is hardcoded to `3000` in `server/index.ts` — unlike the old repo, there is no `PORT` env var override.
 
+## Frontend source maps (build/deploy only)
+
+`bun run sourcemaps:upload` sends the maps written by `bun run build:web` to OpenObserve, so RUM Error Tracking resolves minified stack traces (see [Instrumentation](./instrumentation.md)). Nothing at runtime reads these:
+
+| Variable | Purpose |
+|----------|---------|
+| `PUBLIC_RUM_SITE`, `PUBLIC_OTEL_ORGANIZATION` | The same values the app runs with: the upload goes to `https://<PUBLIC_RUM_SITE>/api/<PUBLIC_OTEL_ORGANIZATION>/sourcemaps` |
+| `OPENOBSERVE_SOURCEMAP_TOKEN` | OpenObserve **API token with the `sourcemaps` RBAC permission** — the RUM client token shipped to browsers cannot write them |
+| `OPENOBSERVE_SOURCEMAP_USER` | Login paired with that token in the `Basic` auth header; defaults to `default` |
+| `NODE_ENV` | Decides the `env` the maps are tagged with (`production`/`development`), exactly like `GET /client-config` reports it to the browser, so set it the way the deployment runs |
+
+The release workflow runs the upload on the released commit before pushing the image, gated on `OPENOBSERVE_SOURCEMAP_TOKEN` (secret) plus the `PUBLIC_RUM_SITE`/`PUBLIC_OTEL_ORGANIZATION` repository variables: when any of the three is absent the step skips itself and says so.
+
 ## Per-module
 
 | Variable | Used by |

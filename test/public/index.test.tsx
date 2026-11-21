@@ -55,6 +55,11 @@ test("entry point mounts the app and boots instrumentation + service worker", as
     await import("@public/index");
   });
 
+  // Errors caught by the ErrorBoundary are reported from there; React's own
+  // `console.error` would become a second, poorer RUM error for the same one.
+  const rootOptions = create.mock.calls[0]![1] as { onCaughtError(): unknown };
+  expect(rootOptions.onCaughtError()).toBeUndefined();
+
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
   });

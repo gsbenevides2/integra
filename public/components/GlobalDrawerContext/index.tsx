@@ -20,6 +20,7 @@ import { tuyaDashboard } from "@public/dashboards/tuya";
 import { voiceAssistantDashboard } from "@public/dashboards/voice-assistant";
 
 import { Drawer } from "../Drawer";
+import { ErrorBoundary } from "../ErrorBoundary";
 import { Content } from "./Content";
 
 export interface DashboardData {
@@ -97,7 +98,15 @@ export function GlobalDrawerProvider({ children }: { children: ReactNode }) {
       >
         <Content />
       </Drawer>
-      {CurrentPageContent && <CurrentPageContent />}
+      {
+        // A dashboard that throws takes down the page it is rendered in, not
+        // the menu: resetKey drops the failure as soon as another one is picked.
+        CurrentPageContent && (
+          <ErrorBoundary resetKey={page}>
+            <CurrentPageContent />
+          </ErrorBoundary>
+        )
+      }
       {children}
     </GlobalDrawerContext.Provider>
   );
