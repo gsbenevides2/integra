@@ -143,6 +143,24 @@ test("a refused clipboard still confirms the copy", () => {
   writeText.mockRestore();
 });
 
+test("a failing telemetry call still shows the crash screen", () => {
+  addError.mockImplementation(() => {
+    throw new Error("RUM sem init");
+  });
+
+  render(
+    <ErrorBoundary>
+      <Boom />
+    </ErrorBoundary>,
+  );
+
+  // The boundary is the last resort: a throw from componentDidCatch would take
+  // the tree down again and leave exactly the blank screen it exists to avoid.
+  expect(screen.getByText(CRASH_TITLE)).toBeTruthy();
+  expect(screen.getByText("explodiu no render")).toBeTruthy();
+  addError.mockImplementation(() => {});
+});
+
 test("a report with no context still reaches RUM", () => {
   addError.mockClear();
 

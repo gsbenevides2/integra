@@ -73,10 +73,16 @@ export function reportError(
   context?: Record<string, string>,
 ): ReportedErrorIds {
   const traceId = recordErrorSpan(name, error, context);
-  openobserveRum.addError(error instanceof Error ? error : String(error), {
-    ...context,
-    ...(traceId ? { trace_id: traceId } : {}),
-  });
+  try {
+    openobserveRum.addError(error instanceof Error ? error : String(error), {
+      ...context,
+      ...(traceId ? { trace_id: traceId } : {}),
+    });
+  } catch {
+    // The SDK buffers `addError` until init (and wraps it in its own monitor),
+    // so this should not happen — but the crash screen is the last resort, and
+    // it must not fail because telemetry did.
+  }
   return { sessionId: getRumSessionId(), traceId };
 }
 
