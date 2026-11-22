@@ -336,7 +336,7 @@ test("history tab: switching cameras stops the previous camera's playback", asyn
 
 test("controls tab: a new state from the server replaces the local toggles", async () => {
   m = mockTuyaFetch({ [`PUT ${BASE}/features/audio`]: () => ({ ok: true }) });
-  const ui = (features: typeof state.features) => (
+  const ui = (features: Record<string, boolean>) => (
     <ToastProvider>
       <ControlsTab name="cam" state={{ ...state, features }} />
     </ToastProvider>
@@ -345,7 +345,16 @@ test("controls tab: a new state from the server replaces the local toggles", asy
   const audio = () => screen.getByRole("switch", { name: "Detecção de áudio" });
   fireEvent.click(audio());
   await waitFor(() => expect(audio().getAttribute("aria-checked")).toBe("true"));
-  view.rerender(ui({ ...state.features, audio: false }));
+  // The same values in a new object keep the local toggle...
+  view.rerender(ui({ ...state.features }));
+  expect(audio().getAttribute("aria-checked")).toBe("true");
+  // ...but changed values from the server replace it.
+  view.rerender(ui({ ...state.features, audio: false, detect: false }));
+  expect(audio().getAttribute("aria-checked")).toBe("false");
+  // A different set of features also counts as new values.
+  fireEvent.click(audio());
+  await waitFor(() => expect(audio().getAttribute("aria-checked")).toBe("true"));
+  view.rerender(ui({ detect: true }));
   expect(audio().getAttribute("aria-checked")).toBe("false");
 });
 

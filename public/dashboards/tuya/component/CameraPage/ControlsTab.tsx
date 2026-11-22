@@ -14,6 +14,16 @@ const LABELS: Record<string, string> = {
   ptz_autotracker: "Rastreamento automático (PTZ)",
 };
 
+function sameFeatures(
+  a: Record<string, boolean> = {},
+  b: Record<string, boolean> = {},
+) {
+  const keys = Object.keys(a);
+  return (
+    keys.length === Object.keys(b).length && keys.every((key) => a[key] === b[key])
+  );
+}
+
 export function ControlsTab({
   name,
   state,
@@ -26,12 +36,13 @@ export function ControlsTab({
   // raced a click landing between the first render with switches and the
   // effect, which then reset the toggle.
   const [changed, setChanged] = useState<Record<string, boolean>>({});
-  // A new state from the server replaces the local toggles, adjusted during
-  // render (not in an effect) so a click can't land in between.
+  // New feature values from the server replace the local toggles, adjusted
+  // during render (not in an effect) so a click can't land in between. Compared
+  // by value: the same values in a new object must not undo a click in flight.
   const [shownState, setShownState] = useState(state);
   if (state !== shownState) {
     setShownState(state);
-    setChanged({});
+    if (!sameFeatures(state?.features, shownState?.features)) setChanged({});
   }
   const features = { ...state?.features, ...changed };
 
