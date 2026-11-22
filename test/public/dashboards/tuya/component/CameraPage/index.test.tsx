@@ -1,8 +1,9 @@
 import React from "react";
 
 import { CameraPage } from "@public/dashboards/tuya/component/CameraPage";
+import { HistoryTab } from "@public/dashboards/tuya/component/CameraPage/HistoryTab";
 
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, mock, test } from "bun:test";
 
 import { fail, mockTuyaFetch } from "../../../../../helpers/tuya-fetch";
@@ -290,6 +291,30 @@ test("history tab drops a late answer for the day it left", async () => {
   answer([{ start_time: unix("2020-01-05T10:00:00"), motion: 90 }]);
   await new Promise((resolve) => setTimeout(resolve, 10));
   expect(screen.queryAllByTestId("motion-bar")).toHaveLength(0);
+});
+
+test("history tab: a network failure reads as no recordings", async () => {
+  open({
+    [`GET ${BASE}/recordings/summary`]: () => {
+      throw new TypeError("offline");
+    },
+  });
+  tab("Histórico");
+  await screen.findByText("Sem gravações.");
+});
+
+test("history tab: a late summary of the previous camera is dropped", async () => {
+  let answer!: (value: unknown) => void;
+  m = mockTuyaFetch({
+    [`GET /api/frigate/cameras/old/recordings/summary`]: () => new Promise((resolve) => (answer = resolve)),
+    [`GET ${BASE}/recordings/summary`]: () => [],
+  });
+  const view = render(<HistoryTab name="old" />);
+  view.rerender(<HistoryTab name="cam" />);
+  await screen.findByText("Sem gravações.");
+  answer([{ day: "2020-01-05", events: 0, hours: [] }]);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  expect(screen.getByText("Sem gravações.")).toBeTruthy();
 });
 
 test("history tab: no recordings", async () => {

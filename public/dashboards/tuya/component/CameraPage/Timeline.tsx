@@ -115,7 +115,11 @@ export function Timeline({
   const hours: number[] = [];
   for (let time = start; time < end; time += 3600) hours.push(time);
 
-  const playhead = preview ?? current;
+  // A clip can play past the end of the day (today's end is frozen when the
+  // day is picked): keep the playhead on the drawn range.
+  const clamp = (time: number) => Math.min(end, Math.max(start, time));
+  const shown = preview ?? current;
+  const playhead = shown === null ? null : clamp(shown);
   const zoomButton = `
     cursor-pointer rounded-full p-1.5 text-mist-300
     hover:bg-gray-800
@@ -132,7 +136,7 @@ export function Timeline({
         aria-orientation="vertical"
         aria-valuemin={start}
         aria-valuemax={end}
-        aria-valuenow={current ?? end}
+        aria-valuenow={clamp(current ?? end)}
         aria-valuetext={current === null ? undefined : clock(current)}
         onKeyDown={(e) => {
           const step = { ArrowUp: MOTION_SCALE, ArrowDown: -MOTION_SCALE }[
@@ -243,7 +247,7 @@ export function Timeline({
                   px-1.5 text-[10px] font-semibold text-white tabular-nums
                 "
               >
-                {clock(playhead)}
+                {clock(shown ?? playhead)}
               </span>
             </div>
           )}

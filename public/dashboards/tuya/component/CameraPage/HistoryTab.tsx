@@ -59,8 +59,11 @@ function dayLabel(day: string) {
   });
 }
 
+/** A JSON list, or an empty one when the request or the body fails. */
 const getJson = <T,>(url: string) =>
-  fetch(url).then((res) => (res.ok ? (res.json() as Promise<T[]>) : []));
+  fetch(url)
+    .then((res) => (res.ok ? (res.json() as Promise<T[]>) : []))
+    .catch(() => [] as T[]);
 
 export function HistoryTab({ name }: { name: string }) {
   const base = `/api/frigate/cameras/${name}`;
@@ -77,12 +80,20 @@ export function HistoryTab({ name }: { name: string }) {
   useEffect(() => {
     // Frigate buckets days and hours in UTC unless told the viewer's timezone.
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    // Switching cameras keeps this component: drop the previous camera's days
+    // and any late answer for it.
+    let live = true;
+    setDays(null);
     getJson<DaySummary>(`${base}/recordings/summary?timezone=${timezone}`).then(
       (summary) => {
+        if (!live) return;
         setDays(summary);
         setDay(summary[0]?.day ?? "");
       },
     );
+    return () => {
+      live = false;
+    };
   }, [base]);
 
   // Frozen when the day is picked: today's end would otherwise move every render.

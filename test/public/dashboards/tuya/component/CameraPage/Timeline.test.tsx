@@ -115,3 +115,11 @@ test("zoom without a playhead anchors the middle of the view", () => {
   fireEvent.click(screen.getByLabelText("Afastar"));
   expect(track.style.height).toBe("480px");
 });
+
+test("a clip playing past the end of the day keeps the playhead on the timeline", () => {
+  const { slider } = setup({ current: END + 300 });
+  // The pill still tells the real time, at the top edge of the day.
+  const pill = screen.getByText(clock(END + 300));
+  expect((pill.parentElement as HTMLElement).style.top).toBe("0px");
+  expect(slider.getAttribute("aria-valuenow")).toBe(String(END));
+});
