@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 
 import { Switch } from "@public/components/Switch";
 import { useToast } from "@public/components/Toast";
@@ -22,19 +22,22 @@ export function ControlsTab({
   state: CameraState | null;
 }) {
   const { showToast } = useToast();
-  const [features, setFeatures] = useState<Record<string, boolean>>({});
-  useEffect(() => setFeatures(state?.features ?? {}), [state]);
+  // Local toggles on top of the camera's state. Copying the state in an effect
+  // raced a click landing between the first render with switches and the
+  // effect, which then reset the toggle.
+  const [changed, setChanged] = useState<Record<string, boolean>>({});
+  const features = { ...state?.features, ...changed };
 
   if (!state) return <p className="text-sm text-mist-400">Carregando...</p>;
 
   const toggle = async (feature: string, value: boolean) => {
-    setFeatures((current) => ({ ...current, [feature]: value }));
+    setChanged((current) => ({ ...current, [feature]: value }));
     const { error } = await getFrigateEdenClient()
       .api.frigate.cameras({ name })
       .features({ feature: feature as "detect" })
       .put({ value });
     if (error) {
-      setFeatures((current) => ({ ...current, [feature]: !value }));
+      setChanged((current) => ({ ...current, [feature]: !value }));
       showToast("Falha ao alterar", "error");
     }
   };
