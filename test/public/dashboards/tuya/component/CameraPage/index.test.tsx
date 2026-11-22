@@ -36,6 +36,11 @@ function open(routes: Parameters<typeof mockTuyaFetch>[0] = {}) {
   return onBack;
 }
 const tab = (name: string) => fireEvent.click(screen.getByRole("tab", { name }));
+/** The unix second the recording of a local hour starts at (10:00 by default). */
+const hourStart = (hour = "10") =>
+  new Date(
+    `${new Date().toLocaleDateString("sv")}T${hour}:00:00`,
+  ).getTime() / 1000;
 
 test("live tab: back, mute toggle, hold-to-move ptz and presets", async () => {
   const onBack = open({ [`POST ${BASE}/ptz`]: () => ({ ok: true }) });
@@ -182,7 +187,7 @@ test("history tab: picks a day and an hour and navigates hours", async () => {
       { day: today, events: 2, hours: hours(2) },
       { day: "2020-01-05", events: 0, hours: hours(0) },
     ],
-    [`GET ${BASE}/events`]: () => [event("b", "dog"), event("a", "person")].map((e, i) => ({ ...e, start_time: 1700000100 - i * 10 })),
+    [`GET ${BASE}/events`]: () => [event("b", "dog"), event("a", "person")].map((e, i) => ({ ...e, start_time: hourStart() + 100 - i * 10 })),
   });
   tab("Histórico");
   expect(await screen.findByText("Escolha uma hora na linha do tempo")).toBeTruthy();
@@ -224,7 +229,9 @@ test("history tab: clicking an event reloads the player from the event", async (
         ],
       },
     ],
-    [`GET ${BASE}/events`]: () => [{ ...event("a", "person"), start_time: 1700000090.75 }],
+    [`GET ${BASE}/events`]: () => [
+      { ...event("a", "person"), start_time: start + 40.75 },
+    ],
   });
   tab("Histórico");
   fireEvent.click(await screen.findByLabelText("10h"));
@@ -233,8 +240,8 @@ test("history tab: clicking an event reloads the player from the event", async (
 
   // The fractional start_time Frigate sends is floored: the clip route takes ints.
   fireEvent.click(thumbnail);
-  expect(document.querySelector("video")!.getAttribute("src")).toBe(`${BASE}/clip.mp4?start=1700000090&end=${start + 3600}`);
-  expect(screen.getByText(`Hoje, desde ${new Date(1700000090 * 1000).toLocaleTimeString("pt-BR")}`)).toBeTruthy();
+  expect(document.querySelector("video")!.getAttribute("src")).toBe(`${BASE}/clip.mp4?start=${start + 40}&end=${start + 3600}`);
+  expect(screen.getByText(`Hoje, desde ${new Date((start + 40) * 1000).toLocaleTimeString("pt-BR")}`)).toBeTruthy();
   const selected = thumbnail.closest("button")!;
   expect(selected.getAttribute("aria-current")).toBe("true");
   expect(selected.className).toContain("ring-blue-500");
@@ -253,7 +260,9 @@ test("history tab: an event clip goes back to the whole hour", async () => {
     [`GET ${BASE}/recordings/summary`]: () => [
       { day: today, events: 1, hours: [{ hour: "10", events: 1, motion: 5, duration: 3600 }] },
     ],
-    [`GET ${BASE}/events`]: () => [{ ...event("a", "person"), start_time: 1700000090 }],
+    [`GET ${BASE}/events`]: () => [
+      { ...event("a", "person"), start_time: start + 40 },
+    ],
   });
   tab("Histórico");
   fireEvent.click(await screen.findByLabelText("10h"));
@@ -265,6 +274,30 @@ test("history tab: an event clip goes back to the whole hour", async () => {
   expect(screen.getByText("Hoje, 10:00 – 10:59")).toBeTruthy();
   expect(screen.queryByText("Ver a hora inteira")).toBeNull();
   expect(screen.getByAltText("person").closest("button")!.getAttribute("aria-current")).toBe("false");
+});
+
+// The event state survives one render after a day/hour change, so an event outside
+// the hour on screen must never pick the clip window.
+test("history tab: an event outside the selected hour does not move the player", async () => {
+  const today = new Date().toLocaleDateString("sv");
+  const start = hourStart();
+  open({
+    [`GET ${BASE}/recordings/summary`]: () => [
+      { day: today, events: 1, hours: [{ hour: "10", events: 1, motion: 5, duration: 3600 }] },
+    ],
+    [`GET ${BASE}/events`]: () => [
+      { ...event("a", "person"), start_time: start + 3600 },
+    ],
+  });
+  tab("Histórico");
+  fireEvent.click(await screen.findByLabelText("10h"));
+  const thumbnail = await screen.findByAltText("person");
+
+  fireEvent.click(thumbnail);
+  expect(document.querySelector("video")!.getAttribute("src")).toBe(`${BASE}/clip.mp4?start=${start}&end=${start + 3600}`);
+  expect(screen.getByText("Hoje, 10:00 – 10:59")).toBeTruthy();
+  expect(screen.queryByText("Ver a hora inteira")).toBeNull();
+  expect(thumbnail.closest("button")!.getAttribute("aria-current")).toBe("false");
 });
 
 test("history tab labels yesterday and survives failing events", async () => {

@@ -90,8 +90,19 @@ export function HistoryTab({ name }: { name: string }) {
   const maxMotion = Math.max(1, ...(current?.hours.map((h) => h.motion) ?? []));
   const available = HOURS.filter((item) => byHour.has(item));
   const position = hour ? available.indexOf(hour) : -1;
+  // The event is dropped by the effect above, so the render right after a day or
+  // hour change still carries the previous one: only an event inside the hour
+  // being shown may drive the clip, or the player would ask Frigate for a window
+  // starting before it (or after its end).
+  const playing =
+    event &&
+    range &&
+    event.start_time >= range.start &&
+    event.start_time < range.end
+      ? event
+      : null;
   // Frigate's clip endpoint takes whole seconds.
-  const clipStart = Math.floor(event?.start_time ?? start ?? 0);
+  const clipStart = Math.floor(playing?.start_time ?? start ?? 0);
 
   return (
     <div className="
@@ -122,7 +133,7 @@ export function HistoryTab({ name }: { name: string }) {
               <p className="text-sm">Escolha uma hora na linha do tempo</p>
             </div>
           )}
-          {event && (
+          {playing && (
             <button
               type="button"
               onClick={() => setEvent(null)}
@@ -150,7 +161,7 @@ export function HistoryTab({ name }: { name: string }) {
             <ChevronLeftIcon className="size-5" />
           </button>
           <p className="text-sm text-mist-300">
-            {event
+            {playing
               ? `${dayLabel(day)}, desde ${clock(clipStart)}`
               : hour
                 ? `${dayLabel(day)}, ${hour}:00 – ${hour}:59`
@@ -285,12 +296,12 @@ export function HistoryTab({ name }: { name: string }) {
                 <button
                   key={item.id}
                   type="button"
-                  aria-current={item.id === event?.id}
+                  aria-current={item.id === playing?.id}
                   onClick={() => setEvent(item)}
                   className={`
                     flex cursor-pointer items-center gap-3 rounded-lg
                     bg-gray-800 p-2 text-left text-sm
-                    ${item.id === event?.id ? "ring-2 ring-blue-500" : ""}
+                    ${item.id === playing?.id ? "ring-2 ring-blue-500" : ""}
                   `}
                 >
                   <img
