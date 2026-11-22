@@ -1,6 +1,8 @@
 import React from "react";
 
+import { ToastProvider } from "@public/components/Toast";
 import { CameraPage } from "@public/dashboards/tuya/component/CameraPage";
+import { ControlsTab } from "@public/dashboards/tuya/component/CameraPage/ControlsTab";
 import { HistoryTab } from "@public/dashboards/tuya/component/CameraPage/HistoryTab";
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -315,6 +317,36 @@ test("history tab: a late summary of the previous camera is dropped", async () =
   answer([{ day: "2020-01-05", events: 0, hours: [] }]);
   await new Promise((resolve) => setTimeout(resolve, 10));
   expect(screen.getByText("Sem gravações.")).toBeTruthy();
+});
+
+test("history tab: switching cameras stops the previous camera's playback", async () => {
+  const day = [{ day: "2020-01-05", events: 0, hours: [{ hour: "10", events: 0, motion: 0, duration: 3600 }] }];
+  m = mockTuyaFetch({
+    [`GET /api/frigate/cameras/old/recordings/summary`]: () => day,
+    [`GET ${BASE}/recordings/summary`]: () => day,
+  });
+  const view = render(<HistoryTab name="old" />);
+  await screen.findByText("Escolha um momento na linha do tempo");
+  tapTimeline(unix("2020-01-05T10:30:00"), unix("2020-01-06T00:00:00"));
+  expect(document.querySelector("video")!.getAttribute("src")).toContain("/cameras/old/");
+  view.rerender(<HistoryTab name="cam" />);
+  expect(await screen.findByText("Escolha um momento na linha do tempo")).toBeTruthy();
+  expect(document.querySelector("video")).toBeNull();
+});
+
+test("controls tab: a new state from the server replaces the local toggles", async () => {
+  m = mockTuyaFetch({ [`PUT ${BASE}/features/audio`]: () => ({ ok: true }) });
+  const ui = (features: typeof state.features) => (
+    <ToastProvider>
+      <ControlsTab name="cam" state={{ ...state, features }} />
+    </ToastProvider>
+  );
+  const view = render(ui(state.features));
+  const audio = () => screen.getByRole("switch", { name: "Detecção de áudio" });
+  fireEvent.click(audio());
+  await waitFor(() => expect(audio().getAttribute("aria-checked")).toBe("true"));
+  view.rerender(ui({ ...state.features, audio: false }));
+  expect(audio().getAttribute("aria-checked")).toBe("false");
 });
 
 test("history tab: no recordings", async () => {

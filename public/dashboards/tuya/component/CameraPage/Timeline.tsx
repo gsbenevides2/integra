@@ -139,9 +139,11 @@ export function Timeline({
         aria-valuenow={clamp(current ?? end)}
         aria-valuetext={current === null ? undefined : clock(current)}
         onKeyDown={(e) => {
-          const step = { ArrowUp: MOTION_SCALE, ArrowDown: -MOTION_SCALE }[
-            e.key
-          ];
+          const steps: Record<string, number> = {
+            ArrowUp: MOTION_SCALE,
+            ArrowDown: -MOTION_SCALE,
+          };
+          const step = steps[e.key];
           if (!step) return;
           e.preventDefault();
           onSeek(Math.min(end, Math.max(start, (current ?? end) + step)));

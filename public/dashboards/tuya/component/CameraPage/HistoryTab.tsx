@@ -84,6 +84,9 @@ export function HistoryTab({ name }: { name: string }) {
     // and any late answer for it.
     let live = true;
     setDays(null);
+    setDay("");
+    setClip(null);
+    setTime(null);
     getJson<DaySummary>(`${base}/recordings/summary?timezone=${timezone}`).then(
       (summary) => {
         if (!live) return;

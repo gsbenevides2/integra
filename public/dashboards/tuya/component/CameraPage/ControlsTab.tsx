@@ -26,6 +26,13 @@ export function ControlsTab({
   // raced a click landing between the first render with switches and the
   // effect, which then reset the toggle.
   const [changed, setChanged] = useState<Record<string, boolean>>({});
+  // A new state from the server replaces the local toggles, adjusted during
+  // render (not in an effect) so a click can't land in between.
+  const [shownState, setShownState] = useState(state);
+  if (state !== shownState) {
+    setShownState(state);
+    setChanged({});
+  }
   const features = { ...state?.features, ...changed };
 
   if (!state) return <p className="text-sm text-mist-400">Carregando...</p>;
@@ -37,7 +44,12 @@ export function ControlsTab({
       .features({ feature: feature as "detect" })
       .put({ value });
     if (error) {
-      setChanged((current) => ({ ...current, [feature]: !value }));
+      // Back to what the server reports, not to a value read before the PUT.
+      setChanged((current) => {
+        const rest = { ...current };
+        delete rest[feature];
+        return rest;
+      });
       showToast("Falha ao alterar", "error");
     }
   };
