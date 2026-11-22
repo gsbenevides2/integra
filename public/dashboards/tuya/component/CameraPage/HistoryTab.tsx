@@ -1,12 +1,14 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  PlayCircleIcon,
-} from "@heroicons/react/24/outline";
+import { PlayCircleIcon } from "@heroicons/react/24/outline";
 
 import { SpeedVideo } from "./SpeedVideo";
+import {
+  MOTION_SCALE,
+  type MotionBucket,
+  type ReviewSegment,
+  Timeline,
+} from "./Timeline";
 
 interface DaySummary {
   day: string;
@@ -20,12 +22,28 @@ interface FrigateEvent {
   start_time: number;
 }
 
-const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+/**
+ * Length of each clip played. Frigate streams clip.mp4 without Range support,
+ * so the browser can't seek inside it: every seek loads a new clip starting at
+ * the chosen instant, and short clips start fast and chain on `ended`.
+ */
+const CLIP_SECONDS = 600;
 
-/** The recording of one local hour, as unix seconds. */
-function hourRange(day: string, hour: string) {
-  const start = new Date(`${day}T${hour}:00:00`).getTime() / 1000;
-  return { start, end: start + 3600 };
+const unix = (date: Date) => Math.floor(date.getTime() / 1000);
+
+/** A local day as unix seconds; today ends now. */
+function dayRange(day: string) {
+  const start = new Date(`${day}T00:00:00`);
+  const next = new Date(start);
+  next.setDate(start.getDate() + 1);
+  return { start: unix(start), end: Math.min(unix(next), unix(new Date())) };
+}
+
+/** Start of the local hour holding `time`, the unit recordings are listed in. */
+function hourOf(time: number) {
+  const date = new Date(time * 1000);
+  date.setMinutes(0, 0, 0);
+  return unix(date);
 }
 
 function dayLabel(day: string) {
@@ -41,86 +59,159 @@ function dayLabel(day: string) {
   });
 }
 
-const clock = (seconds: number) =>
-  new Date(seconds * 1000).toLocaleTimeString("pt-BR");
+const getJson = <T,>(url: string) =>
+  fetch(url).then((res) => (res.ok ? (res.json() as Promise<T[]>) : []));
 
 export function HistoryTab({ name }: { name: string }) {
+  const base = `/api/frigate/cameras/${name}`;
   const [days, setDays] = useState<DaySummary[] | null>(null);
   const [day, setDay] = useState("");
-  const [hour, setHour] = useState<string | null>(null);
+  const [motion, setMotion] = useState<MotionBucket[]>([]);
+  const [reviews, setReviews] = useState<ReviewSegment[]>([]);
+  /** Start of the clip loaded, in unix seconds. */
+  const [clip, setClip] = useState<number | null>(null);
+  /** The instant on the playhead. */
+  const [time, setTime] = useState<number | null>(null);
   const [events, setEvents] = useState<FrigateEvent[]>([]);
-  // The hour's clip is a fragmented mp4 piped out of ffmpeg by Frigate, so the
-  // browser can't seek in it (the part of the stream that was not downloaded
-  // yet does not exist as a seek target). Playing an event means asking Frigate
-  // for a clip that starts at it instead.
-  const [event, setEvent] = useState<FrigateEvent | null>(null);
 
   useEffect(() => {
     // Frigate buckets days and hours in UTC unless told the viewer's timezone.
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    fetch(`/api/frigate/cameras/${name}/recordings/summary?timezone=${timezone}`)
-      .then((res) => (res.ok ? (res.json() as Promise<DaySummary[]>) : []))
-      .then((summary) => {
+    getJson<DaySummary>(`${base}/recordings/summary?timezone=${timezone}`).then(
+      (summary) => {
         setDays(summary);
         setDay(summary[0]?.day ?? "");
-      });
-  }, [name]);
+      },
+    );
+  }, [base]);
 
-  const range = hour ? hourRange(day, hour) : null;
-  const start = range?.start;
+  // Frozen when the day is picked: today's end would otherwise move every render.
+  const range = useMemo(() => (day ? dayRange(day) : null), [day]);
+  useEffect(() => {
+    setMotion([]);
+    setReviews([]);
+    if (!range) return;
+    // A slow answer for the previous day must not land on the new one.
+    let live = true;
+    const span = `after=${range.start}&before=${range.end}`;
+    getJson<MotionBucket>(`${base}/motion?${span}&scale=${MOTION_SCALE}`).then(
+      (list) => live && setMotion(list),
+    );
+    getJson<ReviewSegment>(`${base}/review?${span}`).then(
+      (list) => live && setReviews(list),
+    );
+    return () => {
+      live = false;
+    };
+  }, [base, range]);
+
+  const clipHour = clip === null ? null : hourOf(clip);
   useEffect(() => {
     setEvents([]);
-    setEvent(null);
-    if (!range) return;
-    fetch(
-      `/api/frigate/cameras/${name}/events?limit=100&after=${range.start}&before=${range.end}`,
-    )
-      .then((res) => (res.ok ? (res.json() as Promise<FrigateEvent[]>) : []))
-      .then((list) => setEvents([...list].reverse()));
-    // The range is derived from day and hour; start is its stable key.
-  }, [name, start]);
+    if (clipHour === null) return;
+    let live = true;
+    getJson<FrigateEvent>(
+      `${base}/events?limit=100&after=${clipHour}&before=${clipHour + 3600}`,
+    ).then((list) => live && setEvents([...list].reverse()));
+    return () => {
+      live = false;
+    };
+  }, [base, clipHour]);
 
   if (!days) return <p className="text-sm text-mist-400">Carregando...</p>;
-  if (days.length === 0) {
+  if (days.length === 0 || !range) {
     return <p className="text-sm text-mist-400">Sem gravações.</p>;
   }
 
-  const current = days.find((item) => item.day === day);
-  const byHour = new Map(current?.hours.map((item) => [item.hour, item]));
-  const maxMotion = Math.max(1, ...(current?.hours.map((h) => h.motion) ?? []));
-  const available = HOURS.filter((item) => byHour.has(item));
-  const position = hour ? available.indexOf(hour) : -1;
-  // The event is dropped by the effect above, so the render right after a day or
-  // hour change still carries the previous one: only an event inside the hour
-  // being shown may drive the clip, or the player would ask Frigate for a window
-  // starting before it (or after its end).
-  const playing =
-    event &&
-    range &&
-    event.start_time >= range.start &&
-    event.start_time < range.end
-      ? event
-      : null;
-  // Frigate's clip endpoint takes whole seconds.
-  const clipStart = Math.floor(playing?.start_time ?? start ?? 0);
+  const recordedHours = (days.find((item) => item.day === day)?.hours ?? [])
+    .map((item) => unix(new Date(`${day}T${item.hour}:00:00`)))
+    .sort((a, b) => a - b);
+  const recorded = new Set(recordedHours);
+
+  const seek = (target: number) => {
+    setTime(target);
+    setClip(recorded.has(hourOf(target)) ? Math.floor(target) : null);
+  };
+
+  /** The clip after `from`, skipping hours without recordings. */
+  const nextClip = (from: number) => {
+    const next = from + CLIP_SECONDS;
+    if (recorded.has(hourOf(next))) return next;
+    return recordedHours.find((hour) => hour > from);
+  };
+
+  const pickDay = (next: string) => {
+    setDay(next);
+    setClip(null);
+    setTime(null);
+  };
 
   return (
-    <div className="
-      grid grid-cols-1 gap-4
-      lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start
-    ">
-      <div className="flex flex-col gap-3">
-        <div className="
-          relative aspect-video overflow-hidden rounded-lg bg-gray-800
-        ">
-          {range ? (
+    <div
+      className="
+        grid grid-cols-1 gap-4
+        lg:h-[calc(100dvh-7.75rem)] lg:grid-cols-[minmax(0,1fr)_8rem]
+      "
+    >
+      <div className="flex min-h-0 min-w-0 flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div
+            role="listbox"
+            aria-label="Dia"
+            className="flex min-w-0 stagger-in gap-2 overflow-x-auto pb-1"
+          >
+            {days.map((item) => (
+              <button
+                key={item.day}
+                type="button"
+                role="option"
+                aria-selected={item.day === day}
+                onClick={() => pickDay(item.day)}
+                className={`
+                  shrink-0 cursor-pointer rounded-full border px-3 py-1 text-sm
+                  capitalize
+                  ${
+                    item.day === day
+                      ? "border-blue-500 bg-blue-950 text-white"
+                      : `
+                        border-gray-700 text-mist-300
+                        hover:bg-gray-800
+                      `
+                  }
+                `}
+              >
+                {dayLabel(item.day)}
+              </button>
+            ))}
+          </div>
+          <p className="text-sm text-mist-300 tabular-nums">
+            {time === null
+              ? dayLabel(day)
+              : `${dayLabel(day)}, ${new Date(time * 1000).toLocaleTimeString("pt-BR")}`}
+          </p>
+        </div>
+
+        <div
+          className="
+            relative aspect-video w-full overflow-hidden rounded-lg bg-gray-800
+            lg:aspect-auto lg:min-h-0 lg:flex-1
+          "
+        >
+          {clip !== null ? (
             <SpeedVideo
-              key={`${day}${hour}${clipStart}`}
-              src={`/api/frigate/cameras/${name}/clip.mp4?start=${clipStart}&end=${range.end}`}
+              key={clip}
+              src={`${base}/clip.mp4?start=${clip}&end=${clip + CLIP_SECONDS}`}
               controls
               autoPlay
               playsInline
-              className="size-full animate-fade-up"
+              onTimeUpdate={(e) => setTime(clip + e.currentTarget.currentTime)}
+              onEnded={() => {
+                const next = nextClip(clip);
+                if (next === undefined || next >= range.end) return;
+                setTime(next);
+                setClip(next);
+              }}
+              className="size-full animate-fade-up object-contain"
             />
           ) : (
             <div
@@ -130,191 +221,52 @@ export function HistoryTab({ name }: { name: string }) {
               "
             >
               <PlayCircleIcon className="size-12" />
-              <p className="text-sm">Escolha uma hora na linha do tempo</p>
+              <p className="text-sm">
+                {time === null
+                  ? "Escolha um momento na linha do tempo"
+                  : "Sem gravação neste horário"}
+              </p>
             </div>
           )}
-          {playing && (
-            <button
-              type="button"
-              onClick={() => setEvent(null)}
-              className="
-                absolute top-2 left-2 cursor-pointer rounded-full bg-mist-950/70
-                px-3 py-1 text-xs
-              "
-            >
-              Ver a hora inteira
-            </button>
-          )}
-        </div>
-        <div className="flex items-center justify-between gap-2">
-          <button
-            type="button"
-            aria-label="Hora anterior"
-            disabled={position <= 0}
-            onClick={() => setHour(available[position - 1] ?? null)}
-            className="
-              cursor-pointer rounded-full p-2
-              hover:bg-gray-800
-              disabled:cursor-not-allowed disabled:opacity-30
-            "
-          >
-            <ChevronLeftIcon className="size-5" />
-          </button>
-          <p className="text-sm text-mist-300">
-            {playing
-              ? `${dayLabel(day)}, desde ${clock(clipStart)}`
-              : hour
-                ? `${dayLabel(day)}, ${hour}:00 – ${hour}:59`
-                : dayLabel(day)}
-          </p>
-          <button
-            type="button"
-            aria-label="Próxima hora"
-            disabled={position < 0 || position >= available.length - 1}
-            onClick={() => setHour(available[position + 1] ?? null)}
-            className="
-              cursor-pointer rounded-full p-2
-              hover:bg-gray-800
-              disabled:cursor-not-allowed disabled:opacity-30
-            "
-          >
-            <ChevronRightIcon className="size-5" />
-          </button>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-4">
-        <div
-          role="listbox"
-          aria-label="Dia"
-          className="flex stagger-in gap-2 overflow-x-auto pb-1"
-        >
-          {days.map((item) => (
-            <button
-              key={item.day}
-              type="button"
-              role="option"
-              aria-selected={item.day === day}
-              onClick={() => {
-                setDay(item.day);
-                setHour(null);
-              }}
-              className={`
-                shrink-0 cursor-pointer rounded-full border px-3 py-1 text-sm
-                capitalize
-                ${
-                  item.day === day
-                    ? "border-blue-500 bg-blue-950 text-white"
-                    : `
-                      border-gray-700 text-mist-300
-                      hover:bg-gray-800
-                    `
-                }
-              `}
-            >
-              {dayLabel(item.day)}
-            </button>
-          ))}
         </div>
 
-        <section className="flex flex-col gap-2 rounded-lg bg-gray-800 p-3">
-          <h2 className="text-xs text-mist-400">Linha do tempo (movimento)</h2>
-          <div
-            key={day}
-            className="grid h-28 stagger-in grid-cols-24 gap-0.5"
-          >
-            {HOURS.map((item) => {
-              const data = byHour.get(item);
-              return (
-                <button
-                  key={item}
-                  type="button"
-                  aria-label={`${item}h`}
-                  title={
-                    data
-                      ? `${item}h · ${data.events} evento(s)`
-                      : `${item}h · sem gravação`
-                  }
-                  disabled={!data}
-                  onClick={() => setHour(item)}
-                  className={`
-                    group relative flex cursor-pointer items-end rounded-sm
-                    disabled:cursor-not-allowed
-                    ${hour === item ? "bg-gray-600" : "hover:bg-gray-700"}
-                  `}
-                >
-                  <span
-                    aria-hidden
-                    className={`
-                      w-full rounded-sm
-                      ${
-                        hour === item
-                          ? "bg-blue-400"
-                          : data
-                            ? "bg-blue-700"
-                            : "bg-gray-700"
-                      }
-                    `}
-                    style={{
-                      height: data
-                        ? `${Math.max(8, (data.motion / maxMotion) * 100)}%`
-                        : "4%",
-                    }}
-                  />
-                  {data && data.events > 0 && (
-                    <span
-                      aria-hidden
-                      className="
-                        absolute top-0.5 left-1/2 size-1.5 -translate-x-1/2
-                        rounded-full bg-amber-400
-                      "
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-          <div
-            aria-hidden
-            className="
-              grid grid-cols-24 gap-0.5 text-center text-[10px] text-mist-500
-            "
-          >
-            {HOURS.map((item) => (
-              <span key={item}>{Number(item) % 6 === 0 ? item : ""}</span>
-            ))}
-          </div>
-        </section>
-
-        {hour && events.length > 0 && (
-          <section className="flex flex-col gap-2">
+        {events.length > 0 && (
+          <section className="flex shrink-0 flex-col gap-2">
             <h2 className="text-xs text-mist-400">Eventos nesta hora</h2>
             <div className="
-              flex max-h-80 stagger-in flex-col gap-2 overflow-y-auto pr-1
+              flex stagger-in scrollbar-thin
+              [scrollbar-color:var(--color-gray-700)_transparent] gap-2
+              overflow-x-auto pb-1
             ">
-              {events.map((item) => (
+              {events.map((event) => (
                 <button
-                  key={item.id}
+                  key={event.id}
                   type="button"
-                  aria-current={item.id === playing?.id}
-                  onClick={() => setEvent(item)}
-                  className={`
-                    flex cursor-pointer items-center gap-3 rounded-lg
-                    bg-gray-800 p-2 text-left text-sm
-                    ${item.id === playing?.id ? "ring-2 ring-blue-500" : ""}
-                  `}
+                  onClick={() => seek(event.start_time)}
+                  // Clips start at whole seconds, so this is the event playing.
+                  aria-current={
+                    Math.floor(event.start_time) === clip ? true : undefined
+                  }
+                  className="
+                    flex shrink-0 cursor-pointer flex-col gap-1 rounded-lg
+                    bg-gray-800 p-1.5 text-left text-xs
+                    hover:bg-gray-700
+                    aria-current:bg-blue-950 aria-current:ring-1
+                    aria-current:ring-blue-500
+                  "
                 >
                   <img
-                    src={`/api/frigate/cameras/${name}/events/${item.id}/thumbnail.jpg`}
-                    alt={item.label}
+                    src={`${base}/events/${event.id}/thumbnail.jpg`}
+                    alt={event.label}
                     loading="lazy"
-                    className="aspect-video w-20 rounded-sm object-cover"
+                    className="aspect-video w-28 rounded-sm object-cover"
                   />
                   <span>
-                    {item.label}
-                    <br />
-                    <span className="text-xs text-mist-400">
-                      {clock(item.start_time)}
+                    {event.label}{" "}
+                    <span className="text-mist-400">
+                      {new Date(event.start_time * 1000).toLocaleTimeString(
+                        "pt-BR",
+                      )}
                     </span>
                   </span>
                 </button>
@@ -322,6 +274,24 @@ export function HistoryTab({ name }: { name: string }) {
             </div>
           </section>
         )}
+      </div>
+
+      <div
+        className="
+          h-72 min-h-0
+          lg:h-full
+        "
+      >
+        <Timeline
+          key={day}
+          start={range.start}
+          end={range.end}
+          motion={motion}
+          reviews={reviews}
+          recorded={recorded}
+          current={time}
+          onSeek={seek}
+        />
       </div>
     </div>
   );

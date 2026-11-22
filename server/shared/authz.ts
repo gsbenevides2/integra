@@ -445,6 +445,8 @@ const RESOURCE_RULES: Record<string, (ctx: GuardContext) => Requirement[]> = {
       "GET /api/frigate/cameras/:name/events",
       "GET /api/frigate/cameras/:name/events/:id/:asset",
       "GET /api/frigate/cameras/:name/recordings/summary",
+      "GET /api/frigate/cameras/:name/motion",
+      "GET /api/frigate/cameras/:name/review",
       "GET /api/frigate/cameras/:name/clip.mp4",
       "GET /api/frigate/cameras/:name/latest.jpg",
     ].map((key) => [

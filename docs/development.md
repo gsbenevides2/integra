@@ -63,8 +63,7 @@ Lives in `server/modules/<domain>/service/*.ts`, one file per concern, as `stati
 
 ## 7. Verification
 
-There is no automated test suite in this repo. Treat these as the equivalent:
-
+- `bun run test`: the Bun test suite under `test/` (mirrors the source tree), with 100% line/function coverage enforced by `test/check-coverage.ts`. New or changed code needs tests.
 - `bun run lint` (or `lint:fix`) on every changed file.
 - `bunx tsc --noEmit` for a full typecheck.
 - Actually run the change:
