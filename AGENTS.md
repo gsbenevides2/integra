@@ -17,7 +17,7 @@ bun run test        # 100% line/function coverage enforced; tests mirror source 
 
 ## Pull requests
 
-- Branch `openhands/issue-N`, one PR per issue, body in pt-BR: what changed, how it was validated (paste test output), `Closes #N`.
+- One PR per change, on a descriptive branch (`feat/<topic>`, `fix/<topic>`; `openhands/issue-N` when the OpenHands bot works an issue). An issue is not required. Body in pt-BR: what changed, how it was validated (paste test output), and `Closes #N` when there is an issue.
 - The PR runs PR-Agent review + tests + Docker build in CI. Fix failures and address review comments by pushing to the same branch; do not open a new PR.
 
 ## graphify

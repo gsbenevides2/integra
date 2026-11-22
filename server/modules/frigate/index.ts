@@ -250,6 +250,57 @@ export const frigateRoutes = new Elysia({
     },
   )
   .get(
+    "/cameras/:name/motion",
+    ({ params, query, request }) =>
+      proxyFrigate(
+        `/api/review/activity/motion?${new URLSearchParams({
+          cameras: params.name,
+          after: String(query.after),
+          before: String(query.before),
+          scale: String(query.scale),
+        })}`,
+        request,
+      ),
+    {
+      detail: {
+        summary: "Camera Motion Activity",
+        description:
+          "Motion of the camera's recordings in `scale`-second buckets, 0-100 relative to each hour's peak. Buckets without recordings are omitted.",
+      },
+      params: z.object({ name: cameraName }),
+      query: z.object({
+        after: z.coerce.number(),
+        before: z.coerce.number(),
+        scale: z.coerce.number().int().min(1).max(3600).default(30),
+      }),
+    },
+  )
+  .get(
+    "/cameras/:name/review",
+    ({ params, query, request }) =>
+      proxyFrigate(
+        `/api/review?${new URLSearchParams({
+          cameras: params.name,
+          after: String(query.after),
+          before: String(query.before),
+          limit: "500",
+        })}`,
+        request,
+      ),
+    {
+      detail: {
+        summary: "Camera Review Segments",
+        description:
+          "Alert and detection segments of the camera overlapping the range, newest first.",
+      },
+      params: z.object({ name: cameraName }),
+      query: z.object({
+        after: z.coerce.number(),
+        before: z.coerce.number(),
+      }),
+    },
+  )
+  .get(
     "/cameras/:name/clip.mp4",
     ({ params, query, request }) =>
       proxyFrigate(

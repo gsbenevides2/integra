@@ -251,6 +251,12 @@ test("recordings, clip and latest frame proxy with Range and 404/502 mapping", a
   expect(upstream(1)).toBe("http://frigate.local/api/cam/recordings/summary?timezone=America%2FSao_Paulo");
   await get("/api/frigate/cameras/cam/latest.jpg");
   expect(upstream(2)).toBe("http://frigate.local/api/cam/latest.jpg");
+  await get("/api/frigate/cameras/cam/motion?after=100&before=200");
+  expect(upstream(3)).toBe("http://frigate.local/api/review/activity/motion?cameras=cam&after=100&before=200&scale=30");
+  await get("/api/frigate/cameras/cam/review?after=100&before=200");
+  expect(upstream(4)).toBe("http://frigate.local/api/review?cameras=cam&after=100&before=200&limit=500");
+  expect((await get("/api/frigate/cameras/cam/motion?after=1&before=2&scale=0")).status).toBe(422);
+  expect((await get("/api/frigate/cameras/cam/review?after=x&before=2")).status).toBe(422);
 
   fetchSpy.mockResolvedValue(new Response("x", { status: 500 }));
   expect((await get("/api/frigate/cameras/cam/latest.jpg")).status).toBe(502);

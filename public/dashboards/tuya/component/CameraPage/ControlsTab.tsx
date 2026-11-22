@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 
 import { Switch } from "@public/components/Switch";
 import { useToast } from "@public/components/Toast";
@@ -14,6 +14,16 @@ const LABELS: Record<string, string> = {
   ptz_autotracker: "Rastreamento automático (PTZ)",
 };
 
+function sameFeatures(
+  a: Record<string, boolean> = {},
+  b: Record<string, boolean> = {},
+) {
+  const keys = Object.keys(a);
+  return (
+    keys.length === Object.keys(b).length && keys.every((key) => a[key] === b[key])
+  );
+}
+
 export function ControlsTab({
   name,
   state,
@@ -22,19 +32,35 @@ export function ControlsTab({
   state: CameraState | null;
 }) {
   const { showToast } = useToast();
-  const [features, setFeatures] = useState<Record<string, boolean>>({});
-  useEffect(() => setFeatures(state?.features ?? {}), [state]);
+  // Local toggles on top of the camera's state. Copying the state in an effect
+  // raced a click landing between the first render with switches and the
+  // effect, which then reset the toggle.
+  const [changed, setChanged] = useState<Record<string, boolean>>({});
+  // New feature values from the server replace the local toggles, adjusted
+  // during render (not in an effect) so a click can't land in between. Compared
+  // by value: the same values in a new object must not undo a click in flight.
+  const [shownState, setShownState] = useState(state);
+  if (state !== shownState) {
+    setShownState(state);
+    if (!sameFeatures(state?.features, shownState?.features)) setChanged({});
+  }
+  const features = { ...state?.features, ...changed };
 
   if (!state) return <p className="text-sm text-mist-400">Carregando...</p>;
 
   const toggle = async (feature: string, value: boolean) => {
-    setFeatures((current) => ({ ...current, [feature]: value }));
+    setChanged((current) => ({ ...current, [feature]: value }));
     const { error } = await getFrigateEdenClient()
       .api.frigate.cameras({ name })
       .features({ feature: feature as "detect" })
       .put({ value });
     if (error) {
-      setFeatures((current) => ({ ...current, [feature]: !value }));
+      // Back to what the server reports, not to a value read before the PUT.
+      setChanged((current) => {
+        const rest = { ...current };
+        delete rest[feature];
+        return rest;
+      });
       showToast("Falha ao alterar", "error");
     }
   };

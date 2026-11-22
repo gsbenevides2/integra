@@ -1,8 +1,11 @@
 import React from "react";
 
+import { ToastProvider } from "@public/components/Toast";
 import { CameraPage } from "@public/dashboards/tuya/component/CameraPage";
+import { ControlsTab } from "@public/dashboards/tuya/component/CameraPage/ControlsTab";
+import { HistoryTab } from "@public/dashboards/tuya/component/CameraPage/HistoryTab";
 
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, expect, mock, test } from "bun:test";
 
 import { fail, mockTuyaFetch } from "../../../../../helpers/tuya-fetch";
@@ -36,11 +39,6 @@ function open(routes: Parameters<typeof mockTuyaFetch>[0] = {}) {
   return onBack;
 }
 const tab = (name: string) => fireEvent.click(screen.getByRole("tab", { name }));
-/** The unix second the recording of a local hour starts at (10:00 by default). */
-const hourStart = (hour = "10") =>
-  new Date(
-    `${new Date().toLocaleDateString("sv")}T${hour}:00:00`,
-  ).getTime() / 1000;
 
 test("live tab: back, mute toggle, hold-to-move ptz and presets", async () => {
   const onBack = open({ [`POST ${BASE}/ptz`]: () => ({ ok: true }) });
@@ -179,138 +177,185 @@ test("events tab empty when the request fails", async () => {
   await screen.findByText("Nenhum evento.");
 });
 
-test("history tab: picks a day and an hour and navigates hours", async () => {
+const clock = (time: number) => new Date(time * 1000).toLocaleTimeString("pt-BR");
+const unix = (iso: string) => new Date(iso).getTime() / 1000;
+/** Taps the timeline at `time` (8 s/px, newest at the top of the day). */
+function tapTimeline(time: number, dayEnd: number) {
+  const track = screen.getByTestId("timeline-track");
+  track.getBoundingClientRect = () => ({ top: 0 }) as DOMRect;
+  const clientY = (dayEnd - time) / 8;
+  fireEvent.pointerDown(track, { clientY });
+  fireEvent.pointerUp(track, { clientY });
+}
+
+test("history tab: seeks on the timeline, plays hour after hour and seeks to events", async () => {
   const today = new Date().toLocaleDateString("sv");
-  const hours = (n: number) => [{ hour: "10", events: n, motion: 5, duration: 3600 }, { hour: "09", events: 0, motion: 0, duration: 3600 }];
+  const nine = unix("2020-01-05T09:00:00");
+  const dayEnd = unix("2020-01-06T00:00:00");
+  const hours = ["10", "09", "07"].map((hour) => ({ hour, events: 0, motion: 0, duration: 3600 }));
   open({
     [`GET ${BASE}/recordings/summary`]: () => [
-      { day: today, events: 2, hours: hours(2) },
-      { day: "2020-01-05", events: 0, hours: hours(0) },
+      { day: "2020-01-05", events: 1, hours },
+      { day: today, events: 0, hours: [] },
     ],
-    [`GET ${BASE}/events`]: () => [event("b", "dog"), event("a", "person")].map((e, i) => ({ ...e, start_time: hourStart() + 100 - i * 10 })),
+    [`GET ${BASE}/motion`]: () => [{ start_time: nine + 60, motion: 50 }],
+    [`GET ${BASE}/review`]: () => [{ id: "r", start_time: nine + 90, end_time: nine + 120, severity: "alert" }],
+    // Frigate's start times are fractional; clips take whole seconds.
+    [`GET ${BASE}/events`]: () => [event("b", "dog"), event("a", "person")].map((e, i) => ({ ...e, start_time: nine + 200.7 - i * 100 })),
   });
   tab("Histórico");
-  expect(await screen.findByText("Escolha uma hora na linha do tempo")).toBeTruthy();
+  expect(await screen.findByText("Escolha um momento na linha do tempo")).toBeTruthy();
   expect(screen.getByRole("option", { name: "Hoje" })).toBeTruthy();
-  expect((screen.getByLabelText("Hora anterior") as HTMLButtonElement).disabled).toBe(true);
-  expect((screen.getByLabelText("10h") as HTMLButtonElement).disabled).toBe(false);
-  expect((screen.getByLabelText("11h") as HTMLButtonElement).disabled).toBe(true);
+  await waitFor(() => expect(screen.getAllByTestId("motion-bar")).toHaveLength(1));
+  expect(screen.getByTestId("review-alert")).toBeTruthy();
+  const motion = m.calls.find((c) => c.path === `${BASE}/motion`)!.query;
+  expect([motion.get("after"), motion.get("before"), motion.get("scale")]).toEqual([String(unix("2020-01-05T00:00:00")), String(dayEnd), "30"]);
+  expect(m.calls.find((c) => c.path === `${BASE}/review`)!.query.get("before")).toBe(String(dayEnd));
 
-  fireEvent.click(screen.getByLabelText("10h"));
-  const start = new Date(`${today}T10:00:00`).getTime() / 1000;
-  expect(document.querySelector("video")!.getAttribute("src")).toBe(`${BASE}/clip.mp4?start=${start}&end=${start + 3600}`);
-  expect(screen.getByText(`Hoje, 10:00 – 10:59`)).toBeTruthy();
+  // Tapping 09:10 loads a clip starting right there.
+  const src = () => document.querySelector("video")!.getAttribute("src");
+  tapTimeline(nine + 600, dayEnd);
+  expect(src()).toBe(`${BASE}/clip.mp4?start=${nine + 600}&end=${nine + 1200}`);
+  const player = document.querySelector("video")!;
+  player.currentTime = 100;
+  fireEvent.timeUpdate(player);
+  expect(screen.getByText(`dom., 05/01, ${clock(nine + 700)}`)).toBeTruthy();
+
   await screen.findByText("Eventos nesta hora");
-  const query = m.calls.find((c) => c.query.has("after"))!.query;
-  expect([query.get("after"), query.get("before")]).toEqual([String(start), String(start + 3600)]);
+  const events = m.calls.find((c) => c.path === `${BASE}/events` && c.query.has("after"))!.query;
+  expect([events.get("after"), events.get("before")]).toEqual([String(nine), String(nine + 3600)]);
 
-  fireEvent.click(screen.getByLabelText("Hora anterior"));
-  expect(document.querySelector("video")!.getAttribute("src")).toContain(`start=${start - 3600}`);
-  fireEvent.click(screen.getByLabelText("Próxima hora"));
-  expect((screen.getByLabelText("Próxima hora") as HTMLButtonElement).disabled).toBe(true);
-
-  fireEvent.click(screen.getByRole("option", { name: /05\/01/ }));
-  expect(document.querySelector("video")).toBeNull();
-});
-
-// The clip of an hour is a fragmented mp4 piped out of ffmpeg: the browser cannot
-// seek in it, so an event is played by asking Frigate for a clip that starts there.
-test("history tab: clicking an event reloads the player from the event", async () => {
-  const today = new Date().toLocaleDateString("sv");
-  const start = new Date(`${today}T10:00:00`).getTime() / 1000;
-  open({
-    [`GET ${BASE}/recordings/summary`]: () => [
-      {
-        day: today,
-        events: 1,
-        hours: [
-          { hour: "10", events: 1, motion: 5, duration: 3600 },
-          { hour: "09", events: 0, motion: 0, duration: 3600 },
-        ],
-      },
-    ],
-    [`GET ${BASE}/events`]: () => [
-      { ...event("a", "person"), start_time: start + 40.75 },
-    ],
-  });
-  tab("Histórico");
-  fireEvent.click(await screen.findByLabelText("10h"));
-  const thumbnail = await screen.findByAltText("person");
-  expect(document.querySelector("video")!.getAttribute("src")).toBe(`${BASE}/clip.mp4?start=${start}&end=${start + 3600}`);
-
-  // The fractional start_time Frigate sends is floored: the clip route takes ints.
-  fireEvent.click(thumbnail);
-  expect(document.querySelector("video")!.getAttribute("src")).toBe(`${BASE}/clip.mp4?start=${start + 40}&end=${start + 3600}`);
-  expect(screen.getByText(`Hoje, desde ${new Date((start + 40) * 1000).toLocaleTimeString("pt-BR")}`)).toBeTruthy();
-  const selected = thumbnail.closest("button")!;
-  expect(selected.getAttribute("aria-current")).toBe("true");
-  expect(selected.className).toContain("ring-blue-500");
-
-  // Switching hours drops the event: the next hour plays from its own start.
-  fireEvent.click(screen.getByLabelText("Hora anterior"));
-  expect(screen.queryByText("Ver a hora inteira")).toBeNull();
-  expect(document.querySelector("video")!.getAttribute("src")).toBe(`${BASE}/clip.mp4?start=${start - 3600}&end=${start}`);
-  await screen.findByText("Eventos nesta hora");
-});
-
-test("history tab: an event clip goes back to the whole hour", async () => {
-  const today = new Date().toLocaleDateString("sv");
-  const start = new Date(`${today}T10:00:00`).getTime() / 1000;
-  open({
-    [`GET ${BASE}/recordings/summary`]: () => [
-      { day: today, events: 1, hours: [{ hour: "10", events: 1, motion: 5, duration: 3600 }] },
-    ],
-    [`GET ${BASE}/events`]: () => [
-      { ...event("a", "person"), start_time: start + 40 },
-    ],
-  });
-  tab("Histórico");
-  fireEvent.click(await screen.findByLabelText("10h"));
-  fireEvent.click(await screen.findByAltText("person"));
+  // An event starts a clip at its start; its end chains the next 10 minutes.
+  fireEvent.click(screen.getByAltText("person"));
+  expect(src()).toContain(`start=${nine + 100}&`);
   expect(screen.getByAltText("person").closest("button")!.getAttribute("aria-current")).toBe("true");
+  expect(screen.getByAltText("dog").closest("button")!.hasAttribute("aria-current")).toBe(false);
+  fireEvent.ended(document.querySelector("video")!);
+  expect(src()).toContain(`start=${nine + 700}&`);
 
-  fireEvent.click(screen.getByText("Ver a hora inteira"));
-  expect(document.querySelector("video")!.getAttribute("src")).toBe(`${BASE}/clip.mp4?start=${start}&end=${start + 3600}`);
-  expect(screen.getByText("Hoje, 10:00 – 10:59")).toBeTruthy();
-  expect(screen.queryByText("Ver a hora inteira")).toBeNull();
-  expect(screen.getByAltText("person").closest("button")!.getAttribute("aria-current")).toBe("false");
+  // From 07:55 the next clip would fall in 08h, which has no recordings: it jumps to 09h.
+  tapTimeline(nine - 3600 - 300, dayEnd);
+  fireEvent.ended(document.querySelector("video")!);
+  expect(src()).toContain(`start=${nine}&`);
+
+  // After the last recorded hour there is nothing to chain.
+  tapTimeline(nine + 3600 + 3300, dayEnd);
+  const last = document.querySelector("video")!;
+  fireEvent.ended(last);
+  expect(document.querySelector("video")).toBe(last);
+
+  // An hour without recordings says so instead of playing.
+  tapTimeline(unix("2020-01-05T05:00:00"), dayEnd);
+  expect(screen.getByText("Sem gravação neste horário")).toBeTruthy();
+  expect(document.querySelector("video")).toBeNull();
+
+  fireEvent.click(screen.getByRole("option", { name: "Hoje" }));
+  expect(await screen.findByText("Escolha um momento na linha do tempo")).toBeTruthy();
 });
 
-// The event state survives one render after a day/hour change, so an event outside
-// the hour on screen must never pick the clip window.
-test("history tab: an event outside the selected hour does not move the player", async () => {
-  const today = new Date().toLocaleDateString("sv");
-  const start = hourStart();
-  open({
-    [`GET ${BASE}/recordings/summary`]: () => [
-      { day: today, events: 1, hours: [{ hour: "10", events: 1, motion: 5, duration: 3600 }] },
-    ],
-    [`GET ${BASE}/events`]: () => [
-      { ...event("a", "person"), start_time: start + 3600 },
-    ],
-  });
-  tab("Histórico");
-  fireEvent.click(await screen.findByLabelText("10h"));
-  const thumbnail = await screen.findByAltText("person");
-
-  fireEvent.click(thumbnail);
-  expect(document.querySelector("video")!.getAttribute("src")).toBe(`${BASE}/clip.mp4?start=${start}&end=${start + 3600}`);
-  expect(screen.getByText("Hoje, 10:00 – 10:59")).toBeTruthy();
-  expect(screen.queryByText("Ver a hora inteira")).toBeNull();
-  expect(thumbnail.closest("button")!.getAttribute("aria-current")).toBe("false");
-});
-
-test("history tab labels yesterday and survives failing events", async () => {
+test("history tab labels yesterday and survives failing requests", async () => {
   const yesterday = new Date(Date.now() - 86_400_000).toLocaleDateString("sv");
+  const ten = unix(`${yesterday}T10:00:00`);
   open({
     [`GET ${BASE}/recordings/summary`]: () => [{ day: yesterday, events: 0, hours: [{ hour: "10", events: 0, motion: 0, duration: 3600 }] }],
+    [`GET ${BASE}/motion`]: fail,
+    [`GET ${BASE}/review`]: fail,
     [`GET ${BASE}/events`]: fail,
   });
   tab("Histórico");
   expect(await screen.findByRole("option", { name: "Ontem" })).toBeTruthy();
-  fireEvent.click(screen.getByLabelText("10h"));
-  await waitFor(() => expect(m.calls.some((c) => c.path === `${BASE}/events`)).toBe(true));
+  tapTimeline(ten + 60, unix(`${new Date().toLocaleDateString("sv")}T00:00:00`));
+  expect(document.querySelector("video")!.getAttribute("src")).toContain(`start=${ten + 60}&`);
+  await waitFor(() => expect(m.calls.some((c) => c.path === `${BASE}/events` && c.query.has("after"))).toBe(true));
   expect(screen.queryByText("Eventos nesta hora")).toBeNull();
+  expect(screen.queryAllByTestId("motion-bar")).toHaveLength(0);
+});
+
+test("history tab drops a late answer for the day it left", async () => {
+  const hours = [{ hour: "10", events: 0, motion: 0, duration: 3600 }];
+  let answer!: (value: unknown) => void;
+  open({
+    [`GET ${BASE}/recordings/summary`]: () => [
+      { day: "2020-01-05", events: 0, hours },
+      { day: "2020-01-04", events: 0, hours },
+    ],
+    [`GET ${BASE}/motion`]: (call) =>
+      call.query.get("after") === String(unix("2020-01-05T00:00:00")) ? new Promise((resolve) => (answer = resolve)) : [],
+    [`GET ${BASE}/review`]: () => [],
+    [`GET ${BASE}/events`]: (call) => (call.query.get("after") === String(unix("2020-01-05T10:00:00")) ? new Promise(() => {}) : []),
+  });
+  tab("Histórico");
+  await screen.findByText("Escolha um momento na linha do tempo");
+  // Loads 10h of the first day, whose events never answer, then leaves it.
+  tapTimeline(unix("2020-01-05T10:30:00"), unix("2020-01-06T00:00:00"));
+  fireEvent.click(screen.getByRole("option", { name: /04\/01/ }));
+  await waitFor(() => expect(m.calls.filter((c) => c.path === `${BASE}/motion`)).toHaveLength(2));
+  answer([{ start_time: unix("2020-01-05T10:00:00"), motion: 90 }]);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  expect(screen.queryAllByTestId("motion-bar")).toHaveLength(0);
+});
+
+test("history tab: a network failure reads as no recordings", async () => {
+  open({
+    [`GET ${BASE}/recordings/summary`]: () => {
+      throw new TypeError("offline");
+    },
+  });
+  tab("Histórico");
+  await screen.findByText("Sem gravações.");
+});
+
+test("history tab: a late summary of the previous camera is dropped", async () => {
+  let answer!: (value: unknown) => void;
+  m = mockTuyaFetch({
+    [`GET /api/frigate/cameras/old/recordings/summary`]: () => new Promise((resolve) => (answer = resolve)),
+    [`GET ${BASE}/recordings/summary`]: () => [],
+  });
+  const view = render(<HistoryTab name="old" />);
+  view.rerender(<HistoryTab name="cam" />);
+  await screen.findByText("Sem gravações.");
+  answer([{ day: "2020-01-05", events: 0, hours: [] }]);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  expect(screen.getByText("Sem gravações.")).toBeTruthy();
+});
+
+test("history tab: switching cameras stops the previous camera's playback", async () => {
+  const day = [{ day: "2020-01-05", events: 0, hours: [{ hour: "10", events: 0, motion: 0, duration: 3600 }] }];
+  m = mockTuyaFetch({
+    [`GET /api/frigate/cameras/old/recordings/summary`]: () => day,
+    [`GET ${BASE}/recordings/summary`]: () => day,
+  });
+  const view = render(<HistoryTab name="old" />);
+  await screen.findByText("Escolha um momento na linha do tempo");
+  tapTimeline(unix("2020-01-05T10:30:00"), unix("2020-01-06T00:00:00"));
+  expect(document.querySelector("video")!.getAttribute("src")).toContain("/cameras/old/");
+  view.rerender(<HistoryTab name="cam" />);
+  expect(await screen.findByText("Escolha um momento na linha do tempo")).toBeTruthy();
+  expect(document.querySelector("video")).toBeNull();
+});
+
+test("controls tab: a new state from the server replaces the local toggles", async () => {
+  m = mockTuyaFetch({ [`PUT ${BASE}/features/audio`]: () => ({ ok: true }) });
+  const ui = (features: Record<string, boolean>) => (
+    <ToastProvider>
+      <ControlsTab name="cam" state={{ ...state, features }} />
+    </ToastProvider>
+  );
+  const view = render(ui(state.features));
+  const audio = () => screen.getByRole("switch", { name: "Detecção de áudio" });
+  fireEvent.click(audio());
+  await waitFor(() => expect(audio().getAttribute("aria-checked")).toBe("true"));
+  // The same values in a new object keep the local toggle...
+  view.rerender(ui({ ...state.features }));
+  expect(audio().getAttribute("aria-checked")).toBe("true");
+  // ...but changed values from the server replace it.
+  view.rerender(ui({ ...state.features, audio: false, detect: false }));
+  expect(audio().getAttribute("aria-checked")).toBe("false");
+  // A different set of features also counts as new values.
+  fireEvent.click(audio());
+  await waitFor(() => expect(audio().getAttribute("aria-checked")).toBe("true"));
+  view.rerender(ui({ detect: true }));
+  expect(audio().getAttribute("aria-checked")).toBe("false");
 });
 
 test("history tab: no recordings", async () => {
