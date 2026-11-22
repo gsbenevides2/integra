@@ -55,6 +55,12 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
+      - name: Cache Bun packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Run tests (100% coverage enforced)
@@ -64,11 +70,14 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v6
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      # Só valida o build: sem push e sem exportar a imagem (exportar levava ~50s).
+      # As camadas vêm do cache do GHA (o da main serve de base para os PRs).
+      - name: Build Docker Image
+        uses: docker/build-push-action@v7
         with:
-          fetch-depth: 0
-      - name: Run Build Docker Image
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          chmod +x .github/workflows/release/pr-build.sh
-          .github/workflows/release/pr-build.sh
+          context: .
+          push: false
+          cache-from: type=gha,scope=integra
+          cache-to: type=gha,scope=integra,mode=max
