@@ -10,6 +10,10 @@ permissions:
 jobs:
   review:
     runs-on: ubuntu-latest
+    # Um push novo cancela o review anterior do mesmo PR, que já estaria desatualizado.
+    concurrency:
+      group: pr-agent-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: true
     permissions:
       issues: write
       pull-requests: write
@@ -23,14 +27,22 @@ jobs:
         uses: the-pr-agent/pr-agent@v0.39.0
         id: pr_agent
         env:
-          config.model: "openrouter/xiaomi/mimo-v2.5"
+          # mimo-v2.5 raciocinava ~13k-54k tokens por chamada (6-15 min cada); o v2.6-flash raciocina ~2k.
+          config.model: "openrouter/xiaomi/mimo-v2.6-flash"
+          # O modelo não está na tabela MAX_TOKENS do PR-Agent; max_model_tokens (32k) continua limitando a entrada.
+          config.custom_model_max_tokens: "1048576"
+          # O fallback padrão (gpt-6-luna) não tem chave e sempre falha; use um modelo do OpenRouter.
+          config.fallback_models: '["openrouter/anthropic/claude-haiku-5.5"]'
           OPENROUTER.KEY: ${{ secrets.OPENROUTER_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CONFIG__RESPONSE_LANGUAGE: "pt-BR"
           github_action_config.auto_review: "true"
           github_action_config.auto_describe: "true"
           github_action_config.auto_improve: "true"
-          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review", "review_requested", "synchronize"]'
+          github_action_config.pr_actions: '["opened", "reopened", "ready_for_review", "review_requested"]'
+          # Em pushes (synchronize) roda só describe + review; o /improve, mais lento, fica para a abertura do PR.
+          github_action_config.handle_push_trigger: "true"
+          github_action_config.push_commands: '["/describe", "/review"]'
   test:
     runs-on: ubuntu-latest
     permissions:
