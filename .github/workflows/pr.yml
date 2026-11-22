@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     # Um push novo cancela o review anterior do mesmo PR, que já estaria desatualizado.
     concurrency:
-      group: pr-agent-${{ github.event.pull_request.number }}
+      group: pr-agent-${{ github.event.pull_request.number || github.ref }}
       cancel-in-progress: true
     permissions:
       issues: write
