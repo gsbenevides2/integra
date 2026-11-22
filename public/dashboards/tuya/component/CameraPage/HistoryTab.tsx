@@ -247,11 +247,7 @@ export function HistoryTab({ name }: { name: string }) {
         {events.length > 0 && (
           <section className="flex shrink-0 flex-col gap-2">
             <h2 className="text-xs text-mist-400">Eventos nesta hora</h2>
-            <div className="
-              flex stagger-in scrollbar-thin
-              [scrollbar-color:var(--color-gray-700)_transparent] gap-2
-              overflow-x-auto pb-1
-            ">
+            <div className="flex stagger-in gap-2 overflow-x-auto pb-1">
               {events.map((event) => (
                 <button
                   key={event.id}
