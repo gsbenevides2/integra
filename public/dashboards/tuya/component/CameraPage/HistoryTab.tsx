@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import {
   ChevronLeftIcon,
@@ -41,12 +41,19 @@ function dayLabel(day: string) {
   });
 }
 
+const clock = (seconds: number) =>
+  new Date(seconds * 1000).toLocaleTimeString("pt-BR");
+
 export function HistoryTab({ name }: { name: string }) {
   const [days, setDays] = useState<DaySummary[] | null>(null);
   const [day, setDay] = useState("");
   const [hour, setHour] = useState<string | null>(null);
   const [events, setEvents] = useState<FrigateEvent[]>([]);
-  const video = useRef<HTMLVideoElement>(null);
+  // The hour's clip is a fragmented mp4 piped out of ffmpeg by Frigate, so the
+  // browser can't seek in it (the part of the stream that was not downloaded
+  // yet does not exist as a seek target). Playing an event means asking Frigate
+  // for a clip that starts at it instead.
+  const [event, setEvent] = useState<FrigateEvent | null>(null);
 
   useEffect(() => {
     // Frigate buckets days and hours in UTC unless told the viewer's timezone.
@@ -63,6 +70,7 @@ export function HistoryTab({ name }: { name: string }) {
   const start = range?.start;
   useEffect(() => {
     setEvents([]);
+    setEvent(null);
     if (!range) return;
     fetch(
       `/api/frigate/cameras/${name}/events?limit=100&after=${range.start}&before=${range.end}`,
@@ -82,6 +90,8 @@ export function HistoryTab({ name }: { name: string }) {
   const maxMotion = Math.max(1, ...(current?.hours.map((h) => h.motion) ?? []));
   const available = HOURS.filter((item) => byHour.has(item));
   const position = hour ? available.indexOf(hour) : -1;
+  // Frigate's clip endpoint takes whole seconds.
+  const clipStart = Math.floor(event?.start_time ?? start ?? 0);
 
   return (
     <div className="
@@ -94,9 +104,8 @@ export function HistoryTab({ name }: { name: string }) {
         ">
           {range ? (
             <SpeedVideo
-              videoRef={video}
-              key={`${day}${hour}`}
-              src={`/api/frigate/cameras/${name}/clip.mp4?start=${range.start}&end=${range.end}`}
+              key={`${day}${hour}${clipStart}`}
+              src={`/api/frigate/cameras/${name}/clip.mp4?start=${clipStart}&end=${range.end}`}
               controls
               autoPlay
               playsInline
@@ -112,6 +121,18 @@ export function HistoryTab({ name }: { name: string }) {
               <PlayCircleIcon className="size-12" />
               <p className="text-sm">Escolha uma hora na linha do tempo</p>
             </div>
+          )}
+          {event && (
+            <button
+              type="button"
+              onClick={() => setEvent(null)}
+              className="
+                absolute top-2 left-2 cursor-pointer rounded-full bg-mist-950/70
+                px-3 py-1 text-xs
+              "
+            >
+              Ver a hora inteira
+            </button>
           )}
         </div>
         <div className="flex items-center justify-between gap-2">
@@ -129,7 +150,11 @@ export function HistoryTab({ name }: { name: string }) {
             <ChevronLeftIcon className="size-5" />
           </button>
           <p className="text-sm text-mist-300">
-            {hour ? `${dayLabel(day)}, ${hour}:00 – ${hour}:59` : dayLabel(day)}
+            {event
+              ? `${dayLabel(day)}, desde ${clock(clipStart)}`
+              : hour
+                ? `${dayLabel(day)}, ${hour}:00 – ${hour}:59`
+                : dayLabel(day)}
           </p>
           <button
             type="button"
@@ -256,34 +281,29 @@ export function HistoryTab({ name }: { name: string }) {
             <div className="
               flex max-h-80 stagger-in flex-col gap-2 overflow-y-auto pr-1
             ">
-              {events.map((event) => (
+              {events.map((item) => (
                 <button
-                  key={event.id}
+                  key={item.id}
                   type="button"
-                  onClick={() => {
-                    if (video.current && range) {
-                      video.current.currentTime = event.start_time - range.start;
-                      void video.current.play?.();
-                    }
-                  }}
-                  className="
+                  aria-current={item.id === event?.id}
+                  onClick={() => setEvent(item)}
+                  className={`
                     flex cursor-pointer items-center gap-3 rounded-lg
                     bg-gray-800 p-2 text-left text-sm
-                  "
+                    ${item.id === event?.id ? "ring-2 ring-blue-500" : ""}
+                  `}
                 >
                   <img
-                    src={`/api/frigate/cameras/${name}/events/${event.id}/thumbnail.jpg`}
-                    alt={event.label}
+                    src={`/api/frigate/cameras/${name}/events/${item.id}/thumbnail.jpg`}
+                    alt={item.label}
                     loading="lazy"
                     className="aspect-video w-20 rounded-sm object-cover"
                   />
                   <span>
-                    {event.label}
+                    {item.label}
                     <br />
                     <span className="text-xs text-mist-400">
-                      {new Date(event.start_time * 1000).toLocaleTimeString(
-                        "pt-BR",
-                      )}
+                      {clock(item.start_time)}
                     </span>
                   </span>
                 </button>

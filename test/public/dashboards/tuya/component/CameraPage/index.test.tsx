@@ -174,7 +174,7 @@ test("events tab empty when the request fails", async () => {
   await screen.findByText("Nenhum evento.");
 });
 
-test("history tab: picks a day and an hour, navigates hours and seeks to events", async () => {
+test("history tab: picks a day and an hour and navigates hours", async () => {
   const today = new Date().toLocaleDateString("sv");
   const hours = (n: number) => [{ hour: "10", events: n, motion: 5, duration: 3600 }, { hour: "09", events: 0, motion: 0, duration: 3600 }];
   open({
@@ -194,14 +194,10 @@ test("history tab: picks a day and an hour, navigates hours and seeks to events"
   fireEvent.click(screen.getByLabelText("10h"));
   const start = new Date(`${today}T10:00:00`).getTime() / 1000;
   expect(document.querySelector("video")!.getAttribute("src")).toBe(`${BASE}/clip.mp4?start=${start}&end=${start + 3600}`);
+  expect(screen.getByText(`Hoje, 10:00 – 10:59`)).toBeTruthy();
   await screen.findByText("Eventos nesta hora");
   const query = m.calls.find((c) => c.query.has("after"))!.query;
   expect([query.get("after"), query.get("before")]).toEqual([String(start), String(start + 3600)]);
-
-  const player = document.querySelector("video")!;
-  player.play = (() => Promise.resolve()) as never;
-  fireEvent.click(screen.getByAltText("person"));
-  expect(player.currentTime).toBe(1700000100 - 10 - start);
 
   fireEvent.click(screen.getByLabelText("Hora anterior"));
   expect(document.querySelector("video")!.getAttribute("src")).toContain(`start=${start - 3600}`);
@@ -210,6 +206,65 @@ test("history tab: picks a day and an hour, navigates hours and seeks to events"
 
   fireEvent.click(screen.getByRole("option", { name: /05\/01/ }));
   expect(document.querySelector("video")).toBeNull();
+});
+
+// The clip of an hour is a fragmented mp4 piped out of ffmpeg: the browser cannot
+// seek in it, so an event is played by asking Frigate for a clip that starts there.
+test("history tab: clicking an event reloads the player from the event", async () => {
+  const today = new Date().toLocaleDateString("sv");
+  const start = new Date(`${today}T10:00:00`).getTime() / 1000;
+  open({
+    [`GET ${BASE}/recordings/summary`]: () => [
+      {
+        day: today,
+        events: 1,
+        hours: [
+          { hour: "10", events: 1, motion: 5, duration: 3600 },
+          { hour: "09", events: 0, motion: 0, duration: 3600 },
+        ],
+      },
+    ],
+    [`GET ${BASE}/events`]: () => [{ ...event("a", "person"), start_time: 1700000090.75 }],
+  });
+  tab("Histórico");
+  fireEvent.click(await screen.findByLabelText("10h"));
+  const thumbnail = await screen.findByAltText("person");
+  expect(document.querySelector("video")!.getAttribute("src")).toBe(`${BASE}/clip.mp4?start=${start}&end=${start + 3600}`);
+
+  // The fractional start_time Frigate sends is floored: the clip route takes ints.
+  fireEvent.click(thumbnail);
+  expect(document.querySelector("video")!.getAttribute("src")).toBe(`${BASE}/clip.mp4?start=1700000090&end=${start + 3600}`);
+  expect(screen.getByText(`Hoje, desde ${new Date(1700000090 * 1000).toLocaleTimeString("pt-BR")}`)).toBeTruthy();
+  const selected = thumbnail.closest("button")!;
+  expect(selected.getAttribute("aria-current")).toBe("true");
+  expect(selected.className).toContain("ring-blue-500");
+
+  // Switching hours drops the event: the next hour plays from its own start.
+  fireEvent.click(screen.getByLabelText("Hora anterior"));
+  expect(screen.queryByText("Ver a hora inteira")).toBeNull();
+  expect(document.querySelector("video")!.getAttribute("src")).toBe(`${BASE}/clip.mp4?start=${start - 3600}&end=${start}`);
+  await screen.findByText("Eventos nesta hora");
+});
+
+test("history tab: an event clip goes back to the whole hour", async () => {
+  const today = new Date().toLocaleDateString("sv");
+  const start = new Date(`${today}T10:00:00`).getTime() / 1000;
+  open({
+    [`GET ${BASE}/recordings/summary`]: () => [
+      { day: today, events: 1, hours: [{ hour: "10", events: 1, motion: 5, duration: 3600 }] },
+    ],
+    [`GET ${BASE}/events`]: () => [{ ...event("a", "person"), start_time: 1700000090 }],
+  });
+  tab("Histórico");
+  fireEvent.click(await screen.findByLabelText("10h"));
+  fireEvent.click(await screen.findByAltText("person"));
+  expect(screen.getByAltText("person").closest("button")!.getAttribute("aria-current")).toBe("true");
+
+  fireEvent.click(screen.getByText("Ver a hora inteira"));
+  expect(document.querySelector("video")!.getAttribute("src")).toBe(`${BASE}/clip.mp4?start=${start}&end=${start + 3600}`);
+  expect(screen.getByText("Hoje, 10:00 – 10:59")).toBeTruthy();
+  expect(screen.queryByText("Ver a hora inteira")).toBeNull();
+  expect(screen.getByAltText("person").closest("button")!.getAttribute("aria-current")).toBe("false");
 });
 
 test("history tab labels yesterday and survives failing events", async () => {
